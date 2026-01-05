@@ -64,7 +64,7 @@ where
     pub root: Root<V>,
 }
 
-impl<'a, BS, V> Amt<'a, BS, V>
+impl<BS, V> Amt<'_, BS, V>
 where
     BS: Blockstore,
     V: DeserializeOwned + Serialize + PartialEq + Clone,

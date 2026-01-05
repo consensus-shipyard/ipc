@@ -12,7 +12,6 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{address::Address, bigint::BigUint, econ::TokenAmount, MethodNum};
 use num_traits::Zero;
-use serde::{Deserialize, Serialize};
 
 use crate::constants::ADM_ACTOR_ADDR;
 pub use fil_actor_adm::Kind;

@@ -468,7 +468,7 @@ interface IBlobsFacade {
 )]
 pub mod IBlobsFacade {
     use super::*;
-    use ::alloy_sol_types as alloy_sol_types;
+    use ::alloy_sol_types;
     /// The creation / init bytecode of the contract.
     ///
     /// ```text
@@ -493,40 +493,33 @@ pub mod IBlobsFacade {
     #[derive(Clone)]
     pub struct BlobStatus(u8);
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::private::SolTypeValue<BlobStatus> for u8 {
             #[inline]
             fn stv_to_tokens(
                 &self,
-            ) -> <::alloy_sol_types::sol_data::Uint<
-                8,
-            > as alloy_sol_types::SolType>::Token<'_> {
+            ) -> <::alloy_sol_types::sol_data::Uint<8> as alloy_sol_types::SolType>::Token<'_>
+            {
                 alloy_sol_types::private::SolTypeValue::<
                     ::alloy_sol_types::sol_data::Uint<8>,
                 >::stv_to_tokens(self)
             }
             #[inline]
             fn stv_eip712_data_word(&self) -> alloy_sol_types::Word {
-                <::alloy_sol_types::sol_data::Uint<
-                    8,
-                > as alloy_sol_types::SolType>::tokenize(self)
-                    .0
+                <::alloy_sol_types::sol_data::Uint<8> as alloy_sol_types::SolType>::tokenize(self).0
             }
             #[inline]
-            fn stv_abi_encode_packed_to(
-                &self,
-                out: &mut alloy_sol_types::private::Vec<u8>,
-            ) {
+            fn stv_abi_encode_packed_to(&self, out: &mut alloy_sol_types::private::Vec<u8>) {
                 <::alloy_sol_types::sol_data::Uint<
                     8,
                 > as alloy_sol_types::SolType>::abi_encode_packed_to(self, out)
             }
             #[inline]
             fn stv_abi_packed_encoded_size(&self) -> usize {
-                <::alloy_sol_types::sol_data::Uint<
-                    8,
-                > as alloy_sol_types::SolType>::abi_encoded_size(self)
+                <::alloy_sol_types::sol_data::Uint<8> as alloy_sol_types::SolType>::abi_encoded_size(
+                    self,
+                )
             }
         }
         #[automatically_derived]
@@ -559,13 +552,11 @@ pub mod IBlobsFacade {
         #[automatically_derived]
         impl alloy_sol_types::SolType for BlobStatus {
             type RustType = u8;
-            type Token<'a> = <::alloy_sol_types::sol_data::Uint<
-                8,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> =
+                <::alloy_sol_types::sol_data::Uint<8> as alloy_sol_types::SolType>::Token<'a>;
             const SOL_NAME: &'static str = Self::NAME;
-            const ENCODED_SIZE: Option<usize> = <::alloy_sol_types::sol_data::Uint<
-                8,
-            > as alloy_sol_types::SolType>::ENCODED_SIZE;
+            const ENCODED_SIZE: Option<usize> =
+                <::alloy_sol_types::sol_data::Uint<8> as alloy_sol_types::SolType>::ENCODED_SIZE;
             const PACKED_ENCODED_SIZE: Option<usize> = <::alloy_sol_types::sol_data::Uint<
                 8,
             > as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE;
@@ -575,15 +566,15 @@ pub mod IBlobsFacade {
             }
             #[inline]
             fn type_check(token: &Self::Token<'_>) -> alloy_sol_types::Result<()> {
-                <::alloy_sol_types::sol_data::Uint<
-                    8,
-                > as alloy_sol_types::SolType>::type_check(token)
+                <::alloy_sol_types::sol_data::Uint<8> as alloy_sol_types::SolType>::type_check(
+                    token,
+                )
             }
             #[inline]
             fn detokenize(token: Self::Token<'_>) -> Self::RustType {
-                <::alloy_sol_types::sol_data::Uint<
-                    8,
-                > as alloy_sol_types::SolType>::detokenize(token)
+                <::alloy_sol_types::sol_data::Uint<8> as alloy_sol_types::SolType>::detokenize(
+                    token,
+                )
             }
         }
         #[automatically_derived]
@@ -604,18 +595,16 @@ pub mod IBlobsFacade {
                 > as alloy_sol_types::EventTopic>::encode_topic_preimage(rust, out)
             }
             #[inline]
-            fn encode_topic(
-                rust: &Self::RustType,
-            ) -> alloy_sol_types::abi::token::WordToken {
-                <::alloy_sol_types::sol_data::Uint<
-                    8,
-                > as alloy_sol_types::EventTopic>::encode_topic(rust)
+            fn encode_topic(rust: &Self::RustType) -> alloy_sol_types::abi::token::WordToken {
+                <::alloy_sol_types::sol_data::Uint<8> as alloy_sol_types::EventTopic>::encode_topic(
+                    rust,
+                )
             }
         }
     };
     /**```solidity
-struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; BlobStatus status; }
-```*/
+    struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; BlobStatus status; }
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct Blob {
@@ -624,9 +613,8 @@ struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; B
         #[allow(missing_docs)]
         pub metadataHash: ::alloy_sol_types::private::FixedBytes<32>,
         #[allow(missing_docs)]
-        pub subscriptions: ::alloy_sol_types::private::Vec<
-            <Subscription as ::alloy_sol_types::SolType>::RustType,
-        >,
+        pub subscriptions:
+            ::alloy_sol_types::private::Vec<<Subscription as ::alloy_sol_types::SolType>::RustType>,
         #[allow(missing_docs)]
         pub status: <BlobStatus as ::alloy_sol_types::SolType>::RustType,
     }
@@ -637,7 +625,7 @@ struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; B
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[doc(hidden)]
         type UnderlyingSolTuple<'a> = (
             ::alloy_sol_types::sol_data::Uint<64>,
@@ -649,16 +637,12 @@ struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; B
         type UnderlyingRustTuple<'a> = (
             u64,
             ::alloy_sol_types::private::FixedBytes<32>,
-            ::alloy_sol_types::private::Vec<
-                <Subscription as ::alloy_sol_types::SolType>::RustType,
-            >,
+            ::alloy_sol_types::private::Vec<<Subscription as ::alloy_sol_types::SolType>::RustType>,
             <BlobStatus as ::alloy_sol_types::SolType>::RustType,
         );
         #[cfg(test)]
         #[allow(dead_code, unreachable_patterns)]
-        fn _type_assertion(
-            _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-        ) {
+        fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
             match _t {
                 alloy_sol_types::private::AssertTypeEq::<
                     <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -669,7 +653,12 @@ struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; B
         #[doc(hidden)]
         impl ::core::convert::From<Blob> for UnderlyingRustTuple<'_> {
             fn from(value: Blob) -> Self {
-                (value.size, value.metadataHash, value.subscriptions, value.status)
+                (
+                    value.size,
+                    value.metadataHash,
+                    value.subscriptions,
+                    value.status,
+                )
             }
         }
         #[automatically_derived]
@@ -710,64 +699,50 @@ struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; B
                 if let Some(size) = <Self as alloy_sol_types::SolType>::ENCODED_SIZE {
                     return size;
                 }
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_encoded_size(&tuple)
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_encoded_size(&tuple)
             }
             #[inline]
             fn stv_eip712_data_word(&self) -> alloy_sol_types::Word {
                 <Self as alloy_sol_types::SolStruct>::eip712_hash_struct(self)
             }
             #[inline]
-            fn stv_abi_encode_packed_to(
-                &self,
-                out: &mut alloy_sol_types::private::Vec<u8>,
-            ) {
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_encode_packed_to(&tuple, out)
+            fn stv_abi_encode_packed_to(&self, out: &mut alloy_sol_types::private::Vec<u8>) {
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_encode_packed_to(
+                    &tuple, out,
+                )
             }
             #[inline]
             fn stv_abi_packed_encoded_size(&self) -> usize {
                 if let Some(size) = <Self as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE {
                     return size;
                 }
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_packed_encoded_size(&tuple)
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_packed_encoded_size(
+                    &tuple,
+                )
             }
         }
         #[automatically_derived]
         impl alloy_sol_types::SolType for Blob {
             type RustType = Self;
-            type Token<'a> = <UnderlyingSolTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <UnderlyingSolTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SOL_NAME: &'static str = <Self as alloy_sol_types::SolStruct>::NAME;
-            const ENCODED_SIZE: Option<usize> = <UnderlyingSolTuple<
-                '_,
-            > as alloy_sol_types::SolType>::ENCODED_SIZE;
-            const PACKED_ENCODED_SIZE: Option<usize> = <UnderlyingSolTuple<
-                '_,
-            > as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE;
+            const ENCODED_SIZE: Option<usize> =
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::ENCODED_SIZE;
+            const PACKED_ENCODED_SIZE: Option<usize> =
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE;
             #[inline]
             fn valid_token(token: &Self::Token<'_>) -> bool {
                 <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::valid_token(token)
             }
             #[inline]
             fn detokenize(token: Self::Token<'_>) -> Self::RustType {
-                let tuple = <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::detokenize(token);
+                let tuple = <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::detokenize(token);
                 <Self as ::core::convert::From<UnderlyingRustTuple<'_>>>::from(tuple)
             }
         }
@@ -781,18 +756,13 @@ struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; B
                 )
             }
             #[inline]
-            fn eip712_components() -> alloy_sol_types::private::Vec<
-                alloy_sol_types::private::Cow<'static, str>,
-            > {
+            fn eip712_components(
+            ) -> alloy_sol_types::private::Vec<alloy_sol_types::private::Cow<'static, str>>
+            {
                 let mut components = alloy_sol_types::private::Vec::with_capacity(1);
+                components.push(<Subscription as alloy_sol_types::SolStruct>::eip712_root_type());
                 components
-                    .push(
-                        <Subscription as alloy_sol_types::SolStruct>::eip712_root_type(),
-                    );
-                components
-                    .extend(
-                        <Subscription as alloy_sol_types::SolStruct>::eip712_components(),
-                    );
+                    .extend(<Subscription as alloy_sol_types::SolStruct>::eip712_components());
                 components
             }
             #[inline]
@@ -845,9 +815,7 @@ struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; B
                 rust: &Self::RustType,
                 out: &mut alloy_sol_types::private::Vec<u8>,
             ) {
-                out.reserve(
-                    <Self as alloy_sol_types::EventTopic>::topic_preimage_length(rust),
-                );
+                out.reserve(<Self as alloy_sol_types::EventTopic>::topic_preimage_length(rust));
                 <::alloy_sol_types::sol_data::Uint<
                     64,
                 > as alloy_sol_types::EventTopic>::encode_topic_preimage(
@@ -872,23 +840,16 @@ struct Blob { uint64 size; bytes32 metadataHash; Subscription[] subscriptions; B
                 );
             }
             #[inline]
-            fn encode_topic(
-                rust: &Self::RustType,
-            ) -> alloy_sol_types::abi::token::WordToken {
+            fn encode_topic(rust: &Self::RustType) -> alloy_sol_types::abi::token::WordToken {
                 let mut out = alloy_sol_types::private::Vec::new();
-                <Self as alloy_sol_types::EventTopic>::encode_topic_preimage(
-                    rust,
-                    &mut out,
-                );
-                alloy_sol_types::abi::token::WordToken(
-                    alloy_sol_types::private::keccak256(out),
-                )
+                <Self as alloy_sol_types::EventTopic>::encode_topic_preimage(rust, &mut out);
+                alloy_sol_types::abi::token::WordToken(alloy_sol_types::private::keccak256(out))
             }
         }
     };
     /**```solidity
-struct SubnetStats { uint256 balance; uint64 capacityFree; uint64 capacityUsed; uint256 creditSold; uint256 creditCommitted; uint256 creditDebited; uint256 tokenCreditRate; uint64 numAccounts; uint64 numBlobs; uint64 numAdded; uint64 bytesAdded; uint64 numResolving; uint64 bytesResolving; }
-```*/
+    struct SubnetStats { uint256 balance; uint64 capacityFree; uint64 capacityUsed; uint256 creditSold; uint256 creditCommitted; uint256 creditDebited; uint256 tokenCreditRate; uint64 numAccounts; uint64 numBlobs; uint64 numAdded; uint64 bytesAdded; uint64 numResolving; uint64 bytesResolving; }
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct SubnetStats {
@@ -926,7 +887,7 @@ struct SubnetStats { uint256 balance; uint64 capacityFree; uint64 capacityUsed; 
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[doc(hidden)]
         type UnderlyingSolTuple<'a> = (
             ::alloy_sol_types::sol_data::Uint<256>,
@@ -961,9 +922,7 @@ struct SubnetStats { uint256 balance; uint64 capacityFree; uint64 capacityUsed; 
         );
         #[cfg(test)]
         #[allow(dead_code, unreachable_patterns)]
-        fn _type_assertion(
-            _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-        ) {
+        fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
             match _t {
                 alloy_sol_types::private::AssertTypeEq::<
                     <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -1021,45 +980,45 @@ struct SubnetStats { uint256 balance; uint64 capacityFree; uint64 capacityUsed; 
             #[inline]
             fn stv_to_tokens(&self) -> <Self as alloy_sol_types::SolType>::Token<'_> {
                 (
-                    <::alloy_sol_types::sol_data::Uint<
-                        256,
-                    > as alloy_sol_types::SolType>::tokenize(&self.balance),
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.capacityFree),
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.capacityUsed),
-                    <::alloy_sol_types::sol_data::Uint<
-                        256,
-                    > as alloy_sol_types::SolType>::tokenize(&self.creditSold),
-                    <::alloy_sol_types::sol_data::Uint<
-                        256,
-                    > as alloy_sol_types::SolType>::tokenize(&self.creditCommitted),
-                    <::alloy_sol_types::sol_data::Uint<
-                        256,
-                    > as alloy_sol_types::SolType>::tokenize(&self.creditDebited),
-                    <::alloy_sol_types::sol_data::Uint<
-                        256,
-                    > as alloy_sol_types::SolType>::tokenize(&self.tokenCreditRate),
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.numAccounts),
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.numBlobs),
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.numAdded),
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.bytesAdded),
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.numResolving),
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.bytesResolving),
+                    <::alloy_sol_types::sol_data::Uint<256> as alloy_sol_types::SolType>::tokenize(
+                        &self.balance,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.capacityFree,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.capacityUsed,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<256> as alloy_sol_types::SolType>::tokenize(
+                        &self.creditSold,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<256> as alloy_sol_types::SolType>::tokenize(
+                        &self.creditCommitted,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<256> as alloy_sol_types::SolType>::tokenize(
+                        &self.creditDebited,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<256> as alloy_sol_types::SolType>::tokenize(
+                        &self.tokenCreditRate,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.numAccounts,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.numBlobs,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.numAdded,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.bytesAdded,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.numResolving,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.bytesResolving,
+                    ),
                 )
             }
             #[inline]
@@ -1067,64 +1026,50 @@ struct SubnetStats { uint256 balance; uint64 capacityFree; uint64 capacityUsed; 
                 if let Some(size) = <Self as alloy_sol_types::SolType>::ENCODED_SIZE {
                     return size;
                 }
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_encoded_size(&tuple)
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_encoded_size(&tuple)
             }
             #[inline]
             fn stv_eip712_data_word(&self) -> alloy_sol_types::Word {
                 <Self as alloy_sol_types::SolStruct>::eip712_hash_struct(self)
             }
             #[inline]
-            fn stv_abi_encode_packed_to(
-                &self,
-                out: &mut alloy_sol_types::private::Vec<u8>,
-            ) {
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_encode_packed_to(&tuple, out)
+            fn stv_abi_encode_packed_to(&self, out: &mut alloy_sol_types::private::Vec<u8>) {
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_encode_packed_to(
+                    &tuple, out,
+                )
             }
             #[inline]
             fn stv_abi_packed_encoded_size(&self) -> usize {
                 if let Some(size) = <Self as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE {
                     return size;
                 }
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_packed_encoded_size(&tuple)
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_packed_encoded_size(
+                    &tuple,
+                )
             }
         }
         #[automatically_derived]
         impl alloy_sol_types::SolType for SubnetStats {
             type RustType = Self;
-            type Token<'a> = <UnderlyingSolTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <UnderlyingSolTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SOL_NAME: &'static str = <Self as alloy_sol_types::SolStruct>::NAME;
-            const ENCODED_SIZE: Option<usize> = <UnderlyingSolTuple<
-                '_,
-            > as alloy_sol_types::SolType>::ENCODED_SIZE;
-            const PACKED_ENCODED_SIZE: Option<usize> = <UnderlyingSolTuple<
-                '_,
-            > as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE;
+            const ENCODED_SIZE: Option<usize> =
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::ENCODED_SIZE;
+            const PACKED_ENCODED_SIZE: Option<usize> =
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE;
             #[inline]
             fn valid_token(token: &Self::Token<'_>) -> bool {
                 <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::valid_token(token)
             }
             #[inline]
             fn detokenize(token: Self::Token<'_>) -> Self::RustType {
-                let tuple = <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::detokenize(token);
+                let tuple = <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::detokenize(token);
                 <Self as ::core::convert::From<UnderlyingRustTuple<'_>>>::from(tuple)
             }
         }
@@ -1138,9 +1083,9 @@ struct SubnetStats { uint256 balance; uint64 capacityFree; uint64 capacityUsed; 
                 )
             }
             #[inline]
-            fn eip712_components() -> alloy_sol_types::private::Vec<
-                alloy_sol_types::private::Cow<'static, str>,
-            > {
+            fn eip712_components(
+            ) -> alloy_sol_types::private::Vec<alloy_sol_types::private::Cow<'static, str>>
+            {
                 alloy_sol_types::private::Vec::new()
             }
             #[inline]
@@ -1288,9 +1233,7 @@ struct SubnetStats { uint256 balance; uint64 capacityFree; uint64 capacityUsed; 
                 rust: &Self::RustType,
                 out: &mut alloy_sol_types::private::Vec<u8>,
             ) {
-                out.reserve(
-                    <Self as alloy_sol_types::EventTopic>::topic_preimage_length(rust),
-                );
+                out.reserve(<Self as alloy_sol_types::EventTopic>::topic_preimage_length(rust));
                 <::alloy_sol_types::sol_data::Uint<
                     256,
                 > as alloy_sol_types::EventTopic>::encode_topic_preimage(
@@ -1371,23 +1314,16 @@ struct SubnetStats { uint256 balance; uint64 capacityFree; uint64 capacityUsed; 
                 );
             }
             #[inline]
-            fn encode_topic(
-                rust: &Self::RustType,
-            ) -> alloy_sol_types::abi::token::WordToken {
+            fn encode_topic(rust: &Self::RustType) -> alloy_sol_types::abi::token::WordToken {
                 let mut out = alloy_sol_types::private::Vec::new();
-                <Self as alloy_sol_types::EventTopic>::encode_topic_preimage(
-                    rust,
-                    &mut out,
-                );
-                alloy_sol_types::abi::token::WordToken(
-                    alloy_sol_types::private::keccak256(out),
-                )
+                <Self as alloy_sol_types::EventTopic>::encode_topic_preimage(rust, &mut out);
+                alloy_sol_types::abi::token::WordToken(alloy_sol_types::private::keccak256(out))
             }
         }
     };
     /**```solidity
-struct Subscription { string subscriptionId; uint64 expiry; }
-```*/
+    struct Subscription { string subscriptionId; uint64 expiry; }
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct Subscription {
@@ -1403,7 +1339,7 @@ struct Subscription { string subscriptionId; uint64 expiry; }
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[doc(hidden)]
         type UnderlyingSolTuple<'a> = (
             ::alloy_sol_types::sol_data::String,
@@ -1413,9 +1349,7 @@ struct Subscription { string subscriptionId; uint64 expiry; }
         type UnderlyingRustTuple<'a> = (::alloy_sol_types::private::String, u64);
         #[cfg(test)]
         #[allow(dead_code, unreachable_patterns)]
-        fn _type_assertion(
-            _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-        ) {
+        fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
             match _t {
                 alloy_sol_types::private::AssertTypeEq::<
                     <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -1451,9 +1385,9 @@ struct Subscription { string subscriptionId; uint64 expiry; }
                     <::alloy_sol_types::sol_data::String as alloy_sol_types::SolType>::tokenize(
                         &self.subscriptionId,
                     ),
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.expiry),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.expiry,
+                    ),
                 )
             }
             #[inline]
@@ -1461,64 +1395,50 @@ struct Subscription { string subscriptionId; uint64 expiry; }
                 if let Some(size) = <Self as alloy_sol_types::SolType>::ENCODED_SIZE {
                     return size;
                 }
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_encoded_size(&tuple)
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_encoded_size(&tuple)
             }
             #[inline]
             fn stv_eip712_data_word(&self) -> alloy_sol_types::Word {
                 <Self as alloy_sol_types::SolStruct>::eip712_hash_struct(self)
             }
             #[inline]
-            fn stv_abi_encode_packed_to(
-                &self,
-                out: &mut alloy_sol_types::private::Vec<u8>,
-            ) {
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_encode_packed_to(&tuple, out)
+            fn stv_abi_encode_packed_to(&self, out: &mut alloy_sol_types::private::Vec<u8>) {
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_encode_packed_to(
+                    &tuple, out,
+                )
             }
             #[inline]
             fn stv_abi_packed_encoded_size(&self) -> usize {
                 if let Some(size) = <Self as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE {
                     return size;
                 }
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_packed_encoded_size(&tuple)
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_packed_encoded_size(
+                    &tuple,
+                )
             }
         }
         #[automatically_derived]
         impl alloy_sol_types::SolType for Subscription {
             type RustType = Self;
-            type Token<'a> = <UnderlyingSolTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <UnderlyingSolTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SOL_NAME: &'static str = <Self as alloy_sol_types::SolStruct>::NAME;
-            const ENCODED_SIZE: Option<usize> = <UnderlyingSolTuple<
-                '_,
-            > as alloy_sol_types::SolType>::ENCODED_SIZE;
-            const PACKED_ENCODED_SIZE: Option<usize> = <UnderlyingSolTuple<
-                '_,
-            > as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE;
+            const ENCODED_SIZE: Option<usize> =
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::ENCODED_SIZE;
+            const PACKED_ENCODED_SIZE: Option<usize> =
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE;
             #[inline]
             fn valid_token(token: &Self::Token<'_>) -> bool {
                 <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::valid_token(token)
             }
             #[inline]
             fn detokenize(token: Self::Token<'_>) -> Self::RustType {
-                let tuple = <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::detokenize(token);
+                let tuple = <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::detokenize(token);
                 <Self as ::core::convert::From<UnderlyingRustTuple<'_>>>::from(tuple)
             }
         }
@@ -1532,9 +1452,9 @@ struct Subscription { string subscriptionId; uint64 expiry; }
                 )
             }
             #[inline]
-            fn eip712_components() -> alloy_sol_types::private::Vec<
-                alloy_sol_types::private::Cow<'static, str>,
-            > {
+            fn eip712_components(
+            ) -> alloy_sol_types::private::Vec<alloy_sol_types::private::Cow<'static, str>>
+            {
                 alloy_sol_types::private::Vec::new()
             }
             #[inline]
@@ -1575,9 +1495,7 @@ struct Subscription { string subscriptionId; uint64 expiry; }
                 rust: &Self::RustType,
                 out: &mut alloy_sol_types::private::Vec<u8>,
             ) {
-                out.reserve(
-                    <Self as alloy_sol_types::EventTopic>::topic_preimage_length(rust),
-                );
+                out.reserve(<Self as alloy_sol_types::EventTopic>::topic_preimage_length(rust));
                 <::alloy_sol_types::sol_data::String as alloy_sol_types::EventTopic>::encode_topic_preimage(
                     &rust.subscriptionId,
                     out,
@@ -1590,23 +1508,16 @@ struct Subscription { string subscriptionId; uint64 expiry; }
                 );
             }
             #[inline]
-            fn encode_topic(
-                rust: &Self::RustType,
-            ) -> alloy_sol_types::abi::token::WordToken {
+            fn encode_topic(rust: &Self::RustType) -> alloy_sol_types::abi::token::WordToken {
                 let mut out = alloy_sol_types::private::Vec::new();
-                <Self as alloy_sol_types::EventTopic>::encode_topic_preimage(
-                    rust,
-                    &mut out,
-                );
-                alloy_sol_types::abi::token::WordToken(
-                    alloy_sol_types::private::keccak256(out),
-                )
+                <Self as alloy_sol_types::EventTopic>::encode_topic_preimage(rust, &mut out);
+                alloy_sol_types::abi::token::WordToken(alloy_sol_types::private::keccak256(out))
             }
         }
     };
     /**```solidity
-struct TrimBlobExpiries { uint32 processed; bytes32 nextKey; }
-```*/
+    struct TrimBlobExpiries { uint32 processed; bytes32 nextKey; }
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct TrimBlobExpiries {
@@ -1622,7 +1533,7 @@ struct TrimBlobExpiries { uint32 processed; bytes32 nextKey; }
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[doc(hidden)]
         type UnderlyingSolTuple<'a> = (
             ::alloy_sol_types::sol_data::Uint<32>,
@@ -1632,9 +1543,7 @@ struct TrimBlobExpiries { uint32 processed; bytes32 nextKey; }
         type UnderlyingRustTuple<'a> = (u32, ::alloy_sol_types::private::FixedBytes<32>);
         #[cfg(test)]
         #[allow(dead_code, unreachable_patterns)]
-        fn _type_assertion(
-            _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-        ) {
+        fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
             match _t {
                 alloy_sol_types::private::AssertTypeEq::<
                     <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -1680,64 +1589,50 @@ struct TrimBlobExpiries { uint32 processed; bytes32 nextKey; }
                 if let Some(size) = <Self as alloy_sol_types::SolType>::ENCODED_SIZE {
                     return size;
                 }
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_encoded_size(&tuple)
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_encoded_size(&tuple)
             }
             #[inline]
             fn stv_eip712_data_word(&self) -> alloy_sol_types::Word {
                 <Self as alloy_sol_types::SolStruct>::eip712_hash_struct(self)
             }
             #[inline]
-            fn stv_abi_encode_packed_to(
-                &self,
-                out: &mut alloy_sol_types::private::Vec<u8>,
-            ) {
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_encode_packed_to(&tuple, out)
+            fn stv_abi_encode_packed_to(&self, out: &mut alloy_sol_types::private::Vec<u8>) {
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_encode_packed_to(
+                    &tuple, out,
+                )
             }
             #[inline]
             fn stv_abi_packed_encoded_size(&self) -> usize {
                 if let Some(size) = <Self as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE {
                     return size;
                 }
-                let tuple = <UnderlyingRustTuple<
-                    '_,
-                > as ::core::convert::From<Self>>::from(self.clone());
-                <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_packed_encoded_size(&tuple)
+                let tuple =
+                    <UnderlyingRustTuple<'_> as ::core::convert::From<Self>>::from(self.clone());
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::abi_packed_encoded_size(
+                    &tuple,
+                )
             }
         }
         #[automatically_derived]
         impl alloy_sol_types::SolType for TrimBlobExpiries {
             type RustType = Self;
-            type Token<'a> = <UnderlyingSolTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <UnderlyingSolTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SOL_NAME: &'static str = <Self as alloy_sol_types::SolStruct>::NAME;
-            const ENCODED_SIZE: Option<usize> = <UnderlyingSolTuple<
-                '_,
-            > as alloy_sol_types::SolType>::ENCODED_SIZE;
-            const PACKED_ENCODED_SIZE: Option<usize> = <UnderlyingSolTuple<
-                '_,
-            > as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE;
+            const ENCODED_SIZE: Option<usize> =
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::ENCODED_SIZE;
+            const PACKED_ENCODED_SIZE: Option<usize> =
+                <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::PACKED_ENCODED_SIZE;
             #[inline]
             fn valid_token(token: &Self::Token<'_>) -> bool {
                 <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::valid_token(token)
             }
             #[inline]
             fn detokenize(token: Self::Token<'_>) -> Self::RustType {
-                let tuple = <UnderlyingSolTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::detokenize(token);
+                let tuple = <UnderlyingSolTuple<'_> as alloy_sol_types::SolType>::detokenize(token);
                 <Self as ::core::convert::From<UnderlyingRustTuple<'_>>>::from(tuple)
             }
         }
@@ -1751,9 +1646,9 @@ struct TrimBlobExpiries { uint32 processed; bytes32 nextKey; }
                 )
             }
             #[inline]
-            fn eip712_components() -> alloy_sol_types::private::Vec<
-                alloy_sol_types::private::Cow<'static, str>,
-            > {
+            fn eip712_components(
+            ) -> alloy_sol_types::private::Vec<alloy_sol_types::private::Cow<'static, str>>
+            {
                 alloy_sol_types::private::Vec::new()
             }
             #[inline]
@@ -1796,9 +1691,7 @@ struct TrimBlobExpiries { uint32 processed; bytes32 nextKey; }
                 rust: &Self::RustType,
                 out: &mut alloy_sol_types::private::Vec<u8>,
             ) {
-                out.reserve(
-                    <Self as alloy_sol_types::EventTopic>::topic_preimage_length(rust),
-                );
+                out.reserve(<Self as alloy_sol_types::EventTopic>::topic_preimage_length(rust));
                 <::alloy_sol_types::sol_data::Uint<
                     32,
                 > as alloy_sol_types::EventTopic>::encode_topic_preimage(
@@ -1813,24 +1706,17 @@ struct TrimBlobExpiries { uint32 processed; bytes32 nextKey; }
                 );
             }
             #[inline]
-            fn encode_topic(
-                rust: &Self::RustType,
-            ) -> alloy_sol_types::abi::token::WordToken {
+            fn encode_topic(rust: &Self::RustType) -> alloy_sol_types::abi::token::WordToken {
                 let mut out = alloy_sol_types::private::Vec::new();
-                <Self as alloy_sol_types::EventTopic>::encode_topic_preimage(
-                    rust,
-                    &mut out,
-                );
-                alloy_sol_types::abi::token::WordToken(
-                    alloy_sol_types::private::keccak256(out),
-                )
+                <Self as alloy_sol_types::EventTopic>::encode_topic_preimage(rust, &mut out);
+                alloy_sol_types::abi::token::WordToken(alloy_sol_types::private::keccak256(out))
             }
         }
     };
     /**Event with signature `BlobAdded(address,bytes32,uint256,uint256,uint256)` and selector `0xd42c7814518f1b7f5919557d327e88cddb7b02fc91085b402e94083243a06a8d`.
-```solidity
-event BlobAdded(address indexed subscriber, bytes32 hash, uint256 size, uint256 expiry, uint256 bytesUsed);
-```*/
+    ```solidity
+    event BlobAdded(address indexed subscriber, bytes32 hash, uint256 size, uint256 expiry, uint256 bytesUsed);
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1857,7 +1743,7 @@ event BlobAdded(address indexed subscriber, bytes32 hash, uint256 size, uint256 
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for BlobAdded {
             type DataTuple<'a> = (
@@ -1866,48 +1752,18 @@ event BlobAdded(address indexed subscriber, bytes32 hash, uint256 size, uint256 
                 ::alloy_sol_types::sol_data::Uint<256>,
                 ::alloy_sol_types::sol_data::Uint<256>,
             );
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (
                 alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::Address,
             );
             const SIGNATURE: &'static str = "BlobAdded(address,bytes32,uint256,uint256,uint256)";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                212u8,
-                44u8,
-                120u8,
-                20u8,
-                81u8,
-                143u8,
-                27u8,
-                127u8,
-                89u8,
-                25u8,
-                85u8,
-                125u8,
-                50u8,
-                126u8,
-                136u8,
-                205u8,
-                219u8,
-                123u8,
-                2u8,
-                252u8,
-                145u8,
-                8u8,
-                91u8,
-                64u8,
-                46u8,
-                148u8,
-                8u8,
-                50u8,
-                67u8,
-                160u8,
-                106u8,
-                141u8,
-            ]);
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    212u8, 44u8, 120u8, 20u8, 81u8, 143u8, 27u8, 127u8, 89u8, 25u8, 85u8, 125u8,
+                    50u8, 126u8, 136u8, 205u8, 219u8, 123u8, 2u8, 252u8, 145u8, 8u8, 91u8, 64u8,
+                    46u8, 148u8, 8u8, 50u8, 67u8, 160u8, 106u8, 141u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -1928,13 +1784,11 @@ event BlobAdded(address indexed subscriber, bytes32 hash, uint256 size, uint256 
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
@@ -1967,9 +1821,7 @@ event BlobAdded(address indexed subscriber, bytes32 hash, uint256 size, uint256 
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 out[1usize] = <::alloy_sol_types::sol_data::Address as alloy_sol_types::EventTopic>::encode_topic(
                     &self.subscriber,
                 );
@@ -1994,9 +1846,9 @@ event BlobAdded(address indexed subscriber, bytes32 hash, uint256 size, uint256 
         }
     };
     /**Event with signature `BlobDeleted(address,bytes32,uint256,uint256)` and selector `0x2e6567b73082b547dc70b1e1697dc20d2c21c44915c3af4efd6ce7cc9905a1ce`.
-```solidity
-event BlobDeleted(address indexed subscriber, bytes32 hash, uint256 size, uint256 bytesReleased);
-```*/
+    ```solidity
+    event BlobDeleted(address indexed subscriber, bytes32 hash, uint256 size, uint256 bytesReleased);
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2021,7 +1873,7 @@ event BlobDeleted(address indexed subscriber, bytes32 hash, uint256 size, uint25
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for BlobDeleted {
             type DataTuple<'a> = (
@@ -2029,48 +1881,18 @@ event BlobDeleted(address indexed subscriber, bytes32 hash, uint256 size, uint25
                 ::alloy_sol_types::sol_data::Uint<256>,
                 ::alloy_sol_types::sol_data::Uint<256>,
             );
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (
                 alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::Address,
             );
             const SIGNATURE: &'static str = "BlobDeleted(address,bytes32,uint256,uint256)";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                46u8,
-                101u8,
-                103u8,
-                183u8,
-                48u8,
-                130u8,
-                181u8,
-                71u8,
-                220u8,
-                112u8,
-                177u8,
-                225u8,
-                105u8,
-                125u8,
-                194u8,
-                13u8,
-                44u8,
-                33u8,
-                196u8,
-                73u8,
-                21u8,
-                195u8,
-                175u8,
-                78u8,
-                253u8,
-                108u8,
-                231u8,
-                204u8,
-                153u8,
-                5u8,
-                161u8,
-                206u8,
-            ]);
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    46u8, 101u8, 103u8, 183u8, 48u8, 130u8, 181u8, 71u8, 220u8, 112u8, 177u8,
+                    225u8, 105u8, 125u8, 194u8, 13u8, 44u8, 33u8, 196u8, 73u8, 21u8, 195u8, 175u8,
+                    78u8, 253u8, 108u8, 231u8, 204u8, 153u8, 5u8, 161u8, 206u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -2090,13 +1912,11 @@ event BlobDeleted(address indexed subscriber, bytes32 hash, uint256 size, uint25
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
@@ -2126,9 +1946,7 @@ event BlobDeleted(address indexed subscriber, bytes32 hash, uint256 size, uint25
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 out[1usize] = <::alloy_sol_types::sol_data::Address as alloy_sol_types::EventTopic>::encode_topic(
                     &self.subscriber,
                 );
@@ -2153,9 +1971,9 @@ event BlobDeleted(address indexed subscriber, bytes32 hash, uint256 size, uint25
         }
     };
     /**Event with signature `BlobFinalized(address,bytes32,bool)` and selector `0x74accb1da870635a4e757ed45bf2f8016f9b08bfb46a9f6183bb74b2a362c280`.
-```solidity
-event BlobFinalized(address indexed subscriber, bytes32 hash, bool resolved);
-```*/
+    ```solidity
+    event BlobFinalized(address indexed subscriber, bytes32 hash, bool resolved);
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2178,55 +1996,25 @@ event BlobFinalized(address indexed subscriber, bytes32 hash, bool resolved);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for BlobFinalized {
             type DataTuple<'a> = (
                 ::alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::Bool,
             );
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (
                 alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::Address,
             );
             const SIGNATURE: &'static str = "BlobFinalized(address,bytes32,bool)";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                116u8,
-                172u8,
-                203u8,
-                29u8,
-                168u8,
-                112u8,
-                99u8,
-                90u8,
-                78u8,
-                117u8,
-                126u8,
-                212u8,
-                91u8,
-                242u8,
-                248u8,
-                1u8,
-                111u8,
-                155u8,
-                8u8,
-                191u8,
-                180u8,
-                106u8,
-                159u8,
-                97u8,
-                131u8,
-                187u8,
-                116u8,
-                178u8,
-                163u8,
-                98u8,
-                194u8,
-                128u8,
-            ]);
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    116u8, 172u8, 203u8, 29u8, 168u8, 112u8, 99u8, 90u8, 78u8, 117u8, 126u8, 212u8,
+                    91u8, 242u8, 248u8, 1u8, 111u8, 155u8, 8u8, 191u8, 180u8, 106u8, 159u8, 97u8,
+                    131u8, 187u8, 116u8, 178u8, 163u8, 98u8, 194u8, 128u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -2245,13 +2033,11 @@ event BlobFinalized(address indexed subscriber, bytes32 hash, bool resolved);
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
@@ -2278,9 +2064,7 @@ event BlobFinalized(address indexed subscriber, bytes32 hash, bool resolved);
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 out[1usize] = <::alloy_sol_types::sol_data::Address as alloy_sol_types::EventTopic>::encode_topic(
                     &self.subscriber,
                 );
@@ -2305,9 +2089,9 @@ event BlobFinalized(address indexed subscriber, bytes32 hash, bool resolved);
         }
     };
     /**Event with signature `BlobPending(address,bytes32,bytes32)` and selector `0x57e4769774fa6b36c8faf32c5b177a5c15d70775d3729a530b8ec17009f31122`.
-```solidity
-event BlobPending(address indexed subscriber, bytes32 hash, bytes32 sourceId);
-```*/
+    ```solidity
+    event BlobPending(address indexed subscriber, bytes32 hash, bytes32 sourceId);
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2330,55 +2114,25 @@ event BlobPending(address indexed subscriber, bytes32 hash, bytes32 sourceId);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for BlobPending {
             type DataTuple<'a> = (
                 ::alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::FixedBytes<32>,
             );
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (
                 alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::Address,
             );
             const SIGNATURE: &'static str = "BlobPending(address,bytes32,bytes32)";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                87u8,
-                228u8,
-                118u8,
-                151u8,
-                116u8,
-                250u8,
-                107u8,
-                54u8,
-                200u8,
-                250u8,
-                243u8,
-                44u8,
-                91u8,
-                23u8,
-                122u8,
-                92u8,
-                21u8,
-                215u8,
-                7u8,
-                117u8,
-                211u8,
-                114u8,
-                154u8,
-                83u8,
-                11u8,
-                142u8,
-                193u8,
-                112u8,
-                9u8,
-                243u8,
-                17u8,
-                34u8,
-            ]);
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    87u8, 228u8, 118u8, 151u8, 116u8, 250u8, 107u8, 54u8, 200u8, 250u8, 243u8,
+                    44u8, 91u8, 23u8, 122u8, 92u8, 21u8, 215u8, 7u8, 117u8, 211u8, 114u8, 154u8,
+                    83u8, 11u8, 142u8, 193u8, 112u8, 9u8, 243u8, 17u8, 34u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -2397,13 +2151,11 @@ event BlobPending(address indexed subscriber, bytes32 hash, bytes32 sourceId);
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
@@ -2430,9 +2182,7 @@ event BlobPending(address indexed subscriber, bytes32 hash, bytes32 sourceId);
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 out[1usize] = <::alloy_sol_types::sol_data::Address as alloy_sol_types::EventTopic>::encode_topic(
                     &self.subscriber,
                 );
@@ -2457,9 +2207,9 @@ event BlobPending(address indexed subscriber, bytes32 hash, bytes32 sourceId);
         }
     };
     /**Function with signature `addBlob(address,bytes32,bytes32,bytes32,string,uint64,uint64)` and selector `0x5b5cc14f`.
-```solidity
-function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl) external;
-```*/
+    ```solidity
+    function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl) external;
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct addBlobCall {
@@ -2489,7 +2239,7 @@ function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 meta
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (
@@ -2513,9 +2263,7 @@ function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 meta
             );
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -2560,9 +2308,7 @@ function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 meta
             type UnderlyingRustTuple<'a> = ();
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -2595,15 +2341,12 @@ function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 meta
                 ::alloy_sol_types::sol_data::Uint<64>,
                 ::alloy_sol_types::sol_data::Uint<64>,
             );
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = addBlobReturn;
             type ReturnTuple<'a> = ();
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
-            const SIGNATURE: &'static str = "addBlob(address,bytes32,bytes32,bytes32,string,uint64,uint64)";
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
+            const SIGNATURE: &'static str =
+                "addBlob(address,bytes32,bytes32,bytes32,string,uint64,uint64)";
             const SELECTOR: [u8; 4] = [91u8, 92u8, 193u8, 79u8];
             #[inline]
             fn new<'a>(
@@ -2642,17 +2385,17 @@ function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 meta
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
     /**Function with signature `deleteBlob(address,bytes32,string)` and selector `0xbea9016a`.
-```solidity
-function deleteBlob(address subscriber, bytes32 blobHash, string memory subscriptionId) external;
-```*/
+    ```solidity
+    function deleteBlob(address subscriber, bytes32 blobHash, string memory subscriptionId) external;
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct deleteBlobCall {
@@ -2674,7 +2417,7 @@ function deleteBlob(address subscriber, bytes32 blobHash, string memory subscrip
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (
@@ -2690,9 +2433,7 @@ function deleteBlob(address subscriber, bytes32 blobHash, string memory subscrip
             );
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -2725,9 +2466,7 @@ function deleteBlob(address subscriber, bytes32 blobHash, string memory subscrip
             type UnderlyingRustTuple<'a> = ();
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -2756,14 +2495,10 @@ function deleteBlob(address subscriber, bytes32 blobHash, string memory subscrip
                 ::alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::String,
             );
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = deleteBlobReturn;
             type ReturnTuple<'a> = ();
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str = "deleteBlob(address,bytes32,string)";
             const SELECTOR: [u8; 4] = [190u8, 169u8, 1u8, 106u8];
             #[inline]
@@ -2791,17 +2526,17 @@ function deleteBlob(address subscriber, bytes32 blobHash, string memory subscrip
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
     /**Function with signature `getBlob(bytes32)` and selector `0x8a4d1ad4`.
-```solidity
-function getBlob(bytes32 blobHash) external view returns (Blob memory blob);
-```*/
+    ```solidity
+    function getBlob(bytes32 blobHash) external view returns (Blob memory blob);
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct getBlobCall {
@@ -2822,7 +2557,7 @@ function getBlob(bytes32 blobHash) external view returns (Blob memory blob);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (::alloy_sol_types::sol_data::FixedBytes<32>,);
@@ -2830,9 +2565,7 @@ function getBlob(bytes32 blobHash) external view returns (Blob memory blob);
             type UnderlyingRustTuple<'a> = (::alloy_sol_types::private::FixedBytes<32>,);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -2858,14 +2591,10 @@ function getBlob(bytes32 blobHash) external view returns (Blob memory blob);
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (Blob,);
             #[doc(hidden)]
-            type UnderlyingRustTuple<'a> = (
-                <Blob as ::alloy_sol_types::SolType>::RustType,
-            );
+            type UnderlyingRustTuple<'a> = (<Blob as ::alloy_sol_types::SolType>::RustType,);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -2890,14 +2619,10 @@ function getBlob(bytes32 blobHash) external view returns (Blob memory blob);
         #[automatically_derived]
         impl alloy_sol_types::SolCall for getBlobCall {
             type Parameters<'a> = (::alloy_sol_types::sol_data::FixedBytes<32>,);
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = getBlobReturn;
             type ReturnTuple<'a> = (Blob,);
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str = "getBlob(bytes32)";
             const SELECTOR: [u8; 4] = [138u8, 77u8, 26u8, 212u8];
             #[inline]
@@ -2919,17 +2644,17 @@ function getBlob(bytes32 blobHash) external view returns (Blob memory blob);
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
     /**Function with signature `getStats()` and selector `0xc59d4847`.
-```solidity
-function getStats() external view returns (SubnetStats memory stats);
-```*/
+    ```solidity
+    function getStats() external view returns (SubnetStats memory stats);
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct getStatsCall {}
@@ -2947,7 +2672,7 @@ function getStats() external view returns (SubnetStats memory stats);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = ();
@@ -2955,9 +2680,7 @@ function getStats() external view returns (SubnetStats memory stats);
             type UnderlyingRustTuple<'a> = ();
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -2983,14 +2706,10 @@ function getStats() external view returns (SubnetStats memory stats);
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (SubnetStats,);
             #[doc(hidden)]
-            type UnderlyingRustTuple<'a> = (
-                <SubnetStats as ::alloy_sol_types::SolType>::RustType,
-            );
+            type UnderlyingRustTuple<'a> = (<SubnetStats as ::alloy_sol_types::SolType>::RustType,);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -3015,14 +2734,10 @@ function getStats() external view returns (SubnetStats memory stats);
         #[automatically_derived]
         impl alloy_sol_types::SolCall for getStatsCall {
             type Parameters<'a> = ();
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = getStatsReturn;
             type ReturnTuple<'a> = (SubnetStats,);
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str = "getStats()";
             const SELECTOR: [u8; 4] = [197u8, 157u8, 72u8, 71u8];
             #[inline]
@@ -3040,17 +2755,17 @@ function getStats() external view returns (SubnetStats memory stats);
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
     /**Function with signature `overwriteBlob(bytes32,address,bytes32,bytes32,bytes32,string,uint64,uint64)` and selector `0x434fc5a4`.
-```solidity
-function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl) external;
-```*/
+    ```solidity
+    function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl) external;
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct overwriteBlobCall {
@@ -3082,7 +2797,7 @@ function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (
@@ -3108,9 +2823,7 @@ function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32
             );
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -3157,9 +2870,7 @@ function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32
             type UnderlyingRustTuple<'a> = ();
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -3193,15 +2904,12 @@ function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32
                 ::alloy_sol_types::sol_data::Uint<64>,
                 ::alloy_sol_types::sol_data::Uint<64>,
             );
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = overwriteBlobReturn;
             type ReturnTuple<'a> = ();
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
-            const SIGNATURE: &'static str = "overwriteBlob(bytes32,address,bytes32,bytes32,bytes32,string,uint64,uint64)";
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
+            const SIGNATURE: &'static str =
+                "overwriteBlob(bytes32,address,bytes32,bytes32,bytes32,string,uint64,uint64)";
             const SELECTOR: [u8; 4] = [67u8, 79u8, 197u8, 164u8];
             #[inline]
             fn new<'a>(
@@ -3243,17 +2951,17 @@ function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
     /**Function with signature `trimBlobExpiries(address,bytes32,uint32)` and selector `0x78f8af85`.
-```solidity
-function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit) external returns (TrimBlobExpiries memory);
-```*/
+    ```solidity
+    function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit) external returns (TrimBlobExpiries memory);
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct trimBlobExpiriesCall {
@@ -3278,7 +2986,7 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (
@@ -3294,9 +3002,7 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
             );
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -3305,16 +3011,14 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
             }
             #[automatically_derived]
             #[doc(hidden)]
-            impl ::core::convert::From<trimBlobExpiriesCall>
-            for UnderlyingRustTuple<'_> {
+            impl ::core::convert::From<trimBlobExpiriesCall> for UnderlyingRustTuple<'_> {
                 fn from(value: trimBlobExpiriesCall) -> Self {
                     (value.subscriber, value.startingHash, value.limit)
                 }
             }
             #[automatically_derived]
             #[doc(hidden)]
-            impl ::core::convert::From<UnderlyingRustTuple<'_>>
-            for trimBlobExpiriesCall {
+            impl ::core::convert::From<UnderlyingRustTuple<'_>> for trimBlobExpiriesCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
                     Self {
                         subscriber: tuple.0,
@@ -3328,14 +3032,11 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (TrimBlobExpiries,);
             #[doc(hidden)]
-            type UnderlyingRustTuple<'a> = (
-                <TrimBlobExpiries as ::alloy_sol_types::SolType>::RustType,
-            );
+            type UnderlyingRustTuple<'a> =
+                (<TrimBlobExpiries as ::alloy_sol_types::SolType>::RustType,);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -3344,16 +3045,14 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
             }
             #[automatically_derived]
             #[doc(hidden)]
-            impl ::core::convert::From<trimBlobExpiriesReturn>
-            for UnderlyingRustTuple<'_> {
+            impl ::core::convert::From<trimBlobExpiriesReturn> for UnderlyingRustTuple<'_> {
                 fn from(value: trimBlobExpiriesReturn) -> Self {
                     (value._0,)
                 }
             }
             #[automatically_derived]
             #[doc(hidden)]
-            impl ::core::convert::From<UnderlyingRustTuple<'_>>
-            for trimBlobExpiriesReturn {
+            impl ::core::convert::From<UnderlyingRustTuple<'_>> for trimBlobExpiriesReturn {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
                     Self { _0: tuple.0 }
                 }
@@ -3366,14 +3065,10 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
                 ::alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::Uint<32>,
             );
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = trimBlobExpiriesReturn;
             type ReturnTuple<'a> = (TrimBlobExpiries,);
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str = "trimBlobExpiries(address,bytes32,uint32)";
             const SELECTOR: [u8; 4] = [120u8, 248u8, 175u8, 133u8];
             #[inline]
@@ -3401,10 +3096,10 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
@@ -3449,14 +3144,10 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
         fn selector(&self) -> [u8; 4] {
             match self {
                 Self::addBlob(_) => <addBlobCall as alloy_sol_types::SolCall>::SELECTOR,
-                Self::deleteBlob(_) => {
-                    <deleteBlobCall as alloy_sol_types::SolCall>::SELECTOR
-                }
+                Self::deleteBlob(_) => <deleteBlobCall as alloy_sol_types::SolCall>::SELECTOR,
                 Self::getBlob(_) => <getBlobCall as alloy_sol_types::SolCall>::SELECTOR,
                 Self::getStats(_) => <getStatsCall as alloy_sol_types::SolCall>::SELECTOR,
-                Self::overwriteBlob(_) => {
-                    <overwriteBlobCall as alloy_sol_types::SolCall>::SELECTOR
-                }
+                Self::overwriteBlob(_) => <overwriteBlobCall as alloy_sol_types::SolCall>::SELECTOR,
                 Self::trimBlobExpiries(_) => {
                     <trimBlobExpiriesCall as alloy_sol_types::SolCall>::SELECTOR
                 }
@@ -3480,17 +3171,17 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
             static DECODE_SHIMS: &[fn(
                 &[u8],
                 bool,
-            ) -> alloy_sol_types::Result<IBlobsFacadeCalls>] = &[
+            )
+                -> alloy_sol_types::Result<IBlobsFacadeCalls>] = &[
                 {
                     fn overwriteBlob(
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<IBlobsFacadeCalls> {
                         <overwriteBlobCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
-                            .map(IBlobsFacadeCalls::overwriteBlob)
+                            data, validate,
+                        )
+                        .map(IBlobsFacadeCalls::overwriteBlob)
                     }
                     overwriteBlob
                 },
@@ -3499,10 +3190,7 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<IBlobsFacadeCalls> {
-                        <addBlobCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <addBlobCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
                             .map(IBlobsFacadeCalls::addBlob)
                     }
                     addBlob
@@ -3513,10 +3201,9 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
                         validate: bool,
                     ) -> alloy_sol_types::Result<IBlobsFacadeCalls> {
                         <trimBlobExpiriesCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
-                            .map(IBlobsFacadeCalls::trimBlobExpiries)
+                            data, validate,
+                        )
+                        .map(IBlobsFacadeCalls::trimBlobExpiries)
                     }
                     trimBlobExpiries
                 },
@@ -3525,10 +3212,7 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<IBlobsFacadeCalls> {
-                        <getBlobCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <getBlobCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
                             .map(IBlobsFacadeCalls::getBlob)
                     }
                     getBlob
@@ -3538,10 +3222,7 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<IBlobsFacadeCalls> {
-                        <deleteBlobCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <deleteBlobCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
                             .map(IBlobsFacadeCalls::deleteBlob)
                     }
                     deleteBlob
@@ -3551,22 +3232,17 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<IBlobsFacadeCalls> {
-                        <getStatsCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <getStatsCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
                             .map(IBlobsFacadeCalls::getStats)
                     }
                     getStats
                 },
             ];
             let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
-                return Err(
-                    alloy_sol_types::Error::unknown_selector(
-                        <Self as alloy_sol_types::SolInterface>::NAME,
-                        selector,
-                    ),
-                );
+                return Err(alloy_sol_types::Error::unknown_selector(
+                    <Self as alloy_sol_types::SolInterface>::NAME,
+                    selector,
+                ));
             };
             DECODE_SHIMS[idx](data, validate)
         }
@@ -3586,14 +3262,10 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
                     <getStatsCall as alloy_sol_types::SolCall>::abi_encoded_size(inner)
                 }
                 Self::overwriteBlob(inner) => {
-                    <overwriteBlobCall as alloy_sol_types::SolCall>::abi_encoded_size(
-                        inner,
-                    )
+                    <overwriteBlobCall as alloy_sol_types::SolCall>::abi_encoded_size(inner)
                 }
                 Self::trimBlobExpiries(inner) => {
-                    <trimBlobExpiriesCall as alloy_sol_types::SolCall>::abi_encoded_size(
-                        inner,
-                    )
+                    <trimBlobExpiriesCall as alloy_sol_types::SolCall>::abi_encoded_size(inner)
                 }
             }
         }
@@ -3604,31 +3276,19 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
                     <addBlobCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
                 }
                 Self::deleteBlob(inner) => {
-                    <deleteBlobCall as alloy_sol_types::SolCall>::abi_encode_raw(
-                        inner,
-                        out,
-                    )
+                    <deleteBlobCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
                 }
                 Self::getBlob(inner) => {
                     <getBlobCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
                 }
                 Self::getStats(inner) => {
-                    <getStatsCall as alloy_sol_types::SolCall>::abi_encode_raw(
-                        inner,
-                        out,
-                    )
+                    <getStatsCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
                 }
                 Self::overwriteBlob(inner) => {
-                    <overwriteBlobCall as alloy_sol_types::SolCall>::abi_encode_raw(
-                        inner,
-                        out,
-                    )
+                    <overwriteBlobCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
                 }
                 Self::trimBlobExpiries(inner) => {
-                    <trimBlobExpiriesCall as alloy_sol_types::SolCall>::abi_encode_raw(
-                        inner,
-                        out,
-                    )
+                    <trimBlobExpiriesCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
                 }
             }
         }
@@ -3654,140 +3314,24 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
         /// Prefer using `SolInterface` methods instead.
         pub const SELECTORS: &'static [[u8; 32usize]] = &[
             [
-                46u8,
-                101u8,
-                103u8,
-                183u8,
-                48u8,
-                130u8,
-                181u8,
-                71u8,
-                220u8,
-                112u8,
-                177u8,
-                225u8,
-                105u8,
-                125u8,
-                194u8,
-                13u8,
-                44u8,
-                33u8,
-                196u8,
-                73u8,
-                21u8,
-                195u8,
-                175u8,
-                78u8,
-                253u8,
-                108u8,
-                231u8,
-                204u8,
-                153u8,
-                5u8,
-                161u8,
-                206u8,
+                46u8, 101u8, 103u8, 183u8, 48u8, 130u8, 181u8, 71u8, 220u8, 112u8, 177u8, 225u8,
+                105u8, 125u8, 194u8, 13u8, 44u8, 33u8, 196u8, 73u8, 21u8, 195u8, 175u8, 78u8,
+                253u8, 108u8, 231u8, 204u8, 153u8, 5u8, 161u8, 206u8,
             ],
             [
-                87u8,
-                228u8,
-                118u8,
-                151u8,
-                116u8,
-                250u8,
-                107u8,
-                54u8,
-                200u8,
-                250u8,
-                243u8,
-                44u8,
-                91u8,
-                23u8,
-                122u8,
-                92u8,
-                21u8,
-                215u8,
-                7u8,
-                117u8,
-                211u8,
-                114u8,
-                154u8,
-                83u8,
-                11u8,
-                142u8,
-                193u8,
-                112u8,
-                9u8,
-                243u8,
-                17u8,
-                34u8,
+                87u8, 228u8, 118u8, 151u8, 116u8, 250u8, 107u8, 54u8, 200u8, 250u8, 243u8, 44u8,
+                91u8, 23u8, 122u8, 92u8, 21u8, 215u8, 7u8, 117u8, 211u8, 114u8, 154u8, 83u8, 11u8,
+                142u8, 193u8, 112u8, 9u8, 243u8, 17u8, 34u8,
             ],
             [
-                116u8,
-                172u8,
-                203u8,
-                29u8,
-                168u8,
-                112u8,
-                99u8,
-                90u8,
-                78u8,
-                117u8,
-                126u8,
-                212u8,
-                91u8,
-                242u8,
-                248u8,
-                1u8,
-                111u8,
-                155u8,
-                8u8,
-                191u8,
-                180u8,
-                106u8,
-                159u8,
-                97u8,
-                131u8,
-                187u8,
-                116u8,
-                178u8,
-                163u8,
-                98u8,
-                194u8,
-                128u8,
+                116u8, 172u8, 203u8, 29u8, 168u8, 112u8, 99u8, 90u8, 78u8, 117u8, 126u8, 212u8,
+                91u8, 242u8, 248u8, 1u8, 111u8, 155u8, 8u8, 191u8, 180u8, 106u8, 159u8, 97u8,
+                131u8, 187u8, 116u8, 178u8, 163u8, 98u8, 194u8, 128u8,
             ],
             [
-                212u8,
-                44u8,
-                120u8,
-                20u8,
-                81u8,
-                143u8,
-                27u8,
-                127u8,
-                89u8,
-                25u8,
-                85u8,
-                125u8,
-                50u8,
-                126u8,
-                136u8,
-                205u8,
-                219u8,
-                123u8,
-                2u8,
-                252u8,
-                145u8,
-                8u8,
-                91u8,
-                64u8,
-                46u8,
-                148u8,
-                8u8,
-                50u8,
-                67u8,
-                160u8,
-                106u8,
-                141u8,
+                212u8, 44u8, 120u8, 20u8, 81u8, 143u8, 27u8, 127u8, 89u8, 25u8, 85u8, 125u8, 50u8,
+                126u8, 136u8, 205u8, 219u8, 123u8, 2u8, 252u8, 145u8, 8u8, 91u8, 64u8, 46u8, 148u8,
+                8u8, 50u8, 67u8, 160u8, 106u8, 141u8,
             ],
         ];
     }
@@ -3802,48 +3346,36 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(<BlobAdded as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
-                    <BlobAdded as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
+                    <BlobAdded as alloy_sol_types::SolEvent>::decode_raw_log(topics, data, validate)
                         .map(Self::BlobAdded)
                 }
                 Some(<BlobDeleted as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <BlobDeleted as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
-                        .map(Self::BlobDeleted)
+                        topics, data, validate,
+                    )
+                    .map(Self::BlobDeleted)
                 }
                 Some(<BlobFinalized as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <BlobFinalized as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
-                        .map(Self::BlobFinalized)
+                        topics, data, validate,
+                    )
+                    .map(Self::BlobFinalized)
                 }
                 Some(<BlobPending as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <BlobPending as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
-                        .map(Self::BlobPending)
+                        topics, data, validate,
+                    )
+                    .map(Self::BlobPending)
                 }
-                _ => {
-                    alloy_sol_types::private::Err(alloy_sol_types::Error::InvalidLog {
-                        name: <Self as alloy_sol_types::SolEventInterface>::NAME,
-                        log: alloy_sol_types::private::Box::new(
-                            alloy_sol_types::private::LogData::new_unchecked(
-                                topics.to_vec(),
-                                data.to_vec().into(),
-                            ),
+                _ => alloy_sol_types::private::Err(alloy_sol_types::Error::InvalidLog {
+                    name: <Self as alloy_sol_types::SolEventInterface>::NAME,
+                    log: alloy_sol_types::private::Box::new(
+                        alloy_sol_types::private::LogData::new_unchecked(
+                            topics.to_vec(),
+                            data.to_vec().into(),
                         ),
-                    })
-                }
+                    ),
+                }),
             }
         }
     }
@@ -3851,9 +3383,7 @@ function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit
     impl alloy_sol_types::private::IntoLogData for IBlobsFacadeEvents {
         fn to_log_data(&self) -> alloy_sol_types::private::LogData {
             match self {
-                Self::BlobAdded(inner) => {
-                    alloy_sol_types::private::IntoLogData::to_log_data(inner)
-                }
+                Self::BlobAdded(inner) => alloy_sol_types::private::IntoLogData::to_log_data(inner),
                 Self::BlobDeleted(inner) => {
                     alloy_sol_types::private::IntoLogData::to_log_data(inner)
                 }

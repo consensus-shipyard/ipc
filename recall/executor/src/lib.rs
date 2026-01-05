@@ -12,10 +12,7 @@ use fendermint_actor_blobs_shared::{
     method::Method::{GetGasAllowance, UpdateGasAllowance},
     BLOBS_ACTOR_ADDR, BLOBS_ACTOR_ID,
 };
-use fendermint_vm_actor_interface::{
-    eam::EAM_ACTOR_ID,
-    system::SYSTEM_ACTOR_ADDR,
-};
+use fendermint_vm_actor_interface::{eam::EAM_ACTOR_ID, system::SYSTEM_ACTOR_ADDR};
 use fvm::call_manager::{backtrace, Backtrace, CallManager, Entrypoint, InvocationResult};
 use fvm::engine::EnginePool;
 use fvm::executor::{ApplyFailure, ApplyKind, ApplyRet, Executor};
@@ -224,19 +221,22 @@ where
                 )
             });
 
-            let result = cm.with_transaction(|cm| {
-                // Invoke the message. We charge for the return value internally if the call-stack depth
-                // is 1.
-                cm.call_actor::<K>(
-                    sender_id,
-                    msg.to,
-                    Entrypoint::Invoke(msg.method_num),
-                    params,
-                    &msg.value,
-                    None,
-                    false,
-                )
-            }, always_revert); // FVM 4.7: with_transaction now requires read_only bool parameter
+            let result = cm.with_transaction(
+                |cm| {
+                    // Invoke the message. We charge for the return value internally if the call-stack depth
+                    // is 1.
+                    cm.call_actor::<K>(
+                        sender_id,
+                        msg.to,
+                        Entrypoint::Invoke(msg.method_num),
+                        params,
+                        &msg.value,
+                        None,
+                        false,
+                    )
+                },
+                always_revert,
+            ); // FVM 4.7: with_transaction now requires read_only bool parameter
 
             let (res, machine) = match cm.finish() {
                 (Ok(res), machine) => (res, machine),

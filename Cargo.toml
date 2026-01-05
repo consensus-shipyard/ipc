@@ -16,6 +16,7 @@ members = [
   "ipc/api",
   "ipc/types",
   "ipc/observability",
+  "ipc-decentralized-storage",
 
   # ipld
   "ipld/resolver",
@@ -42,6 +43,7 @@ members = [
   "fendermint/actors/chainmetadata",
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
+  "fendermint/actors/init",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
   # recall actors
