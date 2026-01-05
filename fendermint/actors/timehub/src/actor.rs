@@ -6,7 +6,7 @@ use cid::Cid;
 use fendermint_actor_blobs_shared::sdk::has_credit_approval;
 use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
-    actor_dispatch, actor_error,
+    actor_dispatch_unrestricted, actor_error,
     runtime::{ActorCode, Runtime},
     ActorError,
 };
@@ -145,7 +145,7 @@ impl ActorCode for TimehubActor {
         TIMEHUB_ACTOR_NAME
     }
 
-    actor_dispatch! {
+    actor_dispatch_unrestricted! {
         Constructor => constructor,
         Init => init,
         GetAddress => get_address,

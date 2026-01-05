@@ -354,17 +354,14 @@ impl State {
 
         // Check the current status
         match blob.blob.status {
-            BlobStatus::Added => {
-                return Err(ActorError::illegal_state(format!(
-                    "blob {} cannot be finalized from status added",
-                    params.hash
-                )));
-            }
             BlobStatus::Resolved => {
                 debug!("blob already resolved {} (id: {})", params.hash, params.id);
                 // Blob is already finalized as resolved.
                 // We can ignore later finalizations, even if they are failed.
-                // Remove the entire blob entry from the pending queue
+                // Remove from any queue it might be in
+                self.blobs
+                    .added
+                    .remove_entry(store, &params.hash, blob.blob.size)?;
                 self.blobs
                     .pending
                     .remove_entry(store, &params.hash, blob.blob.size)?;
@@ -392,51 +389,59 @@ impl State {
 
         // Update blob status
         blob.blob.status = params.status.clone();
-        if matches!(blob.blob.status, BlobStatus::Failed) && !blob.subscription.failed {
-            // Mark the subscription as failed
-            blob.subscription.failed = true;
+        // if matches!(blob.blob.status, BlobStatus::Failed) && !blob.subscription.failed {
+        //     // Mark the subscription as failed
+        //     blob.subscription.failed = true;
 
-            // We're not going to make a debit, but we need to refund any spent credits that may
-            // have been used on this group in the event the last debit is later than the
-            // added epoch.
-            let (group_expiry, new_group_expiry) =
-                blob.subscriptions
-                    .max_expiries(store, &params.id, Some(0))?;
-            let (sub_is_min_added, next_min_added) =
-                blob.subscriptions.is_min_added(store, &params.id)?;
-            let last_debit_epoch = caller.subscriber().last_debit_epoch;
-            if last_debit_epoch > blob.subscription.added && sub_is_min_added {
-                // The refund extends up to either the next minimum added epoch that is less
-                // than the last debit epoch, or the last debit epoch.
-                let refund_end = if let Some(next_min_added) = next_min_added {
-                    next_min_added.min(blob.subscription.expiry)
-                } else {
-                    last_debit_epoch
-                };
-                let refund_credits = self.get_storage_cost(
-                    refund_end - (blob.subscription.added - blob.subscription.overlap),
-                    &blob.blob.size,
-                );
-                let group_expiry = group_expiry.unwrap(); // safe here
-                let correction_credits = if refund_end > group_expiry {
-                    self.get_storage_cost(refund_end - group_expiry, &blob.blob.size)
-                } else {
-                    Credit::zero()
-                };
-                self.refund_caller(&mut caller, &refund_credits, &correction_credits);
-            }
+        //     // We're not going to make a debit, but we need to refund any spent credits that may
+        //     // have been used on this group in the event the last debit is later than the
+        //     // added epoch.
+        //     let (group_expiry, new_group_expiry) =
+        //         blob.subscriptions
+        //             .max_expiries(store, &params.id, Some(0))?;
+        //     let (sub_is_min_added, next_min_added) =
+        //         blob.subscriptions.is_min_added(store, &params.id)?;
+        //     let last_debit_epoch = caller.subscriber().last_debit_epoch;
+        //     if last_debit_epoch > blob.subscription.added && sub_is_min_added {
+        //         // The refund extends up to either the next minimum added epoch that is less
+        //         // than the last debit epoch, or the last debit epoch.
+        //         let refund_end = if let Some(next_min_added) = next_min_added {
+        //             next_min_added.min(blob.subscription.expiry)
+        //         } else {
+        //             last_debit_epoch
+        //         };
+        //         let refund_credits = self.get_storage_cost(
+        //             refund_end - (blob.subscription.added - blob.subscription.overlap),
+        //             &blob.blob.size,
+        //         );
+        //         let group_expiry = group_expiry.unwrap(); // safe here
+        //         let correction_credits = if refund_end > group_expiry {
+        //             self.get_storage_cost(refund_end - group_expiry, &blob.blob.size)
+        //         } else {
+        //             Credit::zero()
+        //         };
+        //         self.refund_caller(&mut caller, &refund_credits, &correction_credits);
+        //     }
 
-            // Account for reclaimed size and move committed credit to free credit
-            self.release_capacity_for_subnet_and_caller(
-                &mut caller,
-                group_expiry,
-                new_group_expiry,
-                blob.blob.size,
-                blob.blob.subscribers.len(),
-            );
-        }
+        //     // Account for reclaimed size and move committed credit to free credit
+        //     self.release_capacity_for_subnet_and_caller(
+        //         &mut caller,
+        //         group_expiry,
+        //         new_group_expiry,
+        //         blob.blob.size,
+        //         blob.blob.subscribers.len(),
+        //     );
+        // }
 
-        // Remove the source from the pending queue
+        // Remove the source from both added and pending queues
+        // (blob may be finalized directly from added status without going through pending)
+        // Use blob.subscription.source (what was stored) not params.source (what gateway sends)
+        self.blobs.added.remove_source(
+            store,
+            &params.hash,
+            blob.blob.size,
+            BlobSource::new(subscriber, params.id.clone(), blob.subscription.source),
+        )?;
         self.blobs.pending.remove_source(
             store,
             &params.hash,

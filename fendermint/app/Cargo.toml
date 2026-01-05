@@ -60,6 +60,7 @@ url = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
 actors-custom-api = { path = "../actors/api" }
+fendermint_actor_bucket = { path = "../actors/bucket" }
 fendermint_actor_f3_light_client = { path = "../actors/f3-light-client" }
 fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }

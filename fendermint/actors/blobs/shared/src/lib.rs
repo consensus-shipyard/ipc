@@ -14,6 +14,7 @@ pub mod blobs;
 pub mod bytes;
 pub mod credit;
 pub mod method;
+pub mod operators;
 pub mod sdk;
 
 /// The unique identifier for the blob actor in the system.

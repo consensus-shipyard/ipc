@@ -24,6 +24,8 @@ cid = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 
+fendermint_actor_blobs_shared = { path = "../actors/blobs/shared" }
+fendermint_actor_bucket = { path = "../actors/bucket" }
 fendermint_crypto = { path = "../crypto" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_message = { path = "../vm/message" }

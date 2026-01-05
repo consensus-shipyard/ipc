@@ -1,24 +1,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{Context, Result};
-use cid::Cid;
-use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::ipc::IpcMessage;
-use fendermint_vm_message::query::{FvmQuery, StateParams};
-use fendermint_vm_message::signed::SignedMessage;
-use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{self};
-use fvm_shared::{address::Address, error::ExitCode};
-use std::sync::Arc;
-use std::time::Instant;
-
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
+use crate::fvm::recall_helpers::{
+    close_read_request, read_request_callback, set_read_request_pending,
+};
 use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
     activity::ValidatorActivityTracker,
@@ -33,10 +24,21 @@ use crate::selectors::{
 };
 use crate::types::*;
 use crate::MessagesInterpreter;
+use anyhow::{Context, Result};
+use cid::Cid;
+use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::ipc::IpcMessage;
+use fendermint_vm_message::query::{FvmQuery, StateParams};
+use fendermint_vm_message::signed::SignedMessage;
+use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding;
 use fvm_shared::state::ActorState;
 use fvm_shared::ActorID;
+use fvm_shared::{address::Address, error::ExitCode};
 use ipc_observability::emit;
 use std::convert::TryInto;
+use std::sync::Arc;
+use std::time::Instant;
 
 struct Actor {
     id: ActorID,
@@ -267,8 +269,8 @@ where
             })
             .collect::<Vec<_>>();
 
-        let signed_msgs =
-            select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
+        // let signed_msgs =
+        //     select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
 
         let total_gas_limit = state.block_gas_tracker().available();
         let signed_msgs_iter = select_messages_by_gas_limit(signed_msgs, total_gas_limit)
@@ -281,8 +283,11 @@ where
             .await
             .into_iter();
 
-        let mut all_msgs = top_down_iter
-            .chain(signed_msgs_iter)
+        let chain_msgs: Vec<ChainMessage> = top_down_iter.chain(signed_msgs_iter).collect();
+
+        // Encode all chain messages to IPLD
+        let mut all_msgs = chain_msgs
+            .into_iter()
             .map(|msg| fvm_ipld_encoding::to_vec(&msg).context("failed to encode message as IPLD"))
             .collect::<Result<Vec<Vec<u8>>>>()?;
 
@@ -337,6 +342,14 @@ where
                         if !self.top_down_manager.is_finality_valid(finality).await {
                             return Ok(AttestMessagesResponse::Reject);
                         }
+                    }
+                    ChainMessage::Ipc(IpcMessage::ReadRequestPending(_)) => {
+                        // Read request pending messages are validated in prepare_messages_for_block
+                        // Just accept them here
+                    }
+                    ChainMessage::Ipc(IpcMessage::ReadRequestClosed(_)) => {
+                        // Read request closed messages are validated in prepare_messages_for_block
+                        // Just accept them here
                     }
                     ChainMessage::Signed(signed) => {
                         if signed.message.gas_fee_cap < *base_fee {
@@ -464,6 +477,42 @@ where
                         self.top_down_manager.execute_topdown_msg(state, p).await?;
                     Ok(ApplyMessageResponse {
                         applied_message,
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::ReadRequestPending(read_request) => {
+                    // Set the read request to "pending" state
+                    let ret = set_read_request_pending(state, read_request.id)?;
+
+                    tracing::debug!(
+                        request_id = %read_request.id,
+                        "chain interpreter has set read request to pending"
+                    );
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::ReadRequestClosed(read_request) => {
+                    // Send the data to the callback address.
+                    // If this fails (e.g., the callback address is not reachable),
+                    // we will still close the request.
+                    //
+                    // We MUST use a non-privileged actor (BLOB_READER_ACTOR_ADDR) to call the callback.
+                    // This is to prevent malicious user from accessing unauthorized APIs.
+                    read_request_callback(state, &read_request)?;
+
+                    // Set the status of the request to closed.
+                    let ret = close_read_request(state, read_request.id)?;
+
+                    tracing::debug!(
+                        hash = %read_request.id,
+                        "chain interpreter has closed read request"
+                    );
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
                         domain_hash: None,
                     })
                 }

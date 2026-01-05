@@ -101,7 +101,7 @@ fn start_resolve<V>(
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
     tokio::spawn(async move {
-        tracing::debug!(hash = %task.hash(), "starting iroh blob resolve");
+        println!("starting iroh blob resolve: {:?}", task.hash());
         match task.task_type() {
             TaskType::ResolveBlob { source, size } => {
                 match client

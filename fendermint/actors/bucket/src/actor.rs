@@ -13,7 +13,7 @@ use fendermint_actor_blobs_shared::{
 };
 use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
-    actor_dispatch, actor_error,
+    actor_dispatch_unrestricted, actor_error,
     runtime::{ActorCode, Runtime},
     ActorError,
 };
@@ -461,7 +461,7 @@ impl ActorCode for Actor {
         BUCKET_ACTOR_NAME
     }
 
-    actor_dispatch! {
+    actor_dispatch_unrestricted! {
         Constructor => constructor,
         Init => init,
         GetAddress => get_address,

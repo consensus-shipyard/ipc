@@ -9,16 +9,21 @@ use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, R
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
+use fendermint_vm_interpreter::fvm::recall_env::{BlobPool, ReadRequestPool};
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
+use fendermint_vm_iroh_resolver::iroh::IrohResolver;
+use fendermint_vm_iroh_resolver::pool::ResolvePool;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
+use fendermint_vm_topdown::{
+    CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, IPCReadRequestClosed, Toggle,
+};
 use fvm_shared::address::{current_network, Address, Network};
-use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord, IrohConfig};
+use ipc_ipld_resolver::{Event as ResolverEvent, IrohConfig, VoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -123,6 +128,10 @@ pub async fn run(
 
     let parent_finality_votes = VoteTally::empty();
 
+    // Create Recall blob and read request resolution pools early so they can be used by IrohResolver
+    let blob_pool: BlobPool = ResolvePool::new();
+    let read_request_pool: ReadRequestPool = ResolvePool::new();
+
     let topdown_enabled = settings.topdown_enabled();
 
     // If enabled, start a resolver that communicates with the application through the resolve pool.
@@ -146,8 +155,11 @@ pub async fn run(
             .context("error adding own provided subnet.")?;
 
         if topdown_enabled {
-            if let Some(key) = validator_keypair {
+            if let Some(ref key) = validator_keypair {
                 let parent_finality_votes = parent_finality_votes.clone();
+                let key = key.clone();
+                let client_for_voting = client.clone();
+                let subnet_id_for_voting = own_subnet_id.clone();
 
                 tracing::info!("starting the parent finality vote gossip loop...");
                 tokio::spawn(async move {
@@ -156,8 +168,8 @@ pub async fn run(
                         settings.ipc.vote_interval,
                         settings.ipc.vote_timeout,
                         key,
-                        own_subnet_id,
-                        client,
+                        subnet_id_for_voting,
+                        client_for_voting,
                         |height, block_hash| {
                             AppVote::ParentFinality(IPCParentFinality { height, block_hash })
                         },
@@ -167,6 +179,41 @@ pub async fn run(
             }
         } else {
             tracing::info!("parent finality vote gossip disabled");
+        }
+
+        // Spawn Iroh resolvers for blob and read request resolution
+        if let Some(ref key) = validator_keypair {
+            // Blob resolver
+            let iroh_resolver = IrohResolver::new(
+                client.clone(),
+                blob_pool.queue(),
+                settings.resolver.retry_delay,
+                parent_finality_votes.clone(),
+                key.clone(),
+                own_subnet_id.clone(),
+                |hash, success| AppVote::BlobFinality(IPCBlobFinality::new(hash, success)),
+                blob_pool.results(),
+            );
+
+            println!("starting the Iroh blob resolver...");
+            tokio::spawn(async move { iroh_resolver.run().await });
+
+            // Read request resolver
+            let read_request_resolver = IrohResolver::new(
+                client.clone(),
+                read_request_pool.queue(),
+                settings.resolver.retry_delay,
+                parent_finality_votes.clone(),
+                key.clone(),
+                own_subnet_id.clone(),
+                |hash, _| AppVote::ReadRequestClosed(IPCReadRequestClosed::new(hash)),
+                read_request_pool.results(),
+            );
+
+            println!("starting the Iroh read request resolver...");
+            tokio::spawn(async move { read_request_resolver.run().await });
+        } else {
+            tracing::info!("Iroh resolvers disabled (no validator key).");
         }
 
         tracing::info!("subscribing to gossip...");
@@ -542,6 +589,40 @@ async fn dispatch_vote(
                 }
                 _ => {
                     tracing::debug!("vote handled");
+                }
+            };
+        }
+        AppVote::BlobFinality(blob) => {
+            let res = atomically_or_err(|| {
+                parent_finality_votes.add_blob_vote(
+                    vote.public_key.clone(),
+                    blob.hash.as_bytes().to_vec(),
+                    blob.success,
+                )
+            })
+            .await;
+
+            match res {
+                Ok(_) => tracing::debug!(hash = %blob.hash, "blob vote handled"),
+                Err(e) => {
+                    tracing::debug!(hash = %blob.hash, error = %e, "failed to handle blob vote")
+                }
+            };
+        }
+        AppVote::ReadRequestClosed(read_req) => {
+            let res = atomically_or_err(|| {
+                parent_finality_votes.add_blob_vote(
+                    vote.public_key.clone(),
+                    read_req.hash.as_bytes().to_vec(),
+                    true, // read request completed successfully
+                )
+            })
+            .await;
+
+            match res {
+                Ok(_) => tracing::debug!(hash = %read_req.hash, "read request vote handled"),
+                Err(e) => {
+                    tracing::debug!(hash = %read_req.hash, error = %e, "failed to handle read request vote")
                 }
             };
         }
