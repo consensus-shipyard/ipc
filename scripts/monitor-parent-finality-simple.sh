@@ -21,10 +21,10 @@ PARENT_HEIGHT=$(curl -s --max-time 5 -X POST "https://api.calibration.node.glif.
     --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' 2>/dev/null | \
     jq -r '.result // "0x0"' | xargs printf "%d\n" 2>/dev/null)
 
-# Get finality from recent logs (grep for last known finality)
+# Get finality from recent logs (using portable grep + sed instead of grep -P)
 SUBNET_FINALITY=$(ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes \
     philip@${VALIDATOR_IP} \
-    "sudo journalctl -u ipc-node --since '10 minutes ago' --no-pager 2>/dev/null | grep -oP 'parent at height \K[0-9]+' | tail -1" 2>/dev/null || echo "0")
+    "sudo journalctl -u ipc-node --since '10 minutes ago' --no-pager 2>/dev/null | grep 'parent at height' | sed -E 's/.*parent at height ([0-9]+).*/\1/' | tail -1" 2>/dev/null || echo "0")
 
 # If we couldn't get it from logs, assume it's stuck at the known value
 if [ -z "$SUBNET_FINALITY" ] || [ "$SUBNET_FINALITY" = "0" ]; then
