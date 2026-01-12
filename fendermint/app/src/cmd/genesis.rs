@@ -350,13 +350,15 @@ pub async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> any
     builder.write_to(args.output_path.clone()).await
 }
 
-/// Fetches F3 parameters from the parent Filecoin chain
+/// Fetches F3 parameters for a specific instance ID from the parent Filecoin chain
 async fn fetch_f3_params_from_parent(
     parent_endpoint: &url::Url,
     parent_auth_token: Option<&String>,
+    instance_id: u64,
 ) -> anyhow::Result<Option<ipc::F3Params>> {
     tracing::info!(
-        "Fetching F3 parameters from parent chain at {}",
+        "Fetching F3 parameters for instance {} from parent chain at {}",
+        instance_id,
         parent_endpoint
     );
 
@@ -368,50 +370,34 @@ async fn fetch_f3_params_from_parent(
     // We use a dummy subnet ID here since F3 data is at the chain level, not subnet-specific
     let lotus_client = LotusJsonRPCClient::new(jsonrpc_client, SubnetID::default());
 
-    // Fetch F3 certificate which contains instance ID
-    let certificate = lotus_client.f3_get_certificate().await?;
+    // Get base power table for the specified instance
+    let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
 
-    match certificate {
-        Some(cert) => {
-            // Use the fetched certificate's instance ID to get its base power table.
-            // The finalized chain starts empty and subsequent certificates will be
-            // fetched and processed properly.
-            let instance_id = cert.gpbft_instance;
-            tracing::info!("Starting F3 from instance ID: {}", instance_id);
+    // Convert power entries
+    let power_table: anyhow::Result<Vec<_>> = power_table_response
+        .iter()
+        .map(|entry| {
+            // Decode base64 public key
+            let public_key_bytes =
+                base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &entry.pub_key)?;
+            // Parse the power string to u64
+            let power = entry.power.parse::<u64>()?;
+            Ok(types::PowerEntry {
+                public_key: public_key_bytes,
+                power,
+            })
+        })
+        .collect();
+    let power_table = power_table?;
 
-            // Get base power table for this instance
-            let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
-
-            // Convert power entries
-            let power_table: anyhow::Result<Vec<_>> = power_table_response
-                .iter()
-                .map(|entry| {
-                    // Decode base64 public key
-                    let public_key_bytes = base64::Engine::decode(
-                        &base64::engine::general_purpose::STANDARD,
-                        &entry.pub_key,
-                    )?;
-                    // Parse the power string to u64
-                    let power = entry.power.parse::<u64>()?;
-                    Ok(types::PowerEntry {
-                        public_key: public_key_bytes,
-                        power,
-                    })
-                })
-                .collect();
-            let power_table = power_table?;
-
-            tracing::info!("Successfully fetched F3 parameters from parent chain");
-            Ok(Some(ipc::F3Params {
-                instance_id,
-                power_table,
-                finalized_epochs: Vec::new(), // Start with empty finalized chain
-            }))
-        }
-        None => Err(anyhow::anyhow!(
-            "No F3 certificate available - F3 might not be running on the parent chain"
-        )),
-    }
+    tracing::info!(
+        "Successfully fetched F3 parameters for instance {} from parent chain",
+        instance_id
+    );
+    Ok(Some(ipc::F3Params {
+        instance_id,
+        power_table,
+    }))
 }
 
 pub async fn new_genesis_from_parent(
@@ -439,18 +425,30 @@ pub async fn new_genesis_from_parent(
 
     let genesis_info = parent_provider.get_genesis_info(&args.subnet_id).await?;
 
-    // Fetch F3 certificate data from parent chain if Filecoin RPC endpoint is provided.
-    // If not provided, it means the parent is not Filecoin (e.g., a Fendermint subnet)
-    // and F3 data is not available.
-    let f3_params = if let Some(ref parent_filecoin_rpc) = args.parent_filecoin_rpc {
-        tracing::info!("Fetching F3 data from parent Filecoin chain");
+    // Fetch F3 parameters using stored instance ID from subnet actor (deterministic!)
+    let f3_params = if let Some(f3_instance_id) = genesis_info.f3_instance_id {
+        // Parent is Filecoin and has F3 instance ID stored in subnet actor
+        tracing::info!(
+            "Subnet has F3 instance ID {} stored - fetching deterministic F3 data",
+            f3_instance_id
+        );
+
+        let parent_rpc = args.parent_filecoin_rpc.as_ref().ok_or_else(|| {
+            anyhow!(
+                "Parent Filecoin RPC required when subnet has F3 instance ID. \
+                 Use --parent-filecoin-rpc flag."
+            )
+        })?;
+
         fetch_f3_params_from_parent(
-            parent_filecoin_rpc,
+            parent_rpc,
             args.parent_filecoin_auth_token.as_ref(),
+            f3_instance_id,
         )
         .await?
     } else {
-        tracing::info!("Skipping F3 data fetch - parent is not Filecoin");
+        // Parent doesn't have F3 (either not Filecoin, or creation predates F3 support)
+        tracing::info!("No F3 instance ID in subnet actor - skipping F3 data");
         None
     };
 

@@ -223,6 +223,8 @@ pub struct SubnetGenesisInfo {
     pub permission_mode: PermissionMode,
     pub supply_source: Asset,
     pub genesis_subnet_ipc_contracts_owner: ethers::types::Address,
+    /// F3 instance ID for deterministic genesis (if parent has F3)
+    pub f3_instance_id: Option<u64>,
 }
 
 /// The generic payload that returns the block hash of the data returning block with the actual
