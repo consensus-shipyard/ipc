@@ -42,18 +42,18 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 iroh.workspace = true
 iroh-base.workspace = true
 iroh-blobs.workspace = true
-iroh_manager = { path = "../recall/iroh_manager" }
+iroh_manager = { path = "../../ipc-storage/iroh_manager" }
 
 # Fendermint dependencies for RPC client
-fendermint_rpc = { path = "../fendermint/rpc" }
-fendermint_vm_message = { path = "../fendermint/vm/message" }
-fendermint_vm_actor_interface = { path = "../fendermint/vm/actor_interface" }
-fendermint_actor_blobs_shared = { path = "../fendermint/actors/blobs/shared" }
-fendermint_actor_bucket = { path = "../fendermint/actors/bucket" }
-fendermint_crypto = { path = "../fendermint/crypto" }
+fendermint_rpc = { path = "../../fendermint/rpc" }
+fendermint_vm_message = { path = "../../fendermint/vm/message" }
+fendermint_vm_actor_interface = { path = "../../fendermint/vm/actor_interface" }
+fendermint_actor_blobs_shared = { path = "../../fendermint/actors/blobs/shared" }
+fendermint_actor_bucket = { path = "../../fendermint/actors/bucket" }
+fendermint_crypto = { path = "../../fendermint/crypto" }
 
 # IPC dependencies for address parsing
-ipc-api = { path = "../ipc/api" }
+ipc-api = { path = "../../ipc/api" }
 ethers.workspace = true
 
 # FVM dependencies

@@ -31,7 +31,7 @@ tokio = { workspace = true }
 # Iroh/Recall dependencies
 iroh = { workspace = true }
 iroh-blobs = { workspace = true }
-iroh_manager = { path = "../../recall/iroh_manager" }
+iroh_manager = { path = "../../ipc-storage/iroh_manager" }
 
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }

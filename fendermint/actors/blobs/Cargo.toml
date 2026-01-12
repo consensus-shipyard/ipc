@@ -25,8 +25,8 @@ serde = { workspace = true, features = ["derive"] }
 
 fendermint_actor_blobs_shared = { path = "./shared" }
 fendermint_actor_recall_config_shared = { path = "../recall_config/shared" }
-recall_actor_sdk = { path = "../../../recall/actor_sdk" }
-recall_ipld = { path = "../../../recall/ipld" }
+recall_actor_sdk = { path = "../../../ipc-storage/actor_sdk" }
+recall_ipld = { path = "../../../ipc-storage/ipld" }
 
 # BLS signature verification
 bls-signatures = { version = "0.13.1", default-features = false, features = ["blst"] }

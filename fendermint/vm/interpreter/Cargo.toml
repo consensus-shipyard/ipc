@@ -40,8 +40,8 @@ fil_actor_adm = { workspace = true }
 fil_actor_evm = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }
-recall_executor = { path = "../../../recall/executor" }
-recall_kernel = { path = "../../../recall/kernel" }
+recall_executor = { path = "../../../ipc-storage/executor" }
+recall_kernel = { path = "../../../ipc-storage/kernel" }
 fendermint_vm_iroh_resolver = { path = "../iroh_resolver" }
 iroh = { workspace = true }
 iroh-blobs = { workspace = true }

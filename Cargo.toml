@@ -16,7 +16,6 @@ members = [
   "ipc/api",
   "ipc/types",
   "ipc/observability",
-  "ipc-decentralized-storage",
 
   # ipld
   "ipld/resolver",
@@ -46,7 +45,13 @@ members = [
   "fendermint/actors/init",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
-  # recall actors
+
+  # ipc decentralized storage
+
+  # rpc serves
+  "ipc-storage/ipc-decentralized-storage",
+
+  # actors
   "fendermint/actors/adm_types",         # fil_actor_adm - ADM types
   "fendermint/actors/adm",               # ADM actor
   "fendermint/actors/machine",           # Machine base trait
@@ -59,17 +64,17 @@ members = [
   "fendermint/actors/recall_config",
   "fendermint/actors/recall_config/shared",
 
-  # recall storage (netwatch patched for socket2 0.5 compatibility!)
-  "recall/kernel",
-  "recall/kernel/ops",
-  "recall/syscalls",
-  "recall/executor",
-  "recall/iroh_manager",
-  "recall/ipld",
-  "recall/actor_sdk",
+  # storage components (netwatch patched for socket2 0.5 compatibility!)
+  "ipc-storage/kernel",
+  "ipc-storage/kernel/ops",
+  "ipc-storage/syscalls",
+  "ipc-storage/executor",
+  "ipc-storage/iroh_manager",
+  "ipc-storage/ipld",
+  "ipc-storage/actor_sdk",
 
-  # recall contracts (vendored locally, FVM 4.7 upgrade)
-  "recall-contracts/crates/facade",
+  # sol contracts facade
+  "ipc-storage/sol-facade/crates/facade",
 
   "build-rs-utils",
   "contracts-artifacts",
@@ -196,7 +201,7 @@ uuid = { version = "1.0", features = ["v4"] }
 mime_guess = "2.0"
 urlencoding = "2.1"
 # Recall Solidity facades (vendored locally, upgraded to FVM 4.7)
-recall_sol_facade = { path = "recall-contracts/crates/facade" }
+recall_sol_facade = { path = "ipc-storage/sol-facade/crates/facade" }
 sha2 = "0.10"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"

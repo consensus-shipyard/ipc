@@ -33,7 +33,7 @@ mime_guess = { workspace = true }
 urlencoding = { workspace = true }
 entangler = { workspace = true }
 entangler_storage = { workspace = true }
-iroh_manager = { path = "../../recall/iroh_manager" }
+iroh_manager = { path = "../../ipc-storage/iroh_manager" }
 iroh = { workspace = true }
 iroh-blobs = { workspace = true }
 thiserror = { workspace = true }

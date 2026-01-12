@@ -25,8 +25,8 @@ recall_sol_facade = { workspace = true, features = ["blob-reader"] }
 serde = { workspace = true, features = ["derive"] }
 
 fendermint_actor_blobs_shared = { path = "../blobs/shared" }
-recall_actor_sdk = { path = "../../../recall/actor_sdk" }
-recall_ipld = { path = "../../../recall/ipld" }
+recall_actor_sdk = { path = "../../../ipc-storage/actor_sdk" }
+recall_ipld = { path = "../../../ipc-storage/ipld" }
 
 [dev-dependencies]
 fendermint_actor_blobs_testing = { path = "../blobs/testing" }

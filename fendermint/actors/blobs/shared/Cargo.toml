@@ -22,7 +22,7 @@ num-derive = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
-recall_ipld = { path = "../../../../recall/ipld" }
+recall_ipld = { path = "../../../../ipc-storage/ipld" }
 
 [dev-dependencies]
 blake3 = { workspace = true }
