@@ -2,13 +2,28 @@
 
 # Clear Stuck Mempool Transactions
 # This script helps diagnose and clear stuck transactions in the IPC subnet mempool
+#
+# Usage: ./clear-mempool.sh [VALIDATOR_IP] [SSH_USER]
+#   VALIDATOR_IP: IP address of the validator node (default: prompts user)
+#   SSH_USER: SSH username for the validator (default: current user)
 
 set -e
 
-VALIDATOR_IP="34.73.187.192"
-SSH_USER="philip"
+# Accept parameters or use defaults
+VALIDATOR_IP="${1:-}"
+SSH_USER="${2:-$USER}"
+
+# Prompt for IP if not provided
+if [ -z "$VALIDATOR_IP" ]; then
+    read -p "Enter validator IP address: " VALIDATOR_IP
+    if [ -z "$VALIDATOR_IP" ]; then
+        echo "Error: Validator IP is required"
+        exit 1
+    fi
+fi
 
 echo "🔍 Analyzing stuck mempool transactions..."
+echo "   Validator: $SSH_USER@$VALIDATOR_IP"
 echo ""
 
 # Check mempool status
@@ -80,9 +95,15 @@ echo "    ssh $SSH_USER@$VALIDATOR_IP 'sudo systemctl stop cometbft && rm -rf ~/
 echo ""
 
 echo "Option 3: Restart the subnet"
-echo "  - Use the subnet manager:"
-echo "    cd /Users/philip/github/ipc/scripts/ipc-subnet-manager"
-echo "    ./ipc-manager restart"
+echo "  - Use the subnet manager (if available):"
+# Get script directory dynamically
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -d "$SCRIPT_DIR/ipc-subnet-manager" ]; then
+    echo "    cd $SCRIPT_DIR/ipc-subnet-manager"
+    echo "    ./ipc-manager restart"
+else
+    echo "    (ipc-subnet-manager not found in $SCRIPT_DIR)"
+fi
 echo ""
 
 echo "Option 4: Check transaction validity"
