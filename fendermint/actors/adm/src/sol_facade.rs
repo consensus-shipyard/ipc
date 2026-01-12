@@ -3,9 +3,9 @@ use fil_actors_runtime::{actor_error, ActorError};
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::address::Address;
-use recall_sol_facade::machine as sol;
-use recall_sol_facade::machine::{listBuckets_0Call, listBuckets_1Call, Calls};
-use recall_sol_facade::types::{Address as SolAddress, SolCall, SolInterface, H160};
+use ipc_storage_sol_facade::machine as sol;
+use ipc_storage_sol_facade::machine::{listBuckets_0Call, listBuckets_1Call, Calls};
+use ipc_storage_sol_facade::types::{Address as SolAddress, SolCall, SolInterface, H160};
 use std::collections::HashMap;
 
 use crate::{CreateExternalParams, CreateExternalReturn, Kind, ListMetadataParams, Metadata};
@@ -163,7 +163,7 @@ fn sol_kind(kind: Kind) -> u8 {
     }
 }
 
-// --- Copied from recall_actor_sdk --- //
+// --- Copied from ipc_storage_actor_sdk --- //
 
 #[derive(Default, Serialize_tuple, Deserialize_tuple)]
 #[serde(transparent)]

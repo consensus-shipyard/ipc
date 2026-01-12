@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::GetStatsReturn;
-use fendermint_actor_recall_config_shared::get_config;
+use fendermint_actor_ipc_storage_config_shared::get_config;
 use fil_actors_runtime::{runtime::Runtime, ActorError};
 
 use crate::{actor::BlobsActor, State};

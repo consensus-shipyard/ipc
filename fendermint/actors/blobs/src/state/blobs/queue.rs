@@ -9,7 +9,7 @@ use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{tuple::*, RawBytes};
 use fvm_shared::address::Address;
-use recall_ipld::hamt::{self, map::TrackedFlushResult, MapKey};
+use ipc_storage_ipld::hamt::{self, map::TrackedFlushResult, MapKey};
 
 /// Key used to namespace a blob source set.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize_tuple, Deserialize_tuple)]

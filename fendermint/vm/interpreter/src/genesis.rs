@@ -20,7 +20,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::{
     account, activity, adm, blob_reader, blobs, burntfunds, chainmetadata, cron, eam,
-    f3_light_client, gas_market, init, ipc, recall_config, reward, system, EMPTY_ARR,
+    f3_light_client, gas_market, init, ipc, ipc_storage_config, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -426,20 +426,20 @@ impl<'a> GenesisBuilder<'a> {
             )
             .context("failed to create chainmetadata actor")?;
 
-        // Initialize the recall config actor.
-        let recall_config_state = fendermint_actor_recall_config::State {
+        // Initialize the ipc_storage config actor.
+        let ipc_storage_config_state = fendermint_actor_ipc_storage_config::State {
             admin: None,
-            config: fendermint_actor_recall_config_shared::RecallConfig::default(),
+            config: fendermint_actor_ipc_storage_config_shared::IPCStorageConfig::default(),
         };
         state
             .create_custom_actor(
-                fendermint_actor_recall_config::ACTOR_NAME,
-                recall_config::RECALL_CONFIG_ACTOR_ID,
-                &recall_config_state,
+                fendermint_actor_ipc_storage_config::ACTOR_NAME,
+                ipc_storage_config::IPC_STORAGE_CONFIG_ACTOR_ID,
+                &ipc_storage_config_state,
                 TokenAmount::zero(),
                 None,
             )
-            .context("failed to create recall config actor")?;
+            .context("failed to create ipc_storage config actor")?;
 
         // Initialize the blob actor with delegated address for Ethereum/Solidity access.
         let blobs_state = fendermint_actor_blobs::State::new(&state.store())?;

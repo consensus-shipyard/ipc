@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-//! Recall environment types for blob and read request resolution.
+//! Environment types for blob and read request resolution.
 
 use fendermint_actor_blobs_shared::blobs::SubscriptionId;
 use fendermint_vm_iroh_resolver::pool::{

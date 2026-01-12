@@ -20,13 +20,13 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 log = { workspace = true, features = ["std"] }
 num-traits = { workspace = true }
-recall_sol_facade = { workspace = true, features = ["blobs", "credit", "gas"] }
+ipc_storage_sol_facade = { workspace = true, features = ["blobs", "credit", "gas"] }
 serde = { workspace = true, features = ["derive"] }
 
 fendermint_actor_blobs_shared = { path = "./shared" }
-fendermint_actor_recall_config_shared = { path = "../recall_config/shared" }
-recall_actor_sdk = { path = "../../../ipc-storage/actor_sdk" }
-recall_ipld = { path = "../../../ipc-storage/ipld" }
+fendermint_actor_ipc_storage_config_shared = { path = "../ipc_storage_config/shared" }
+ipc_storage_actor_sdk = { path = "../../../ipc-storage/actor_sdk" }
+ipc_storage_ipld = { path = "../../../ipc-storage/ipld" }
 
 # BLS signature verification
 bls-signatures = { version = "0.13.1", default-features = false, features = ["blst"] }

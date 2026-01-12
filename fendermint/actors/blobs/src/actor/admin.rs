@@ -5,9 +5,9 @@
 use fendermint_actor_blobs_shared::{
     accounts::SetAccountStatusParams, blobs::TrimBlobExpiriesParams, bytes::B256,
 };
-use fendermint_actor_recall_config_shared::{get_config, require_caller_is_admin};
+use fendermint_actor_ipc_storage_config_shared::{get_config, require_caller_is_admin};
 use fil_actors_runtime::{runtime::Runtime, ActorError};
-use recall_actor_sdk::caller::{Caller, CallerOption};
+use ipc_storage_actor_sdk::caller::{Caller, CallerOption};
 
 use crate::{
     actor::{delete_from_disc, BlobsActor},

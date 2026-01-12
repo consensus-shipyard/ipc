@@ -8,7 +8,7 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use recall_ipld::hamt::{self, map::TrackedFlushResult};
+use ipc_storage_ipld::hamt::{self, map::TrackedFlushResult};
 
 pub use cid::Cid;
 
@@ -64,9 +64,9 @@ impl Operators {
         // Create empty pubkey HAMT using fvm_ipld_hamt directly with explicit config
         let mut pubkey_hamt: Hamt<&BS, Address, BytesKey, Sha256> =
             Hamt::new_with_config(store, PUBKEY_HAMT_CONFIG);
-        let pubkey_to_addr = pubkey_hamt
-            .flush()
-            .map_err(|e| ActorError::illegal_state(format!("failed to flush pubkey HAMT: {}", e)))?;
+        let pubkey_to_addr = pubkey_hamt.flush().map_err(|e| {
+            ActorError::illegal_state(format!("failed to flush pubkey HAMT: {}", e))
+        })?;
         Ok(Self {
             root,
             pubkey_to_addr,
@@ -152,9 +152,9 @@ impl Operators {
         pubkey_hamt
             .set(pubkey_key, address)
             .map_err(|e| ActorError::illegal_state(format!("failed to set pubkey: {}", e)))?;
-        let pubkey_cid = pubkey_hamt
-            .flush()
-            .map_err(|e| ActorError::illegal_state(format!("failed to flush pubkey HAMT: {}", e)))?;
+        let pubkey_cid = pubkey_hamt.flush().map_err(|e| {
+            ActorError::illegal_state(format!("failed to flush pubkey HAMT: {}", e))
+        })?;
         self.save_pubkey(pubkey_cid, 1);
 
         // Add to operator HAMT
@@ -227,9 +227,9 @@ impl Operators {
         pubkey_hamt
             .delete(&pubkey_key)
             .map_err(|e| ActorError::illegal_state(format!("failed to delete pubkey: {}", e)))?;
-        let pubkey_cid = pubkey_hamt
-            .flush()
-            .map_err(|e| ActorError::illegal_state(format!("failed to flush pubkey HAMT: {}", e)))?;
+        let pubkey_cid = pubkey_hamt.flush().map_err(|e| {
+            ActorError::illegal_state(format!("failed to flush pubkey HAMT: {}", e))
+        })?;
         self.save_pubkey(pubkey_cid, -1);
 
         // Mark as inactive

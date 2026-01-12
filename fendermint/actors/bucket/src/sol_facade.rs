@@ -9,13 +9,13 @@ use anyhow::Error;
 use fendermint_actor_blobs_shared::bytes::B256;
 use fil_actors_runtime::{actor_error, ActorError};
 use fvm_shared::clock::ChainEpoch;
-use num_traits::Zero;
-use recall_actor_sdk::{declare_abi_call, evm::TryIntoEVMEvent};
-pub use recall_sol_facade::bucket::Calls;
-use recall_sol_facade::{
+use ipc_storage_actor_sdk::{declare_abi_call, evm::TryIntoEVMEvent};
+pub use ipc_storage_sol_facade::bucket::Calls;
+use ipc_storage_sol_facade::{
     bucket as sol,
     types::{SolCall, SolInterface},
 };
+use num_traits::Zero;
 
 use crate::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Object,
@@ -100,11 +100,11 @@ impl TryIntoEVMEvent for ObjectDeleted<'_> {
 
 // ----- Calls ----- //
 
-pub fn can_handle(input_data: &recall_actor_sdk::evm::InputData) -> bool {
+pub fn can_handle(input_data: &ipc_storage_actor_sdk::evm::InputData) -> bool {
     Calls::valid_selector(input_data.selector())
 }
 
-pub fn parse_input(input: &recall_actor_sdk::evm::InputData) -> Result<Calls, ActorError> {
+pub fn parse_input(input: &ipc_storage_actor_sdk::evm::InputData) -> Result<Calls, ActorError> {
     Calls::abi_decode_raw(input.selector(), input.calldata(), true)
         .map_err(|e| actor_error!(illegal_argument, format!("invalid call: {}", e)))
 }

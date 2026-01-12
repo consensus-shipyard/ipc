@@ -12,16 +12,16 @@ use fendermint_actor_blobs_shared::{
         RevokeCreditParams, SetSponsorParams,
     },
 };
-use fendermint_actor_recall_config_shared::get_config;
+use fendermint_actor_ipc_storage_config_shared::get_config;
 use fil_actors_runtime::{extract_send_result, runtime::Runtime, ActorError};
 use fvm_shared::{econ::TokenAmount, METHOD_SEND};
-use num_traits::Zero;
-use recall_actor_sdk::{
+use ipc_storage_actor_sdk::{
     caller::{Caller, CallerOption},
     evm::emit_evm_event,
     util::is_bucket_address,
     util::to_delegated_address,
 };
+use num_traits::Zero;
 
 use crate::{
     actor::{delete_from_disc, BlobsActor},
@@ -476,7 +476,7 @@ mod tests {
     use fvm_shared::{
         address::Address, bigint::BigInt, clock::ChainEpoch, error::ExitCode, MethodNum,
     };
-    use recall_actor_sdk::util::Kind;
+    use ipc_storage_actor_sdk::util::Kind;
 
     // TODO: Re-enable when ADM actor is available
     // Stub ADM_ACTOR_ADDR for tests

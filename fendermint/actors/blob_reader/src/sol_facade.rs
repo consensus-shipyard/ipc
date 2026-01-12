@@ -4,8 +4,8 @@
 
 use fendermint_actor_blobs_shared::bytes::B256;
 use fvm_shared::{address::Address, MethodNum};
-use recall_actor_sdk::evm::TryIntoEVMEvent;
-use recall_sol_facade::{blob_reader as sol, primitives::U256, types::H160};
+use ipc_storage_actor_sdk::evm::TryIntoEVMEvent;
+use ipc_storage_sol_facade::{blob_reader as sol, primitives::U256, types::H160};
 
 pub struct ReadRequestOpened<'a> {
     pub id: &'a B256,

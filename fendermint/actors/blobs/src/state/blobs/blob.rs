@@ -15,8 +15,8 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use ipc_storage_ipld::hamt::{self, map::TrackedFlushResult};
 use log::debug;
-use recall_ipld::hamt::{self, map::TrackedFlushResult};
 
 use super::{
     AddBlobStateParams, BlobSource, Expiries, ExpiryUpdate, Queue, Subscribers, Subscriptions,

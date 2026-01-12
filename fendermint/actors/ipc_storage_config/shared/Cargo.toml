@@ -1,6 +1,6 @@
 [package]
-name = "fendermint_actor_recall_config_shared"
-description = "Shared resources for the recall config"
+name = "fendermint_actor_ipc_storage_config_shared"
+description = "Shared resources for the ipc_storage config"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true

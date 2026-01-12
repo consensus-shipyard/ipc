@@ -4,7 +4,7 @@
 
 use anyhow::anyhow;
 use data_encoding::{DecodeError, DecodeKind};
-use recall_ipld::hamt::MapKey;
+use ipc_storage_ipld::hamt::MapKey;
 use serde::{Deserialize, Serialize};
 
 /// Container for 256 bits or 32 bytes.

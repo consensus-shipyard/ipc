@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::credit::{Credit, CreditApproval, GasAllowance};
-use fendermint_actor_recall_config_shared::RecallConfig;
+use fendermint_actor_ipc_storage_config_shared::IPCStorageConfig;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount, error::ExitCode};
-use recall_ipld::hamt;
+use ipc_storage_ipld::hamt;
 
 use super::CommitCapacityParams;
 use crate::{
@@ -32,7 +32,7 @@ impl State {
     pub fn buy_credit<BS: Blockstore>(
         &mut self,
         store: &BS,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         to: Address,
         value: TokenAmount,
         current_epoch: ChainEpoch,
@@ -66,7 +66,7 @@ impl State {
     /// Flushes state to the blockstore.
     pub fn set_account_sponsor<BS: Blockstore>(
         &mut self,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         store: &BS,
         from: Address,
         sponsor: Option<Address>,
@@ -111,7 +111,7 @@ impl State {
     /// Flushes state to the blockstore.
     pub fn approve_credit<BS: Blockstore>(
         &mut self,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         store: &BS,
         from: Address,
         to: Address,
@@ -201,7 +201,7 @@ impl State {
     pub(crate) fn commit_capacity_for_caller<BS: Blockstore>(
         &mut self,
         caller: &mut Caller<BS>,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         params: CommitCapacityParams,
     ) -> Result<TokenAmount, ActorError> {
         ensure_positive_amount(&params.cost)?;

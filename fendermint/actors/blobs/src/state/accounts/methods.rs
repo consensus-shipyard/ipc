@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use fendermint_actor_blobs_shared::{accounts::AccountStatus, bytes::B256};
-use fendermint_actor_recall_config_shared::RecallConfig;
+use fendermint_actor_ipc_storage_config_shared::IPCStorageConfig;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, clock::ChainEpoch};
@@ -31,7 +31,7 @@ impl State {
     pub fn set_account_status<BS: Blockstore>(
         &mut self,
         store: &BS,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         address: Address,
         status: AccountStatus,
         current_epoch: ChainEpoch,
@@ -76,7 +76,7 @@ impl State {
     pub fn debit_accounts<BS: Blockstore>(
         &mut self,
         store: &BS,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         current_epoch: ChainEpoch,
     ) -> Result<(HashSet<B256>, bool), ActorError> {
         // Delete expired subscriptions

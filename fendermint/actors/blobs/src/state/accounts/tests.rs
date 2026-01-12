@@ -10,7 +10,7 @@ use fendermint_actor_blobs_shared::{
 use fendermint_actor_blobs_testing::{
     new_address, new_hash, new_metadata_hash, new_pk, setup_logs,
 };
-use fendermint_actor_recall_config_shared::RecallConfig;
+use fendermint_actor_ipc_storage_config_shared::IPCStorageConfig;
 use fvm_ipld_blockstore::{Blockstore, MemoryBlockstore};
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
 use num_traits::Zero;
@@ -27,7 +27,7 @@ use crate::{
 fn test_set_account_status() {
     setup_logs();
 
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
 
     struct TestCase {
         name: &'static str,
@@ -110,7 +110,7 @@ fn test_set_account_status() {
 #[test]
 fn test_debit_accounts_delete_from_disc() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -134,7 +134,7 @@ fn test_debit_accounts_delete_from_disc() {
 #[test]
 fn test_debit_accounts_delete_from_disc_with_approval() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -174,7 +174,7 @@ fn test_debit_accounts_delete_from_disc_with_approval() {
 
 #[allow(clippy::too_many_arguments)]
 fn debit_accounts_delete_from_disc<BS: Blockstore>(
-    config: &RecallConfig,
+    config: &IPCStorageConfig,
     store: &BS,
     mut state: State,
     caller: Address,
@@ -377,7 +377,7 @@ fn debit_accounts_delete_from_disc<BS: Blockstore>(
 
 #[test]
 fn test_paginated_debit_accounts() {
-    let config = RecallConfig {
+    let config = IPCStorageConfig {
         account_debit_batch_size: 5, // Process 5 accounts at a time (10 accounts total)
         ..Default::default()
     };
@@ -436,7 +436,7 @@ fn test_paginated_debit_accounts() {
 
 #[test]
 fn test_multiple_debit_cycles() {
-    let config = RecallConfig {
+    let config = IPCStorageConfig {
         account_debit_batch_size: 5, // Process 5 accounts at a time (10 accounts total)
         ..Default::default()
     };

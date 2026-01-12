@@ -34,14 +34,14 @@ fendermint_actor_adm = { path = "../../actors/adm" }
 fendermint_actor_blobs = { path = "../../actors/blobs" }
 fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared" }
 fendermint_actor_blob_reader = { path = "../../actors/blob_reader" }
-fendermint_actor_recall_config = { path = "../../actors/recall_config" }
-fendermint_actor_recall_config_shared = { path = "../../actors/recall_config/shared" }
+fendermint_actor_ipc_storage_config = { path = "../../actors/ipc_storage_config" }
+fendermint_actor_ipc_storage_config_shared = { path = "../../actors/ipc_storage_config/shared" }
 fil_actor_adm = { workspace = true }
 fil_actor_evm = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }
-recall_executor = { path = "../../../ipc-storage/executor" }
-recall_kernel = { path = "../../../ipc-storage/kernel" }
+ipc_storage_executor = { path = "../../../ipc-storage/executor" }
+ipc_storage_kernel = { path = "../../../ipc-storage/kernel" }
 fendermint_vm_iroh_resolver = { path = "../iroh_resolver" }
 iroh = { workspace = true }
 iroh-blobs = { workspace = true }

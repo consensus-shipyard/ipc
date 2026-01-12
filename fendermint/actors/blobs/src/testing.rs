@@ -5,7 +5,7 @@
 use fendermint_actor_blobs_shared::{
     blobs::AddBlobParams, credit::BuyCreditParams, method::Method,
 };
-use fendermint_actor_recall_config_shared::{RecallConfig, RECALL_CONFIG_ACTOR_ADDR};
+use fendermint_actor_ipc_storage_config_shared::{IPCStorageConfig, IPC_STORAGE_CONFIG_ACTOR_ADDR};
 use fil_actors_runtime::test_utils::{expect_empty, MockRuntime, SYSTEM_ACTOR_CODE_ID};
 use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
 use fvm_ipld_blockstore::Blockstore;
@@ -14,8 +14,8 @@ use fvm_shared::{
     address::Address, clock::ChainEpoch, econ::TokenAmount, error::ExitCode, sys::SendFlags,
     MethodNum,
 };
+use ipc_storage_actor_sdk::evm::to_actor_event;
 use num_traits::Zero;
-use recall_actor_sdk::evm::to_actor_event;
 
 use crate::{
     actor::BlobsActor,
@@ -44,13 +44,13 @@ pub fn construct_and_verify() -> MockRuntime {
 
 pub fn expect_get_config(rt: &MockRuntime) {
     rt.expect_send(
-        RECALL_CONFIG_ACTOR_ADDR,
-        fendermint_actor_recall_config_shared::Method::GetConfig as MethodNum,
+        IPC_STORAGE_CONFIG_ACTOR_ADDR,
+        fendermint_actor_ipc_storage_config_shared::Method::GetConfig as MethodNum,
         None,
         TokenAmount::zero(),
         None,
         SendFlags::READ_ONLY,
-        IpldBlock::serialize_cbor(&RecallConfig::default()).unwrap(),
+        IpldBlock::serialize_cbor(&IPCStorageConfig::default()).unwrap(),
         ExitCode::OK,
         None,
     );

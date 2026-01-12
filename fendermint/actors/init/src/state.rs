@@ -45,7 +45,7 @@ impl State {
     ) -> Result<(ActorID, bool), ActorError> {
         let mut map = AddressMap::load(store, &self.address_map, DEFAULT_HAMT_CONFIG, "addresses")?;
         let (id, existing) = if let Some(delegated_addr) = delegated_addr {
-            // If there's a delegated address, either recall the already-mapped actor ID or
+            // If there's a delegated address, either ipc_storage the already-mapped actor ID or
             // create and map a new one.
             if let Some(existing_id) = map.get(delegated_addr)? {
                 (*existing_id, true)

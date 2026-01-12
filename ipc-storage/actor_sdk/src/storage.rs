@@ -13,7 +13,7 @@ mod sys {
     use fvm_sdk::sys::fvm_syscalls;
 
     fvm_syscalls! {
-        module = "recall";
+        module = "ipc_storage";
 
         /// Deletes a blob by hash from backing storage.
         pub fn delete_blob(hash_ptr: *const u8) -> Result<()>;

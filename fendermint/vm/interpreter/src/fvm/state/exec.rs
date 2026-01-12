@@ -28,8 +28,8 @@ use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
     message::Message, receipt::Receipt, version::NetworkVersion, ActorID, MethodNum,
 };
-use recall_executor::RecallExecutor;
-use recall_kernel::RecallKernel;
+use ipc_storage_executor::IPCStorageExecutor;
+use ipc_storage_kernel::IPCStorageKernel;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::fmt;
@@ -161,8 +161,9 @@ where
     DB: Blockstore + Clone + 'static,
 {
     #[allow(clippy::type_complexity)]
-    executor:
-        RecallExecutor<RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>,
+    executor: IPCStorageExecutor<
+        IPCStorageKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+    >,
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
     /// The main motivation to add it here was to make it easier to pass in data to the
@@ -213,7 +214,7 @@ where
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
-        let mut executor = RecallExecutor::new(engine.clone(), machine)?;
+        let mut executor = IPCStorageExecutor::new(engine.clone(), machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
         let base_fee = block_gas_tracker.base_fee().clone();
@@ -318,8 +319,8 @@ where
     pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
     where
         F: FnOnce(
-            &mut RecallExecutor<
-                RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+            &mut IPCStorageExecutor<
+                IPCStorageKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
             >,
         ) -> anyhow::Result<R>,
     {

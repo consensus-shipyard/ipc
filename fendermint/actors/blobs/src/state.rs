@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::GetStatsReturn;
-use fendermint_actor_recall_config_shared::RecallConfig;
+use fendermint_actor_ipc_storage_config_shared::IPCStorageConfig;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
@@ -44,7 +44,7 @@ impl State {
     }
 
     /// Returns stats about the current actor state.
-    pub fn get_stats(&self, config: &RecallConfig, balance: TokenAmount) -> GetStatsReturn {
+    pub fn get_stats(&self, config: &IPCStorageConfig, balance: TokenAmount) -> GetStatsReturn {
         GetStatsReturn {
             balance,
             capacity_free: self.capacity_available(config.blob_capacity),
@@ -129,7 +129,7 @@ mod tests {
     fn test_simulate_one_day() {
         setup_logs();
 
-        let config = RecallConfig {
+        let config = IPCStorageConfig {
             blob_credit_debit_interval: ChainEpoch::from(10),
             blob_min_ttl: ChainEpoch::from(10),
             ..Default::default()
@@ -161,7 +161,7 @@ mod tests {
         }
 
         fn generate_test_users<BS: Blockstore>(
-            config: &RecallConfig,
+            config: &IPCStorageConfig,
             store: &BS,
             state: &mut State,
             credit_tokens: TokenAmount,

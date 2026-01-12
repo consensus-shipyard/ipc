@@ -5,7 +5,7 @@
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, clock::ChainEpoch};
-use recall_ipld::hamt::MapKey;
+use ipc_storage_ipld::hamt::MapKey;
 use serde::{Deserialize, Serialize};
 
 use crate::bytes::B256;

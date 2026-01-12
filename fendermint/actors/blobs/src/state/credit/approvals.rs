@@ -7,7 +7,7 @@ use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use recall_ipld::{hamt, hamt::map::TrackedFlushResult};
+use ipc_storage_ipld::{hamt, hamt::map::TrackedFlushResult};
 
 /// HAMT wrapper tracking [`CreditApproval`]s by account address.
 #[derive(Debug, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]

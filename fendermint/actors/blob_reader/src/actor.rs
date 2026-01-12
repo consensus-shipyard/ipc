@@ -10,7 +10,7 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::MethodNum;
-use recall_actor_sdk::evm::emit_evm_event;
+use ipc_storage_actor_sdk::evm::emit_evm_event;
 
 use crate::shared::{
     CloseReadRequestParams, GetOpenReadRequestsParams, GetPendingReadRequestsParams,
@@ -166,7 +166,7 @@ mod tests {
     };
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
-    use recall_actor_sdk::evm::to_actor_event;
+    use ipc_storage_actor_sdk::evm::to_actor_event;
 
     pub fn construct_and_verify() -> MockRuntime {
         let rt = MockRuntime {

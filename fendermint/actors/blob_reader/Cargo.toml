@@ -21,12 +21,12 @@ frc42_dispatch = { workspace = true }
 log = { workspace = true, features = ["std"] }
 num-traits = { workspace = true }
 num-derive = { workspace = true }
-recall_sol_facade = { workspace = true, features = ["blob-reader"] }
+ipc_storage_sol_facade = { workspace = true, features = ["blob-reader"] }
 serde = { workspace = true, features = ["derive"] }
 
 fendermint_actor_blobs_shared = { path = "../blobs/shared" }
-recall_actor_sdk = { path = "../../../ipc-storage/actor_sdk" }
-recall_ipld = { path = "../../../ipc-storage/ipld" }
+ipc_storage_actor_sdk = { path = "../../../ipc-storage/actor_sdk" }
+ipc_storage_ipld = { path = "../../../ipc-storage/ipld" }
 
 [dev-dependencies]
 fendermint_actor_blobs_testing = { path = "../blobs/testing" }

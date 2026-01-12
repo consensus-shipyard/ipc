@@ -10,7 +10,7 @@ use fendermint_actor_blobs_shared::{
 use fendermint_actor_blobs_testing::{
     new_address, new_hash, new_metadata_hash, new_pk, setup_logs,
 };
-use fendermint_actor_recall_config_shared::RecallConfig;
+use fendermint_actor_ipc_storage_config_shared::IPCStorageConfig;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::{Blockstore, MemoryBlockstore};
 use fvm_shared::{address::Address, bigint::BigInt, clock::ChainEpoch, econ::TokenAmount};
@@ -24,7 +24,7 @@ use crate::{caller::DelegationOptions, testing::check_approval_used, State};
 #[test]
 fn test_add_blob_refund() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -48,7 +48,7 @@ fn test_add_blob_refund() {
 #[test]
 fn test_add_blob_refund_with_approval() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -88,7 +88,7 @@ fn test_add_blob_refund_with_approval() {
 
 #[allow(clippy::too_many_arguments)]
 fn add_blob_refund<BS: Blockstore>(
-    config: &RecallConfig,
+    config: &IPCStorageConfig,
     store: &BS,
     mut state: State,
     caller: Address,
@@ -278,7 +278,7 @@ fn add_blob_refund<BS: Blockstore>(
 #[test]
 fn test_add_blob_same_hash_same_account() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -302,7 +302,7 @@ fn test_add_blob_same_hash_same_account() {
 #[test]
 fn test_add_blob_same_hash_same_account_with_approval() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -342,7 +342,7 @@ fn test_add_blob_same_hash_same_account_with_approval() {
 
 #[allow(clippy::too_many_arguments)]
 fn add_blob_same_hash_same_account<BS: Blockstore>(
-    config: &RecallConfig,
+    config: &IPCStorageConfig,
     store: &BS,
     mut state: State,
     caller: Address,
@@ -716,7 +716,7 @@ fn add_blob_same_hash_same_account<BS: Blockstore>(
 fn test_add_blob_ttl_exceeds_account_max_ttl() {
     setup_logs();
 
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     const YEAR: ChainEpoch = 365 * 24 * 60 * 60;
 
     // Test cases structure
@@ -791,7 +791,7 @@ fn test_add_blob_ttl_exceeds_account_max_ttl() {
 
     // Run all test cases
     for tc in test_cases {
-        let config = RecallConfig::default();
+        let config = IPCStorageConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let caller = new_address();
@@ -885,7 +885,7 @@ fn test_add_blob_ttl_exceeds_account_max_ttl() {
 #[test]
 fn test_add_blob_with_overflowing_ttl() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -929,7 +929,7 @@ fn test_add_blob_with_overflowing_ttl() {
 #[test]
 fn test_finalize_blob_from_bad_state() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -984,7 +984,7 @@ fn test_finalize_blob_from_bad_state() {
 #[test]
 fn test_finalize_blob_resolved() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -1060,7 +1060,7 @@ fn test_finalize_blob_resolved() {
 #[test]
 fn test_finalize_blob_failed() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -1150,7 +1150,7 @@ fn test_finalize_blob_failed() {
 #[test]
 fn test_finalize_blob_failed_refund() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -1292,7 +1292,7 @@ fn test_finalize_blob_failed_refund() {
 #[test]
 fn test_delete_blob_refund() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -1316,7 +1316,7 @@ fn test_delete_blob_refund() {
 #[test]
 fn test_delete_blob_refund_with_approval() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let caller = new_address();
@@ -1356,7 +1356,7 @@ fn test_delete_blob_refund_with_approval() {
 
 #[allow(clippy::too_many_arguments)]
 fn delete_blob_refund<BS: Blockstore>(
-    config: &RecallConfig,
+    config: &IPCStorageConfig,
     store: &BS,
     mut state: State,
     caller: Address,
@@ -1537,7 +1537,7 @@ fn delete_blob_refund<BS: Blockstore>(
 #[test]
 fn test_trim_blob_expiries() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
 
     const HOUR: ChainEpoch = 3600;
     const TWO_HOURS: ChainEpoch = HOUR * 2;
@@ -1728,7 +1728,7 @@ fn test_trim_blob_expiries() {
 #[test]
 fn test_trim_blob_expiries_pagination() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
 
     // Test cases for pagination
     struct PaginationTest {
@@ -1932,7 +1932,7 @@ fn test_trim_blob_expiries_pagination() {
 fn test_trim_blob_expiries_for_multiple_accounts() {
     setup_logs();
 
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let address1 = new_address();

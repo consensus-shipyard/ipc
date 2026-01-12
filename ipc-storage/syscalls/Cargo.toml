@@ -1,5 +1,5 @@
 [package]
-name = "recall_syscalls"
+name = "ipc_storage_syscalls"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -15,5 +15,5 @@ iroh-blobs = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 
-recall_kernel_ops = { path = "../kernel/ops" }
+ipc_storage_kernel_ops = { path = "../kernel/ops" }
 iroh_manager = { path = "../iroh_manager" }

@@ -18,10 +18,10 @@ use fil_actors_runtime::{
     ActorError,
 };
 use fvm_shared::address::Address;
-use recall_actor_sdk::evm::{
+use ipc_storage_actor_sdk::evm::{
     emit_evm_event, InputData, InvokeContractParams, InvokeContractReturn,
 };
-use recall_ipld::hamt::BytesKey;
+use ipc_storage_ipld::hamt::BytesKey;
 
 use crate::shared::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
@@ -506,7 +506,7 @@ mod tests {
     use fvm_shared::{
         clock::ChainEpoch, econ::TokenAmount, error::ExitCode, sys::SendFlags, MethodNum,
     };
-    use recall_actor_sdk::evm::to_actor_event;
+    use ipc_storage_actor_sdk::evm::to_actor_event;
 
     fn get_runtime() -> (MockRuntime, Address) {
         let origin_id_addr = Address::new_id(110);

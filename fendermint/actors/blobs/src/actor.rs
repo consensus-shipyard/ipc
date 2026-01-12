@@ -10,7 +10,7 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::MethodNum;
-use recall_actor_sdk::evm::{InputData, InvokeContractParams, InvokeContractReturn};
+use ipc_storage_actor_sdk::evm::{InputData, InvokeContractParams, InvokeContractReturn};
 
 use crate::{
     sol_facade::{blobs as sol_blobs, credit as sol_credit, AbiCall, AbiCallRuntime},
@@ -221,7 +221,7 @@ impl ActorCode for BlobsActor {
 fn delete_from_disc(hash: B256) -> Result<(), ActorError> {
     #[cfg(feature = "fil-actor")]
     {
-        recall_actor_sdk::storage::delete_blob(hash.0).map_err(|en| {
+        ipc_storage_actor_sdk::storage::delete_blob(hash.0).map_err(|en| {
             ActorError::unspecified(format!("failed to delete blob from disc: {:?}", en))
         })?;
         log::debug!("deleted blob {} from disc", hash);

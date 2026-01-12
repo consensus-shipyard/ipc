@@ -1,4 +1,4 @@
-# Recall Bucket Storage Guide (Path-Based Access)
+# Bucket Storage Guide (Path-Based Access)
 
 ## Configuration
 

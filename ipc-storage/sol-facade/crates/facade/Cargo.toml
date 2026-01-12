@@ -1,12 +1,8 @@
 [package]
-name = "recall_sol_facade"
-authors = ["Recall Contributors"]
-description = "Rust bindings for the Recall Solidity Facades"
+name = "ipc_storage_sol_facade"
+description = "Rust bindings for the Solidity Facades"
 edition = "2021"
-homepage = "https://github.com/recallnet/contracts/"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/recallnet/contracts/"
-keywords = ["recall", "rust"]
 version = "0.1.2"
 
 [dependencies]

@@ -13,12 +13,12 @@ use num_derive::FromPrimitive;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 
-pub const RECALL_CONFIG_ACTOR_ID: ActorID = 70;
-pub const RECALL_CONFIG_ACTOR_ADDR: Address = Address::new_id(RECALL_CONFIG_ACTOR_ID);
+pub const IPC_STORAGE_CONFIG_ACTOR_ID: ActorID = 70;
+pub const IPC_STORAGE_CONFIG_ACTOR_ADDR: Address = Address::new_id(IPC_STORAGE_CONFIG_ACTOR_ID);
 
 /// The updatable config.
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
-pub struct RecallConfig {
+pub struct IPCStorageConfig {
     /// The total storage capacity of the subnet.
     pub blob_capacity: u64,
     /// The token to credit rate.
@@ -35,7 +35,7 @@ pub struct RecallConfig {
     pub account_debit_batch_size: u64,
 }
 
-impl Default for RecallConfig {
+impl Default for IPCStorageConfig {
     fn default() -> Self {
         Self {
             blob_capacity: 10 * 1024 * 1024 * 1024 * 1024, // 10 TiB
@@ -56,7 +56,7 @@ impl Default for RecallConfig {
 #[serde(transparent)]
 pub struct SetAdminParams(pub Address);
 
-pub type SetConfigParams = RecallConfig;
+pub type SetConfigParams = IPCStorageConfig;
 
 #[derive(FromPrimitive)]
 #[repr(u64)]
@@ -70,7 +70,7 @@ pub enum Method {
 
 pub fn get_admin(rt: &impl Runtime) -> Result<Option<Address>, ActorError> {
     deserialize_block(extract_send_result(rt.send(
-        &RECALL_CONFIG_ACTOR_ADDR,
+        &IPC_STORAGE_CONFIG_ACTOR_ADDR,
         Method::GetAdmin as MethodNum,
         None,
         TokenAmount::zero(),
@@ -79,7 +79,7 @@ pub fn get_admin(rt: &impl Runtime) -> Result<Option<Address>, ActorError> {
     ))?)
 }
 
-/// Requires caller is the Recall Admin.
+/// Requires caller is the ipc storage admin.
 pub fn require_caller_is_admin(rt: &impl Runtime) -> Result<(), ActorError> {
     let admin = get_admin(rt)?;
     if admin.is_none() {
@@ -91,9 +91,9 @@ pub fn require_caller_is_admin(rt: &impl Runtime) -> Result<(), ActorError> {
     }
 }
 
-pub fn get_config(rt: &impl Runtime) -> Result<RecallConfig, ActorError> {
+pub fn get_config(rt: &impl Runtime) -> Result<IPCStorageConfig, ActorError> {
     deserialize_block(extract_send_result(rt.send(
-        &RECALL_CONFIG_ACTOR_ADDR,
+        &IPC_STORAGE_CONFIG_ACTOR_ADDR,
         Method::GetConfig as MethodNum,
         None,
         TokenAmount::zero(),

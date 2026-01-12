@@ -13,7 +13,7 @@ use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, clock::ChainEpoch};
-use recall_ipld::hamt::{self, map::TrackedFlushResult, BytesKey, MapKey};
+use ipc_storage_ipld::hamt::{self, map::TrackedFlushResult, BytesKey, MapKey};
 use serde::{Deserialize, Serialize};
 
 const MAX_LIST_LIMIT: usize = 1000;

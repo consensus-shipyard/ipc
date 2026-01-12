@@ -9,7 +9,7 @@ use fendermint_actor_blobs_shared::{
 use fendermint_actor_blobs_testing::{
     new_address, new_hash, new_metadata_hash, new_pk, setup_logs,
 };
-use fendermint_actor_recall_config_shared::RecallConfig;
+use fendermint_actor_ipc_storage_config_shared::IPCStorageConfig;
 use fvm_ipld_blockstore::MemoryBlockstore;
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
 use num_traits::Zero;
@@ -50,7 +50,7 @@ fn check_approvals_match(
 #[test]
 fn test_buy_credit_success() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let to = new_address();
@@ -70,7 +70,7 @@ fn test_buy_credit_success() {
 #[test]
 fn test_buy_credit_negative_amount() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let to = new_address();
@@ -84,7 +84,7 @@ fn test_buy_credit_negative_amount() {
 #[test]
 fn test_buy_credit_at_capacity() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let to = new_address();
@@ -108,7 +108,7 @@ fn test_approve_credit_success() {
     let to = new_address();
     let current_epoch = 1;
 
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
 
     // No limit or expiry
     let res = state.approve_credit(
@@ -200,7 +200,7 @@ fn test_approve_credit_invalid_ttl() {
     let to = new_address();
     let current_epoch = 1;
 
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let ttl = ChainEpoch::from(config.blob_min_ttl - 1);
     let res = state.approve_credit(
         &config,
@@ -229,7 +229,7 @@ fn test_approve_credit_overflowing_ttl() {
     let to = new_address();
     let current_epoch = 1;
 
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
 
     let res = state.approve_credit(
         &config,
@@ -250,7 +250,7 @@ fn test_approve_credit_overflowing_ttl() {
 #[test]
 fn test_approve_credit_insufficient_credit() {
     setup_logs();
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let store = MemoryBlockstore::default();
     let mut state = State::new(&store).unwrap();
     let from = new_address();
@@ -334,7 +334,7 @@ fn test_revoke_credit_success() {
     let to = new_address();
     let current_epoch = 1;
 
-    let config = RecallConfig::default();
+    let config = IPCStorageConfig::default();
     let res = state.approve_credit(
         &config,
         &store,

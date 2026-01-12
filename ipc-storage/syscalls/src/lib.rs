@@ -7,12 +7,12 @@ use std::net::SocketAddr;
 use fvm::kernel::{ExecutionError, Result, SyscallError};
 use fvm::syscalls::Context;
 use fvm_shared::error::ErrorNumber;
+use ipc_storage_kernel_ops::IPCStorageOps;
 use iroh_blobs::Hash;
 use iroh_manager::BlobsClient;
-use recall_kernel_ops::RecallOps;
 use tokio::sync::Mutex;
 
-pub const MODULE_NAME: &str = "recall";
+pub const MODULE_NAME: &str = "ipc_storage";
 pub const DELETE_BLOB_SYSCALL_FUNCTION_NAME: &str = "delete_blob";
 
 const ENV_IROH_RPC_ADDR: &str = "IROH_SYSCALL_RPC_ADDR";
@@ -31,7 +31,7 @@ fn hash_source(bytes: &[u8]) -> Result<[u8; 32]> {
 }
 
 /// Deletes a blob by hash from backing storage.
-pub fn delete_blob(context: Context<'_, impl RecallOps>, hash_offset: u32) -> Result<()> {
+pub fn delete_blob(context: Context<'_, impl IPCStorageOps>, hash_offset: u32) -> Result<()> {
     let hash_bytes = context.memory.try_slice(hash_offset, 32)?;
     let seq_hash = Hash::from_bytes(hash_source(hash_bytes)?);
 

@@ -6,7 +6,7 @@ use fil_actors_runtime::{actor_error, runtime::Runtime, ActorError};
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::event::{ActorEvent, Entry, Flags};
 use fvm_shared::IPLD_RAW;
-use recall_sol_facade::primitives::IntoLogData;
+use ipc_storage_sol_facade::primitives::IntoLogData;
 
 /// The event key prefix for the Ethereum log topics.
 const EVENT_TOPIC_KEY_PREFIX: &str = "t";

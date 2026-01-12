@@ -61,8 +61,8 @@ members = [
   "fendermint/actors/blob_reader",
   "fendermint/actors/bucket",            # S3-like object storage
   "fendermint/actors/timehub",           # Timestamping service
-  "fendermint/actors/recall_config",
-  "fendermint/actors/recall_config/shared",
+  "fendermint/actors/ipc_storage_config",
+  "fendermint/actors/ipc_storage_config/shared",
 
   # storage components (netwatch patched for socket2 0.5 compatibility!)
   "ipc-storage/kernel",
@@ -129,7 +129,7 @@ hex-literal = "0.4.1"
 http = "0.2.12"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
-# Recall/Iroh dependencies
+# Iroh dependencies
 ambassador = "0.3.5"
 iroh = "0.35"
 iroh-base = "0.35"
@@ -192,7 +192,7 @@ regex = "1"
 replace_with = "0.1.7"
 statrs = "0.18.0"
 reqwest = { version = "0.11.13", features = ["json"] }
-# Recall entanglement library
+# entanglement library
 entangler = { package = "recall_entangler", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
 entangler_storage = { package = "recall_entangler_storage", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
 # Objects HTTP API dependencies
@@ -200,8 +200,8 @@ warp = "0.3"
 uuid = { version = "1.0", features = ["v4"] }
 mime_guess = "2.0"
 urlencoding = "2.1"
-# Recall Solidity facades (vendored locally, upgraded to FVM 4.7)
-recall_sol_facade = { path = "ipc-storage/sol-facade/crates/facade" }
+# Solidity facades (vendored locally, upgraded to FVM 4.7)
+ipc_storage_sol_facade = { path = "ipc-storage/sol-facade/crates/facade" }
 sha2 = "0.10"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"

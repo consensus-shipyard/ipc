@@ -5,13 +5,13 @@
 use fendermint_actor_blobs_shared::credit::{
     Credit, CreditAllowance, CreditApproval, GasAllowance,
 };
-use fendermint_actor_recall_config_shared::RecallConfig;
+use fendermint_actor_ipc_storage_config_shared::IPCStorageConfig;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
+use ipc_storage_ipld::hamt;
 use log::debug;
 use num_traits::Zero;
-use recall_ipld::hamt;
 
 use crate::state::accounts::Account;
 
@@ -375,7 +375,7 @@ impl<'a, BS: Blockstore> Caller<'a, BS> {
     /// Validates a blob TTL for the subscriber.
     pub fn validate_ttl_usage(
         &self,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         ttl: Option<ChainEpoch>,
     ) -> Result<ChainEpoch, ActorError> {
         let ttl = ttl.unwrap_or(config.blob_default_ttl);
@@ -500,7 +500,7 @@ impl<'a, BS: Blockstore> Delegation<'a, &'a BS> {
     /// Creates a new delegation from one account to another.
     pub fn update_or_create(
         store: &'a BS,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         accounts: &hamt::map::Hamt<'a, &'a BS, Address, Account>,
         from: Address,
         to: Address,

@@ -1,5 +1,5 @@
 [package]
-name = "recall_kernel_ops"
+name = "ipc_storage_kernel_ops"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true

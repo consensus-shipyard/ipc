@@ -14,9 +14,9 @@ use fendermint_actor_blobs_shared::{
 };
 use fil_actors_runtime::{actor_error, runtime::Runtime, ActorError};
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
-use recall_actor_sdk::{evm::TryIntoEVMEvent, util::token_to_biguint};
-pub use recall_sol_facade::credit::Calls;
-use recall_sol_facade::{
+use ipc_storage_actor_sdk::{evm::TryIntoEVMEvent, util::token_to_biguint};
+pub use ipc_storage_sol_facade::credit::Calls;
+use ipc_storage_sol_facade::{
     credit as sol,
     primitives::U256,
     types::{BigUintWrapper, SolCall, SolInterface, H160},
@@ -109,11 +109,11 @@ impl TryIntoEVMEvent for CreditDebited {
 
 // ----- Calls ----- //
 
-pub fn can_handle(input_data: &recall_actor_sdk::evm::InputData) -> bool {
+pub fn can_handle(input_data: &ipc_storage_actor_sdk::evm::InputData) -> bool {
     Calls::valid_selector(input_data.selector())
 }
 
-pub fn parse_input(input: &recall_actor_sdk::evm::InputData) -> Result<Calls, ActorError> {
+pub fn parse_input(input: &ipc_storage_actor_sdk::evm::InputData) -> Result<Calls, ActorError> {
     Calls::abi_decode_raw(input.selector(), input.calldata(), true)
         .map_err(|e| actor_error!(illegal_argument, format!("invalid call: {}", e)))
 }

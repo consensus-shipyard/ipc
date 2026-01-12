@@ -8,8 +8,8 @@ use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
+use fendermint_vm_interpreter::fvm::ipc_storage_env::{BlobPool, ReadRequestPool};
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
-use fendermint_vm_interpreter::fvm::recall_env::{BlobPool, ReadRequestPool};
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_iroh_resolver::iroh::IrohResolver;
@@ -128,7 +128,7 @@ pub async fn run(
 
     let parent_finality_votes = VoteTally::empty();
 
-    // Create Recall blob and read request resolution pools early so they can be used by IrohResolver
+    // Create blob and read request resolution pools early so they can be used by IrohResolver
     let blob_pool: BlobPool = ResolvePool::new();
     let read_request_pool: ReadRequestPool = ResolvePool::new();
 

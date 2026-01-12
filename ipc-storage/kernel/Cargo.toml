@@ -1,5 +1,5 @@
 [package]
-name = "recall_kernel"
+name = "ipc_storage_kernel"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -15,5 +15,5 @@ fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_shared = { workspace = true }
 
-recall_kernel_ops = { path = "./ops" }
-recall_syscalls = { path = "../syscalls" }
+ipc_storage_kernel_ops = { path = "./ops" }
+ipc_storage_syscalls = { path = "../syscalls" }

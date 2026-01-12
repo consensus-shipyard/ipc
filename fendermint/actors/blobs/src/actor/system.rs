@@ -13,14 +13,14 @@ use fendermint_actor_blobs_shared::{
         GetActiveOperatorsReturn, GetOperatorInfoParams, OperatorInfo, RegisterNodeOperatorParams,
     },
 };
-use fendermint_actor_recall_config_shared::get_config;
+use fendermint_actor_ipc_storage_config_shared::get_config;
 use fil_actors_runtime::{runtime::Runtime, ActorError, SYSTEM_ACTOR_ADDR};
 use fvm_shared::error::ExitCode;
-use num_traits::Zero;
-use recall_actor_sdk::{
+use ipc_storage_actor_sdk::{
     caller::{Caller, CallerOption},
     evm::emit_evm_event,
 };
+use num_traits::Zero;
 
 use crate::{
     actor::{delete_from_disc, BlobsActor},
@@ -32,7 +32,7 @@ use crate::{
 impl BlobsActor {
     /// Returns the gas allowance from a credit purchase for an address.
     ///
-    /// This method is called by the recall executor, and as such, cannot fail.
+    /// This method is called by the ipc_storage executor, and as such, cannot fail.
     pub fn get_gas_allowance(
         rt: &impl Runtime,
         params: GetGasAllowanceParams,
@@ -65,7 +65,7 @@ impl BlobsActor {
     /// The allowance update is applied to `sponsor` if it exists.
     /// The `from` address must have an approval from `sponsor`.
     /// The `from` address can be any actor, including those without delegated addresses.
-    /// This method is called by the recall executor, and as such, cannot fail.
+    /// This method is called by the ipc_storage executor, and as such, cannot fail.
     pub fn update_gas_allowance(
         rt: &impl Runtime,
         params: UpdateGasAllowanceParams,
@@ -315,7 +315,7 @@ impl BlobsActor {
 
     /// Debits accounts for current blob usage.
     ///
-    /// This is called by the system actor every X blocks, where X is set in the recall config actor.
+    /// This is called by the system actor every X blocks, where X is set in the ipc_storage config actor.
     pub fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 

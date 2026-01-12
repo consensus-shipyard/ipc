@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::credit::TokenCreditRate;
-use fendermint_actor_recall_config_shared::{
-    Method, RecallConfig, SetAdminParams, SetConfigParams,
+use fendermint_actor_ipc_storage_config_shared::{
+    IPCStorageConfig, Method, SetAdminParams, SetConfigParams,
 };
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
@@ -13,11 +13,11 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, bigint::BigUint, clock::ChainEpoch};
-use num_traits::Zero;
-use recall_actor_sdk::{
+use ipc_storage_actor_sdk::{
     evm::emit_evm_event,
     util::{to_delegated_address, to_id_and_delegated_address},
 };
+use num_traits::Zero;
 
 use crate::sol_facade::{ConfigAdminSet, ConfigSet};
 
@@ -26,14 +26,14 @@ mod sol_facade;
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
 
-pub const ACTOR_NAME: &str = "recall_config";
+pub const ACTOR_NAME: &str = "ipc_storage_config";
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct State {
     /// The admin address that is allowed to update the config.
     pub admin: Option<Address>,
-    /// The Recall network configuration.
-    pub config: RecallConfig,
+    /// The network configuration.
+    pub config: IPCStorageConfig,
 }
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
@@ -55,7 +55,7 @@ impl Actor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let st = State {
             admin: None,
-            config: RecallConfig {
+            config: IPCStorageConfig {
                 blob_capacity: params.initial_blob_capacity,
                 token_credit_rate: params.initial_token_credit_rate,
                 blob_credit_debit_interval: params.initial_blob_credit_debit_interval,
@@ -181,7 +181,7 @@ impl Actor {
         Ok(())
     }
 
-    fn get_config(rt: &impl Runtime) -> Result<RecallConfig, ActorError> {
+    fn get_config(rt: &impl Runtime) -> Result<IPCStorageConfig, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.state::<State>().map(|s| s.config)
     }
@@ -229,14 +229,16 @@ impl ActorCode for Actor {
 mod tests {
     use super::*;
 
-    use fendermint_actor_recall_config_shared::{RecallConfig, RECALL_CONFIG_ACTOR_ID};
+    use fendermint_actor_ipc_storage_config_shared::{
+        IPCStorageConfig, IPC_STORAGE_CONFIG_ACTOR_ID,
+    };
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::error::ExitCode;
-    use recall_actor_sdk::evm::to_actor_event;
+    use ipc_storage_actor_sdk::evm::to_actor_event;
 
     pub fn construct_and_verify(
         blob_capacity: u64,
@@ -246,7 +248,7 @@ mod tests {
         initial_blob_default_ttl: ChainEpoch,
     ) -> MockRuntime {
         let rt = MockRuntime {
-            receiver: Address::new_id(RECALL_CONFIG_ACTOR_ID),
+            receiver: Address::new_id(IPC_STORAGE_CONFIG_ACTOR_ID),
             ..Default::default()
         };
 
@@ -417,7 +419,7 @@ mod tests {
         let admin_event = to_actor_event(ConfigAdminSet::new(f4_eth_addr)).unwrap();
         rt.expect_emitted_event(admin_event);
 
-        let config = RecallConfig {
+        let config = IPCStorageConfig {
             blob_capacity: 2048,
             token_credit_rate: TokenCreditRate::from(10usize),
             blob_credit_debit_interval: ChainEpoch::from(1800),
@@ -446,23 +448,26 @@ mod tests {
         rt.verify();
 
         rt.expect_validate_caller_any();
-        let recall_config = rt
+        let ipc_storage_config = rt
             .call::<Actor>(Method::GetConfig as u64, None)
             .unwrap()
             .unwrap()
-            .deserialize::<RecallConfig>()
+            .deserialize::<IPCStorageConfig>()
             .unwrap();
         rt.verify();
 
-        assert_eq!(recall_config.blob_capacity, 2048);
+        assert_eq!(ipc_storage_config.blob_capacity, 2048);
         assert_eq!(
-            recall_config.token_credit_rate,
+            ipc_storage_config.token_credit_rate,
             TokenCreditRate::from(10usize)
         );
-        assert_eq!(recall_config.blob_credit_debit_interval, 1800);
-        assert_eq!(recall_config.blob_min_ttl, ChainEpoch::from(2 * 60 * 60));
+        assert_eq!(ipc_storage_config.blob_credit_debit_interval, 1800);
         assert_eq!(
-            recall_config.blob_default_ttl,
+            ipc_storage_config.blob_min_ttl,
+            ChainEpoch::from(2 * 60 * 60)
+        );
+        assert_eq!(
+            ipc_storage_config.blob_default_ttl,
             ChainEpoch::from(24 * 60 * 60)
         );
 
@@ -482,10 +487,10 @@ mod tests {
     fn test_set_invalid_config() {
         struct TestCase {
             name: &'static str,
-            config: RecallConfig,
+            config: IPCStorageConfig,
         }
 
-        let valid_config = RecallConfig {
+        let valid_config = IPCStorageConfig {
             blob_capacity: 2048,
             token_credit_rate: TokenCreditRate::from(10usize),
             blob_credit_debit_interval: ChainEpoch::from(1800),
@@ -499,7 +504,7 @@ mod tests {
             // Token credit rate validation
             TestCase {
                 name: "token credit rate cannot be zero",
-                config: RecallConfig {
+                config: IPCStorageConfig {
                     token_credit_rate: TokenCreditRate::from(0usize),
                     ..valid_config.clone()
                 },
@@ -507,7 +512,7 @@ mod tests {
             // Blob capacity validation
             TestCase {
                 name: "blob capacity cannot be zero",
-                config: RecallConfig {
+                config: IPCStorageConfig {
                     blob_capacity: 0,
                     ..valid_config.clone()
                 },
@@ -515,14 +520,14 @@ mod tests {
             // Credit debit interval validation
             TestCase {
                 name: "blob credit debit interval cannot be zero",
-                config: RecallConfig {
+                config: IPCStorageConfig {
                     blob_credit_debit_interval: 0,
                     ..valid_config.clone()
                 },
             },
             TestCase {
                 name: "blob credit debit interval cannot be negative",
-                config: RecallConfig {
+                config: IPCStorageConfig {
                     blob_credit_debit_interval: -1,
                     ..valid_config.clone()
                 },
@@ -530,21 +535,21 @@ mod tests {
             // TTL validations
             TestCase {
                 name: "blob min ttl cannot be negative",
-                config: RecallConfig {
+                config: IPCStorageConfig {
                     blob_min_ttl: -1,
                     ..valid_config.clone()
                 },
             },
             TestCase {
                 name: "blob min ttl cannot be zero",
-                config: RecallConfig {
+                config: IPCStorageConfig {
                     blob_min_ttl: 0,
                     ..valid_config.clone()
                 },
             },
             TestCase {
                 name: "blob default ttl must be greater than or equal to min ttl",
-                config: RecallConfig {
+                config: IPCStorageConfig {
                     blob_min_ttl: 4 * 60 * 60,
                     blob_default_ttl: 2 * 60 * 60,
                     ..valid_config.clone()
@@ -552,14 +557,14 @@ mod tests {
             },
             TestCase {
                 name: "blob default ttl cannot be zero",
-                config: RecallConfig {
+                config: IPCStorageConfig {
                     blob_default_ttl: 0,
                     ..valid_config.clone()
                 },
             },
             TestCase {
                 name: "blob default ttl cannot be negative",
-                config: RecallConfig {
+                config: IPCStorageConfig {
                     blob_default_ttl: -1,
                     ..valid_config.clone()
                 },
@@ -598,21 +603,21 @@ mod tests {
         let rt = construct_and_verify(1024, TokenCreditRate::from(5usize), 3600, 3600, 3600);
 
         rt.expect_validate_caller_any();
-        let recall_config = rt
+        let ipc_storage_config = rt
             .call::<Actor>(Method::GetConfig as u64, None)
             .unwrap()
             .unwrap()
-            .deserialize::<RecallConfig>()
+            .deserialize::<IPCStorageConfig>()
             .unwrap();
         rt.verify();
 
-        assert_eq!(recall_config.blob_capacity, 1024);
+        assert_eq!(ipc_storage_config.blob_capacity, 1024);
         assert_eq!(
-            recall_config.token_credit_rate,
+            ipc_storage_config.token_credit_rate,
             TokenCreditRate::from(5usize)
         );
-        assert_eq!(recall_config.blob_credit_debit_interval, 3600);
-        assert_eq!(recall_config.blob_min_ttl, 3600);
-        assert_eq!(recall_config.blob_default_ttl, 3600);
+        assert_eq!(ipc_storage_config.blob_credit_debit_interval, 3600);
+        assert_eq!(ipc_storage_config.blob_min_ttl, 3600);
+        assert_eq!(ipc_storage_config.blob_default_ttl, 3600);
     }
 }

@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-//! Helper functions for Recall blob and read request operations
+//! Helper functions for blob and read request operations
 use crate::fvm::constants::BLOCK_GAS_LIMIT;
 use anyhow::{anyhow, Result};
 use fendermint_actor_blob_reader::{

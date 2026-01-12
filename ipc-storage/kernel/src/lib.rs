@@ -19,7 +19,7 @@ use fvm_shared::randomness::RANDOMNESS_LENGTH;
 use fvm_shared::sys::out::network::NetworkContext;
 use fvm_shared::sys::out::vm::MessageContext;
 use fvm_shared::{address::Address, econ::TokenAmount, ActorID, MethodNum};
-use recall_kernel_ops::RecallOps;
+use ipc_storage_kernel_ops::IPCStorageOps;
 
 #[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
@@ -34,9 +34,9 @@ use recall_kernel_ops::RecallOps;
 #[delegate(NetworkOps, where = "C: CallManager")]
 #[delegate(RandomnessOps, where = "C: CallManager")]
 #[delegate(SelfOps, where = "C: CallManager")]
-pub struct RecallKernel<C>(pub DefaultKernel<C>);
+pub struct IPCStorageKernel<C>(pub DefaultKernel<C>);
 
-impl<C> RecallOps for RecallKernel<C>
+impl<C> IPCStorageOps for IPCStorageKernel<C>
 where
     C: CallManager,
 {
@@ -52,7 +52,7 @@ where
     }
 }
 
-impl<K> SyscallHandler<K> for RecallKernel<K::CallManager>
+impl<K> SyscallHandler<K> for IPCStorageKernel<K::CallManager>
 where
     K: Kernel
         + ActorOps
@@ -66,21 +66,21 @@ where
         + NetworkOps
         + RandomnessOps
         + SelfOps
-        + RecallOps,
+        + IPCStorageOps,
 {
     fn link_syscalls(linker: &mut Linker<K>) -> anyhow::Result<()> {
         DefaultKernel::<K::CallManager>::link_syscalls(linker)?;
         linker.link_syscall(
-            recall_syscalls::MODULE_NAME,
-            recall_syscalls::DELETE_BLOB_SYSCALL_FUNCTION_NAME,
-            recall_syscalls::delete_blob,
+            ipc_storage_syscalls::MODULE_NAME,
+            ipc_storage_syscalls::DELETE_BLOB_SYSCALL_FUNCTION_NAME,
+            ipc_storage_syscalls::delete_blob,
         )?;
 
         Ok(())
     }
 }
 
-impl<C> Kernel for RecallKernel<C>
+impl<C> Kernel for IPCStorageKernel<C>
 where
     C: CallManager,
 {
@@ -103,7 +103,7 @@ where
         value_received: TokenAmount,
         read_only: bool,
     ) -> Self {
-        RecallKernel(DefaultKernel::new(
+        IPCStorageKernel(DefaultKernel::new(
             mgr,
             blocks,
             caller,

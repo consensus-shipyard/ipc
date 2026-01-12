@@ -88,8 +88,8 @@ dependencies = [
  "fendermint_actor_f3_light_client",
  "fendermint_actor_gas_market_eip1559",
  "fendermint_actor_init",
+ "fendermint_actor_ipc_storage_config",
  "fendermint_actor_machine",
- "fendermint_actor_recall_config",
  "fendermint_actor_timehub",
 ]
 
@@ -3885,12 +3885,12 @@ dependencies = [
  "fvm_shared",
  "hex-literal 0.4.1",
  "integer-encoding 3.0.4",
+ "ipc_storage_actor_sdk",
+ "ipc_storage_sol_facade",
  "log",
  "multihash 0.18.1",
  "num-derive 0.4.2",
  "num-traits",
- "recall_actor_sdk",
- "recall_sol_facade",
  "serde",
 ]
 
@@ -3908,12 +3908,12 @@ dependencies = [
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
  "hex-literal 0.4.1",
+ "ipc_storage_actor_sdk",
+ "ipc_storage_ipld",
+ "ipc_storage_sol_facade",
  "log",
  "num-derive 0.4.2",
  "num-traits",
- "recall_actor_sdk",
- "recall_ipld",
- "recall_sol_facade",
  "serde",
 ]
 
@@ -3926,19 +3926,19 @@ dependencies = [
  "cid 0.11.1",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_blobs_testing",
- "fendermint_actor_recall_config_shared",
+ "fendermint_actor_ipc_storage_config_shared",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "fvm_ipld_blockstore 0.3.1",
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
  "hex-literal 0.4.1",
+ "ipc_storage_actor_sdk",
+ "ipc_storage_ipld",
+ "ipc_storage_sol_facade",
  "log",
  "num-traits",
  "rand 0.8.5",
- "recall_actor_sdk",
- "recall_ipld",
- "recall_sol_facade",
  "serde",
 ]
 
@@ -3953,9 +3953,9 @@ dependencies = [
  "frc42_dispatch 8.0.0",
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
+ "ipc_storage_ipld",
  "num-derive 0.4.2",
  "num-traits",
- "recall_ipld",
  "serde",
 ]
 
@@ -3987,13 +3987,13 @@ dependencies = [
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
  "hex-literal 0.4.1",
+ "ipc_storage_actor_sdk",
+ "ipc_storage_ipld",
+ "ipc_storage_sol_facade",
  "num-derive 0.4.2",
  "num-traits",
  "quickcheck",
  "quickcheck_macros",
- "recall_actor_sdk",
- "recall_ipld",
- "recall_sol_facade",
  "serde",
 ]
 
@@ -4096,6 +4096,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_ipc_storage_config"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fendermint_actor_blobs_shared",
+ "fendermint_actor_ipc_storage_config_shared",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "ipc_storage_actor_sdk",
+ "ipc_storage_sol_facade",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "fendermint_actor_ipc_storage_config_shared"
+version = "0.1.0"
+dependencies = [
+ "fendermint_actor_blobs_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch 8.0.0",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "num-derive 0.4.2",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "fendermint_actor_machine"
 version = "0.1.0"
 dependencies = [
@@ -4106,40 +4138,8 @@ dependencies = [
  "fvm_ipld_blockstore 0.3.1",
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
- "recall_actor_sdk",
- "recall_sol_facade",
- "serde",
-]
-
-[[package]]
-name = "fendermint_actor_recall_config"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "fendermint_actor_blobs_shared",
- "fendermint_actor_recall_config_shared",
- "fil_actors_evm_shared",
- "fil_actors_runtime",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "hex-literal 0.4.1",
- "num-traits",
- "recall_actor_sdk",
- "recall_sol_facade",
- "serde",
-]
-
-[[package]]
-name = "fendermint_actor_recall_config_shared"
-version = "0.1.0"
-dependencies = [
- "fendermint_actor_blobs_shared",
- "fil_actors_runtime",
- "frc42_dispatch 8.0.0",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "num-derive 0.4.2",
- "num-traits",
+ "ipc_storage_actor_sdk",
+ "ipc_storage_sol_facade",
  "serde",
 ]
 
@@ -4159,11 +4159,11 @@ dependencies = [
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
  "hex-literal 0.4.1",
+ "ipc_storage_actor_sdk",
+ "ipc_storage_sol_facade",
  "multihash-codetable",
  "num-derive 0.4.2",
  "num-traits",
- "recall_actor_sdk",
- "recall_sol_facade",
  "serde",
  "tracing",
 ]
@@ -4728,8 +4728,8 @@ dependencies = [
  "fendermint_actor_f3_light_client",
  "fendermint_actor_gas_market_eip1559",
  "fendermint_actor_init",
- "fendermint_actor_recall_config",
- "fendermint_actor_recall_config_shared",
+ "fendermint_actor_ipc_storage_config",
+ "fendermint_actor_ipc_storage_config_shared",
  "fendermint_crypto",
  "fendermint_eth_deployer",
  "fendermint_eth_hardhat",
@@ -4760,6 +4760,8 @@ dependencies = [
  "ipc-api",
  "ipc-observability",
  "ipc_actors_abis",
+ "ipc_storage_executor",
+ "ipc_storage_kernel",
  "iroh",
  "iroh-blobs",
  "libipld",
@@ -4772,8 +4774,6 @@ dependencies = [
  "quickcheck",
  "quickcheck_macros",
  "rand 0.8.5",
- "recall_executor",
- "recall_kernel",
  "serde",
  "serde_json",
  "serde_with 2.3.3",
@@ -7402,6 +7402,112 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "ipc_storage_actor_sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.11.1",
+ "fil_actor_adm",
+ "fil_actors_runtime",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_sdk",
+ "fvm_shared",
+ "ipc_storage_sol_facade",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "ipc_storage_executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.11.1",
+ "fendermint_actor_blobs_shared",
+ "fendermint_vm_actor_interface",
+ "fvm",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "num-traits",
+ "replace_with",
+ "tracing",
+]
+
+[[package]]
+name = "ipc_storage_ipld"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.11.1",
+ "fil_actors_runtime",
+ "fvm_ipld_amt",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_ipld_hamt",
+ "fvm_sdk",
+ "fvm_shared",
+ "integer-encoding 3.0.4",
+ "serde",
+]
+
+[[package]]
+name = "ipc_storage_kernel"
+version = "0.1.0"
+dependencies = [
+ "ambassador 0.3.7",
+ "anyhow",
+ "fvm",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_shared",
+ "ipc_storage_kernel_ops",
+ "ipc_storage_syscalls",
+]
+
+[[package]]
+name = "ipc_storage_kernel_ops"
+version = "0.1.0"
+dependencies = [
+ "fvm",
+]
+
+[[package]]
+name = "ipc_storage_sol_facade"
+version = "0.1.2"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-macro-expander",
+ "alloy-sol-macro-input",
+ "alloy-sol-types",
+ "anyhow",
+ "dunce",
+ "eyre",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "serde",
+ "serde_json",
+ "syn 2.0.114",
+ "thiserror 2.0.17",
+ "walkdir",
+]
+
+[[package]]
+name = "ipc_storage_syscalls"
+version = "0.1.0"
+dependencies = [
+ "fvm",
+ "fvm_shared",
+ "ipc_storage_kernel_ops",
+ "iroh-blobs",
+ "iroh_manager",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -11229,22 +11335,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "recall_actor_sdk"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "fil_actor_adm",
- "fil_actors_runtime",
- "fvm_ipld_encoding 0.5.3",
- "fvm_sdk",
- "fvm_shared",
- "num-traits",
- "recall_sol_facade",
- "serde",
-]
-
-[[package]]
 name = "recall_entangler"
 version = "0.1.0"
 source = "git+https://github.com/recallnet/entanglement.git?rev=aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc#aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc"
@@ -11282,96 +11372,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "uuid 1.19.0",
-]
-
-[[package]]
-name = "recall_executor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "fendermint_actor_blobs_shared",
- "fendermint_vm_actor_interface",
- "fvm",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "num-traits",
- "replace_with",
- "tracing",
-]
-
-[[package]]
-name = "recall_ipld"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "fil_actors_runtime",
- "fvm_ipld_amt",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_ipld_encoding 0.5.3",
- "fvm_ipld_hamt",
- "fvm_sdk",
- "fvm_shared",
- "integer-encoding 3.0.4",
- "serde",
-]
-
-[[package]]
-name = "recall_kernel"
-version = "0.1.0"
-dependencies = [
- "ambassador 0.3.7",
- "anyhow",
- "fvm",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_shared",
- "recall_kernel_ops",
- "recall_syscalls",
-]
-
-[[package]]
-name = "recall_kernel_ops"
-version = "0.1.0"
-dependencies = [
- "fvm",
-]
-
-[[package]]
-name = "recall_sol_facade"
-version = "0.1.2"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-macro-expander",
- "alloy-sol-macro-input",
- "alloy-sol-types",
- "anyhow",
- "dunce",
- "eyre",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "prettyplease",
- "proc-macro2",
- "quote",
- "regex",
- "serde",
- "serde_json",
- "syn 2.0.114",
- "thiserror 2.0.17",
- "walkdir",
-]
-
-[[package]]
-name = "recall_syscalls"
-version = "0.1.0"
-dependencies = [
- "fvm",
- "fvm_shared",
- "iroh-blobs",
- "iroh_manager",
- "recall_kernel_ops",
- "tokio",
- "tracing",
 ]
 
 [[package]]

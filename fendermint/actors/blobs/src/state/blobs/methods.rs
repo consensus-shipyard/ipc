@@ -10,15 +10,15 @@ use fendermint_actor_blobs_shared::{
     bytes::B256,
     credit::Credit,
 };
-use fendermint_actor_recall_config_shared::RecallConfig;
+use fendermint_actor_ipc_storage_config_shared::IPCStorageConfig;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{
     address::Address, bigint::BigInt, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
 };
+use ipc_storage_ipld::hamt::BytesKey;
 use log::debug;
 use num_traits::Zero;
-use recall_ipld::hamt::BytesKey;
 
 use super::{
     AddBlobStateParams, Blob, BlobSource, DeleteBlobStateParams, FinalizeBlobStateParams,
@@ -44,7 +44,7 @@ impl State {
     pub fn add_blob<BS: Blockstore>(
         &mut self,
         store: &BS,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         caller: Address,
         sponsor: Option<Address>,
         params: AddBlobStateParams,
@@ -580,7 +580,7 @@ impl State {
     /// Flushes state to the blockstore.
     pub fn trim_blob_expiries<BS: Blockstore>(
         &mut self,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         store: &BS,
         subscriber: Address,
         current_epoch: ChainEpoch,
@@ -699,7 +699,7 @@ impl State {
     /// Returns an account's current max allowed blob TTL by address.
     pub(crate) fn get_account_max_ttl<BS: Blockstore>(
         &self,
-        config: &RecallConfig,
+        config: &IPCStorageConfig,
         store: &BS,
         address: Address,
     ) -> Result<ChainEpoch, ActorError> {
