@@ -874,6 +874,31 @@ set_federated_power() {
     # Expand ipc_binary path for local mode
     ipc_binary="${ipc_binary/#\~/$HOME}"
 
+    # Get address for --from parameter
+    local from_address=$(yq eval ".validators[$primary_idx].address // null" "$CONFIG_FILE")
+    local primary_private_key=$(get_config_value "validators[$primary_idx].private_key")
+
+    # If no address in config, derive it from private key for known Anvil accounts
+    if [ "$from_address" = "null" ] || [ -z "$from_address" ]; then
+        case "$primary_private_key" in
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+                from_address="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+                ;;
+            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
+                from_address="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+                ;;
+            "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a")
+                from_address="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+                ;;
+            *)
+                log_error "Cannot determine --from address. Please add 'address' field to primary validator config."
+                return 1
+                ;;
+        esac
+    fi
+
+    log_info "Using address for transaction: $from_address"
+
     # Collect all validator public keys (without 0x prefix)
     local pubkeys=""
     for idx in "${!VALIDATOR_PUBKEYS[@]}"; do
@@ -892,8 +917,8 @@ set_federated_power() {
     log_info "Setting federated power for ${#VALIDATOR_PUBKEYS[@]} validators..."
     log_info "Power per validator: $validator_power"
 
-    # Run set-federated-power from primary node
-    local cmd="$ipc_binary subnet set-federated-power --subnet $subnet_id --validator-pubkeys $pubkeys --validator-power $validator_power --from t1d4gxuxytb6vg7cxzvxqk3cvbx4hv7vrtd6oa2mi"
+    # Run set-federated-power from primary node with dynamic address
+    local cmd="$ipc_binary subnet set-federated-power --subnet $subnet_id --validator-pubkeys $pubkeys --validator-power $validator_power --from $from_address"
 
     local output=$(exec_on_host "$primary_idx" "$cmd 2>&1")
 
