@@ -296,7 +296,8 @@ draw_dashboard() {
 
     # Network Health
     local peers=${METRICS[peers]:-0}
-    local expected_peers=2
+    # Calculate expected peers as validator_count - 1 (excludes self)
+    local expected_peers=$((${#VALIDATORS[@]} - 1))
     local peer_status=$(get_status_indicator $peers $expected_peers 1 true)
 
     echo -e "${BOLD}┌─ NETWORK HEALTH ──────────────────────────────────────────────────────┐${RESET}"
