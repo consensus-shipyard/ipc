@@ -21,7 +21,7 @@ use fvm_shared::econ::TokenAmount;
 use ipc_api::ethers_address_to_fil_address;
 use iroh::NodeAddr;
 use iroh_blobs::{hashseq::HashSeq, rpc::client::blobs::BlobStatus, util::SetTagOption, Hash};
-use iroh_manager::{connect_rpc, get_blob_hash_and_size, BlobsClient, IrohNode};
+use storage_node_iroh_manager::{connect_rpc, get_blob_hash_and_size, BlobsClient, IrohNode};
 use lazy_static::lazy_static;
 use mime_guess::get_mime_extensions_str;
 use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter};

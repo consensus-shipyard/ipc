@@ -6,7 +6,9 @@ mod executions;
 mod externs;
 pub mod interpreter;
 pub mod observe;
+#[cfg(feature = "storage-node")]
 pub mod recall_env;
+#[cfg(feature = "storage-node")]
 pub mod recall_helpers;
 pub mod state;
 pub mod store;

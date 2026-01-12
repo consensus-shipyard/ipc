@@ -1,0 +1,24 @@
+[package]
+name = "storage_node_integration"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Core dependencies (will be updated after path changes)
+anyhow.workspace = true
+fvm_shared.workspace = true
+fvm_ipld_encoding.workspace = true
+iroh-blobs.workspace = true
+iroh-base.workspace = true
+
+# Storage-node dependencies (paths to be updated)
+# These will reference other storage-node crates
+# fendermint_actor_storage_blobs_shared = { path = "../actors/blobs/shared" }
+
+[dev-dependencies]
+
+[features]
+default = []
+

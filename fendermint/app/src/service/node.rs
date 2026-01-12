@@ -12,8 +12,8 @@ use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interp
 use fendermint_vm_interpreter::fvm::recall_env::{BlobPool, ReadRequestPool};
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
-use fendermint_vm_iroh_resolver::iroh::IrohResolver;
-use fendermint_vm_iroh_resolver::pool::ResolvePool;
+use storage_node_iroh_resolver::iroh::IrohResolver;
+use storage_node_iroh_resolver::pool::ResolvePool;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};

@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members = [
+    # Core modules
+    "core/executor",
+    "core/kernel",
+    "core/kernel/ops",
+    "core/syscalls",
+    "core/sdk",
+    "core/ipld",
+
+    # Iroh integration
+    "iroh/manager",
+    "iroh/resolver",
+
+    # Storage actors
+    "actors/adm_types",
+    "actors/adm",
+    "actors/machine",
+    "actors/blobs",
+    "actors/blobs/shared",
+    "actors/blobs/testing",
+    "actors/blob_reader",
+    "actors/bucket",
+    "actors/timehub",
+    "actors/recall_config",
+    "actors/recall_config/shared",
+
+    # Integration layer
+    "integration",
+
+    # Contracts
+    "contracts/facade",
+]
+
+[workspace.package]
+authors = ["Protocol Labs"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+# This workspace inherits dependencies from the main workspace
+
