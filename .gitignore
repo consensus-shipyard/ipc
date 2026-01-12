@@ -3,6 +3,9 @@ target/
 node_modules/
 .DS_Store
 
+# Environment files with credentials
+.env
+.env.local
 
 # we migrated from npm to pnpm.
 package-lock.json
