@@ -43,27 +43,29 @@ ELK Stack Manager - IPC Validator Logs
 Usage: $0 <command> [options]
 
 Commands:
-  status                Show status of all services
-  start                 Start all ELK services
-  stop                  Stop all ELK services
-  restart [service]     Restart all services or specific service
-  logs [service]        View logs (follows by default)
-  health                Check health of all components
-  indices               List Elasticsearch indices
-  search <query>        Quick search logs
-  delete-old-logs <days> Delete logs older than N days
-  backup                Create Elasticsearch snapshot
-  update                Update all Docker images
-  clean                 Clean up old Docker resources
-  filebeat-status       Check Filebeat status on all validators
-  help                  Show this help message
+  status                    Show status of all services
+  start                     Start all ELK services
+  stop                      Stop all ELK services
+  restart [service]         Restart all services or specific service
+  logs [service]            View logs (follows by default)
+  health                    Check health of all components
+  indices                   List Elasticsearch indices
+  search <query>            Quick search logs
+  delete-old-logs <days>    Delete documents older than N days (recommended)
+  delete-old-indices <days> Delete entire indices older than N days (destructive)
+  backup                    Create Elasticsearch snapshot
+  update                    Update all Docker images
+  clean                     Clean up old Docker resources
+  filebeat-status           Check Filebeat status on all validators
+  help                      Show this help message
 
 Examples:
   $0 status
   $0 restart logstash
   $0 logs elasticsearch
   $0 search "validator:validator-1 AND ERROR"
-  $0 delete-old-logs 30
+  $0 delete-old-logs 30          # Delete old documents, keep indices
+  $0 delete-old-indices 90       # Delete entire old indices
   $0 filebeat-status
 
 EOF
@@ -232,7 +234,8 @@ cmd_delete_old_logs() {
         exit 1
     fi
 
-    log_warn "This will delete indices older than $days days"
+    log_warn "This will delete documents older than $days days from ipc-logs-* indices"
+    echo "Note: This will NOT delete the indices themselves, only old documents"
     read -p "Are you sure? (yes/no): " confirm
 
     if [ "$confirm" != "yes" ]; then
@@ -240,10 +243,12 @@ cmd_delete_old_logs() {
         exit 0
     fi
 
-    log_info "Deleting indices older than $days days..."
+    log_info "Deleting documents older than $days days..."
 
-    curl -s -u "elastic:${ELASTIC_PASSWORD:-changeme}" \
-        -X DELETE "http://localhost:9200/ipc-logs-*" \
+    # Use the correct endpoint: POST /_delete_by_query
+    # This deletes documents matching the query without deleting indices
+    local result=$(curl -s -u "elastic:${ELASTIC_PASSWORD:-changeme}" \
+        -X POST "http://localhost:9200/ipc-logs-*/_delete_by_query" \
         -H 'Content-Type: application/json' \
         -d "{
           \"query\": {
@@ -253,9 +258,71 @@ cmd_delete_old_logs() {
               }
             }
           }
-        }" | jq '.' 2>/dev/null
+        }")
 
-    log_success "Old logs deleted"
+    echo "$result" | jq '.' 2>/dev/null
+
+    # Extract deletion count
+    local deleted=$(echo "$result" | jq -r '.deleted // 0' 2>/dev/null)
+    log_success "Deleted $deleted documents older than $days days"
+}
+
+# Delete entire old indices (more aggressive cleanup)
+cmd_delete_old_indices() {
+    local days="$1"
+
+    if [ -z "$days" ]; then
+        log_error "Please specify number of days"
+        echo "Example: $0 delete-old-indices 30"
+        exit 1
+    fi
+
+    log_warn "⚠️  DESTRUCTIVE OPERATION ⚠️"
+    log_warn "This will DELETE ENTIRE INDICES older than $days days"
+    log_warn "All data in matching indices will be permanently lost"
+    echo ""
+    echo "To delete only old documents (recommended), use: $0 delete-old-logs $days"
+    echo ""
+    read -p "Type 'DELETE' to confirm index deletion: " confirm
+
+    if [ "$confirm" != "DELETE" ]; then
+        log_info "Cancelled"
+        exit 0
+    fi
+
+    log_info "Finding indices older than $days days..."
+
+    # Get list of indices with their creation dates
+    local cutoff_date=$(date -d "-${days} days" +%Y.%m.%d 2>/dev/null || date -v-${days}d +%Y.%m.%d 2>/dev/null)
+
+    # List all ipc-logs indices
+    local indices=$(curl -s -u "elastic:${ELASTIC_PASSWORD:-changeme}" \
+        "http://localhost:9200/_cat/indices/ipc-logs-*?h=index" 2>/dev/null)
+
+    local deleted_count=0
+
+    while IFS= read -r index; do
+        if [ -n "$index" ]; then
+            # Extract date from index name (format: ipc-logs-hostname-YYYY.MM.dd)
+            local index_date=$(echo "$index" | grep -oE '[0-9]{4}\.[0-9]{2}\.[0-9]{2}$')
+
+            if [ -n "$index_date" ]; then
+                # Compare dates (basic string comparison works for YYYY.MM.dd format)
+                if [[ "$index_date" < "$cutoff_date" ]]; then
+                    log_info "Deleting index: $index (date: $index_date)"
+                    curl -s -u "elastic:${ELASTIC_PASSWORD:-changeme}" \
+                        -X DELETE "http://localhost:9200/$index" >/dev/null 2>&1
+                    ((deleted_count++))
+                fi
+            fi
+        fi
+    done <<< "$indices"
+
+    if [ $deleted_count -eq 0 ]; then
+        log_info "No indices found older than $days days"
+    else
+        log_success "Deleted $deleted_count indices older than $days days"
+    fi
 }
 
 # Backup
@@ -375,6 +442,9 @@ main() {
             ;;
         delete-old-logs)
             cmd_delete_old_logs "$@"
+            ;;
+        delete-old-indices)
+            cmd_delete_old_indices "$@"
             ;;
         backup)
             cmd_backup "$@"
