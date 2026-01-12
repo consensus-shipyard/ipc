@@ -2,9 +2,9 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{address::Address};
 use crate::State;
+use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::address::Address;
 
 pub fn check_approval_used<BS: Blockstore>(
     state: &State,
