@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 //! Networking related utilities
 
 #[cfg_attr(wasm_browser, path = "interfaces/wasm_browser.rs")]

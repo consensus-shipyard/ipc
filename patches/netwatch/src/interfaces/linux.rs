@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 //! Linux-specific network interfaces implementations.
 
 use nested_enum_utils::common_fields;

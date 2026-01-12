@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 //! Adapted from https://github.com/foundry-rs/foundry/blob/60f0b692acae47a4933bb4a0bc4a29cab8831ba1/crates/forge/bin/cmd/bind.rs
 //!
 //! This build script generates Rust bindings for Solidity contracts using Forge.

@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 //! Copied from https://github.com/foundry-rs/foundry/blob/60f0b692acae47a4933bb4a0bc4a29cab8831ba1/crates/common/src/fs.rs
 //!
 //! Contains various `std::fs` wrapper functions that also contain the target path in their errors.

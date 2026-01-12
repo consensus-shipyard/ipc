@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 //! A very basic smoke test for netwatch, to make sure it doesn't error out immediately
 //! in Wasm at all.
 //!

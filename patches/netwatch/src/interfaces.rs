@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 //! Contains helpers for looking up system network interfaces.
 
 use std::{collections::HashMap, fmt, net::IpAddr};
