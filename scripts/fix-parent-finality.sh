@@ -5,7 +5,11 @@
 
 set -e
 
-cd /Users/philip/github/ipc/scripts/ipc-subnet-manager
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Navigate to the ipc-subnet-manager directory
+cd "$SCRIPT_DIR/ipc-subnet-manager"
 
 echo "🔧 Fixing Parent Finality Issues"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
