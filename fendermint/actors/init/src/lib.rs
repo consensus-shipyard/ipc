@@ -11,10 +11,8 @@ use fil_actors_runtime::{
     actor_dispatch_unrestricted, actor_error, extract_send_result, ActorContext, ActorError,
     AsActorError, SYSTEM_ACTOR_ADDR,
 };
-use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
-use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
+use fvm_shared::{ActorID, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 
 pub use fil_actors_runtime::INIT_ACTOR_ADDR;
@@ -57,9 +55,14 @@ impl IPCInitActor {
     pub fn exec(rt: &impl Runtime, params: ExecParams) -> Result<ExecReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let caller_code =
-            rt.get_actor_code_cid(&rt.message().caller().id().unwrap()).ok_or_else(|| {
-                actor_error!(illegal_state, "no code for caller as {}", rt.message().caller())
+        let caller_code = rt
+            .get_actor_code_cid(&rt.message().caller().id().unwrap())
+            .ok_or_else(|| {
+                actor_error!(
+                    illegal_state,
+                    "no code for caller as {}",
+                    rt.message().caller()
+                )
             })?;
 
         if !can_exec(rt, &caller_code, &params.code_cid) {
@@ -77,7 +80,11 @@ impl IPCInitActor {
         })?;
 
         if existing {
-            return Err(actor_error!(forbidden, "cannot exec over existing actor {}", id_address));
+            return Err(actor_error!(
+                forbidden,
+                "cannot exec over existing actor {}",
+                id_address
+            ));
         }
 
         rt.create_actor(params.code_cid, id_address, None)?;
@@ -100,8 +107,8 @@ impl IPCInitActor {
         rt.validate_immediate_caller_is(std::iter::once(&fil_actors_runtime::EAM_ACTOR_ADDR))?;
 
         let caller_id = rt.message().caller().id().unwrap();
-        let delegated_address =
-            Address::new_delegated(caller_id, &params.subaddress.to_vec()).map_err(|e| {
+        let delegated_address = Address::new_delegated(caller_id, &params.subaddress.to_vec())
+            .map_err(|e| {
                 ActorError::illegal_argument(format!("invalid delegated address: {}", e))
             })?;
 
@@ -113,9 +120,10 @@ impl IPCInitActor {
         })?;
 
         if existing {
-            let code_cid = rt
-                .get_actor_code_cid(&id_address)
-                .context_code(fvm_shared::error::ExitCode::USR_FORBIDDEN, "cannot redeploy a deleted actor")?;
+            let code_cid = rt.get_actor_code_cid(&id_address).context_code(
+                fvm_shared::error::ExitCode::USR_FORBIDDEN,
+                "cannot redeploy a deleted actor",
+            )?;
             let placeholder_cid = rt.get_code_cid_for_type(Type::Placeholder);
             if code_cid != placeholder_cid {
                 return Err(ActorError::forbidden(format!(

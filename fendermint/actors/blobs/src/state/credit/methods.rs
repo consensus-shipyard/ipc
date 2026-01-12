@@ -195,21 +195,6 @@ impl State {
         self.credits.credit_committed -= &amount;
     }
 
-    /// Refunds credit to the caller.
-    /// Does NOT flush the state to the blockstore.
-    pub(crate) fn refund_caller<BS: Blockstore>(
-        &mut self,
-        caller: &mut Caller<BS>,
-        amount: &Credit,
-        correction: &Credit,
-    ) {
-        caller.refund_credit(amount, correction);
-
-        // Update global state
-        self.credits.credit_debited -= amount;
-        self.credits.credit_committed += correction;
-    }
-
     /// Commits new capacity for the caller.
     /// The caller may pay for capacity with free credit or token value.
     /// Does NOT flush the state to the blockstore.

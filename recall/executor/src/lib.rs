@@ -37,6 +37,8 @@ mod outputs;
 
 use crate::outputs::{GasAmounts, GasOutputs};
 
+pub(crate) type PreflightResult = Result<StdResult<(ActorID, Option<ActorID>, GasAmounts, GasCharge), ApplyRet>>;
+
 /// The default [`Executor`].
 ///
 /// # Warning
@@ -378,7 +380,7 @@ where
         msg: &Message,
         apply_kind: ApplyKind,
         raw_length: usize,
-    ) -> Result<StdResult<(ActorID, Option<ActorID>, GasAmounts, GasCharge), ApplyRet>> {
+    ) -> PreflightResult {
         msg.check().or_fatal()?;
 
         // TODO We don't like having price lists _inside_ the FVM, but passing

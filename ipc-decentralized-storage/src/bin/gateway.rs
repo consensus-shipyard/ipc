@@ -7,13 +7,13 @@ use anyhow::{anyhow, Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
 use clap::Parser;
 use fendermint_rpc::message::SignedMessageFactory;
-use fendermint_rpc::QueryClient;
 use fendermint_rpc::FendermintClient;
+use fendermint_rpc::QueryClient;
+use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::address::{set_current_network, Address, Network};
 use fvm_shared::chainid::ChainID;
-use fendermint_vm_message::query::FvmQueryHeight;
-use ipc_decentralized_storage::gateway::BlobGateway;
 use ipc_decentralized_storage::gateway::objects_service;
+use ipc_decentralized_storage::gateway::BlobGateway;
 use ipc_decentralized_storage::objects::ObjectsConfig;
 use iroh_manager::IrohNode;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
@@ -24,7 +24,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 #[derive(Parser, Debug)]
 #[command(name = "gateway")]
-#[command(about = "Run the blob gateway with objects API to query pending blobs and handle object uploads")]
+#[command(
+    about = "Run the blob gateway with objects API to query pending blobs and handle object uploads"
+)]
 struct Args {
     /// Set the FVM Address Network: "mainnet" (f) or "testnet" (t)
     #[arg(short, long, default_value = "testnet", env = "FM_NETWORK")]
@@ -105,7 +107,10 @@ async fn main() -> Result<()> {
         "main" | "mainnet" | "f" => Network::Mainnet,
         "test" | "testnet" | "t" => Network::Testnet,
         _ => {
-            anyhow::bail!("Invalid network: {}. Use 'mainnet' or 'testnet'", args.network);
+            anyhow::bail!(
+                "Invalid network: {}. Use 'mainnet' or 'testnet'",
+                args.network
+            );
         }
     };
     set_current_network(network);
@@ -121,7 +126,8 @@ async fn main() -> Result<()> {
 
     let pk = sk.public_key();
     // Use f1 address (secp256k1) for signing native FVM actor transactions
-    let from_addr = Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
+    let from_addr =
+        Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
     tracing::info!("Gateway sender address: {}", from_addr);
 
     // Parse or generate BLS private key if provided
@@ -140,7 +146,10 @@ async fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("failed to parse BLS private key: {:?}", e))?;
 
             tracing::info!("Loaded BLS private key successfully");
-            tracing::info!("BLS Public key: {}", hex::encode(key.public_key().as_bytes()));
+            tracing::info!(
+                "BLS Public key: {}",
+                hex::encode(key.public_key().as_bytes())
+            );
             Some(key)
         } else {
             tracing::info!("BLS key file not found, generating a new BLS private key");
@@ -155,7 +164,10 @@ async fn main() -> Result<()> {
                 "Generated and saved new BLS private key to: {}",
                 key_file.display()
             );
-            tracing::info!("BLS Public key: {}", hex::encode(key.public_key().as_bytes()));
+            tracing::info!(
+                "BLS Public key: {}",
+                hex::encode(key.public_key().as_bytes())
+            );
             Some(key)
         }
     } else {
@@ -190,12 +202,12 @@ async fn main() -> Result<()> {
         // Use the gateway's own Iroh blobs client for uploads
         let iroh_blobs = iroh_node.blobs_client().clone();
 
-        let _objects_handle = objects_service::start_objects_service(
-            objects_config,
-            iroh_node.clone(),
-            iroh_blobs,
+        let _objects_handle =
+            objects_service::start_objects_service(objects_config, iroh_node.clone(), iroh_blobs);
+        tracing::info!(
+            "Objects upload service started on {}",
+            args.objects_listen_addr
         );
-        tracing::info!("Objects upload service started on {}", args.objects_listen_addr);
     }
 
     // Create the Fendermint RPC client

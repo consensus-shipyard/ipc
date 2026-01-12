@@ -15,8 +15,8 @@ pub mod store;
 use anyhow::{Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
 use ethers::types::Address;
-use fendermint_rpc::FendermintClient;
 use fendermint_actor_blobs_shared::bytes::B256;
+use fendermint_rpc::FendermintClient;
 use iroh_blobs::Hash;
 use iroh_manager::IrohNode;
 use std::collections::HashMap;
@@ -160,7 +160,14 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
     let rpc_client_for_server = rpc_client.clone();
     let iroh_for_rpc = iroh_node.clone();
     tokio::spawn(async move {
-        if let Err(e) = rpc::start_rpc_server(rpc_bind_addr, signatures_for_rpc, rpc_client_for_server, iroh_for_rpc).await {
+        if let Err(e) = rpc::start_rpc_server(
+            rpc_bind_addr,
+            signatures_for_rpc,
+            rpc_client_for_server,
+            iroh_for_rpc,
+        )
+        .await
+        {
             error!("RPC server error: {}", e);
         }
     });
@@ -180,7 +187,9 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
             signatures_for_events,
             store_for_events,
             iroh_for_events,
-        ).await {
+        )
+        .await
+        {
             error!("Event poller error: {}", e);
         }
     });
@@ -279,7 +288,15 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
                             .collect();
 
                         let handle = tokio::spawn(async move {
-                            resolver::resolve_blob(iroh_clone, iroh_hash, size, iroh_sources, bls_key, sigs).await
+                            resolver::resolve_blob(
+                                iroh_clone,
+                                iroh_hash,
+                                size,
+                                iroh_sources,
+                                bls_key,
+                                sigs,
+                            )
+                            .await
                         });
 
                         in_progress.insert(hash, handle);

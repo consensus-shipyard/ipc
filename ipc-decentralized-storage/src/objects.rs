@@ -99,7 +99,9 @@ pub async fn run_objects_service(
     let client = FendermintClient::new_http(config.tendermint_url, None)?;
 
     // Admin routes
-    let health = warp::path!("health").and(warp::get()).and_then(handle_health);
+    let health = warp::path!("health")
+        .and(warp::get())
+        .and_then(handle_health);
     let node_addr = warp::path!("v1" / "node")
         .and(warp::get())
         .and(with_iroh(iroh_node.clone()))
@@ -166,7 +168,9 @@ pub fn objects_routes(
     iroh_resolver_blobs: BlobsClient,
     max_object_size: u64,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    let health = warp::path!("health").and(warp::get()).and_then(handle_health);
+    let health = warp::path!("health")
+        .and(warp::get())
+        .and_then(handle_health);
     let node_addr = warp::path!("v1" / "node")
         .and(warp::get())
         .and(with_iroh(iroh_node.clone()))

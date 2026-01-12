@@ -247,9 +247,7 @@ async fn handle_get_blob(
 }
 
 /// Warp filter to inject Iroh node
-fn with_iroh(
-    iroh: IrohNode,
-) -> impl Filter<Extract = (IrohNode,), Error = Infallible> + Clone {
+fn with_iroh(iroh: IrohNode) -> impl Filter<Extract = (IrohNode,), Error = Infallible> + Clone {
     warp::any().map(move || iroh.clone())
 }
 
@@ -389,7 +387,8 @@ async fn handle_get_blob_content(
             };
 
             // Stream the content as the response body
-            let bytes_stream = reader.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+            let bytes_stream =
+                reader.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
             let body = Body::wrap_stream(bytes_stream);
 
             let mut response = warp::reply::Response::new(body);
@@ -397,12 +396,14 @@ async fn handle_get_blob_content(
                 "Content-Type",
                 warp::http::HeaderValue::from_static("application/octet-stream"),
             );
-            response.headers_mut().insert(
-                "Content-Length",
-                warp::http::HeaderValue::from(size),
-            );
+            response
+                .headers_mut()
+                .insert("Content-Length", warp::http::HeaderValue::from(size));
 
-            Ok(warp::reply::with_status(response, warp::http::StatusCode::OK))
+            Ok(warp::reply::with_status(
+                response,
+                warp::http::StatusCode::OK,
+            ))
         }
         Ok(None) => Ok(warp::reply::with_status(
             warp::reply::Response::new(Body::from(

@@ -104,10 +104,7 @@ async fn poll_once<S: Store>(
     }
 
     let from_block = last_polled + 1;
-    debug!(
-        "Processing blocks from {} to {}",
-        from_block, latest_height
-    );
+    debug!("Processing blocks from {} to {}", from_block, latest_height);
 
     // Build filter for BlobFinalized events
     let finalized_filter = Filter::new()
@@ -378,34 +375,34 @@ pub async fn resolve_blob(
                                     iroh_blobs::rpc::client::blobs::DownloadOptions {
                                         format: iroh_blobs::BlobFormat::Raw,
                                         nodes: vec![source_addr.clone()],
-                                        tag: iroh_blobs::util::SetTagOption::Named(iroh_blobs::Tag(
-                                            format!("blob-{}-{}", hash, content_hash).into(),
-                                        )),
+                                        tag: iroh_blobs::util::SetTagOption::Named(
+                                            iroh_blobs::Tag(
+                                                format!("blob-{}-{}", hash, content_hash).into(),
+                                            ),
+                                        ),
                                         mode: iroh_blobs::rpc::client::blobs::DownloadMode::Queued,
                                     },
                                 )
                                 .await
                             {
-                                Ok(content_progress) => {
-                                    match content_progress.finish().await {
-                                        Ok(content_outcome) => {
-                                            debug!(
+                                Ok(content_progress) => match content_progress.finish().await {
+                                    Ok(content_outcome) => {
+                                        debug!(
                                                 "Downloaded {} blob {} (downloaded: {} bytes, local: {} bytes)",
                                                 blob_type,
                                                 content_hash,
                                                 content_outcome.downloaded_size,
                                                 content_outcome.local_size
                                             );
-                                        }
-                                        Err(e) => {
-                                            warn!(
-                                                "Failed to complete {} blob {} download: {}",
-                                                blob_type, content_hash, e
-                                            );
-                                            all_downloaded = false;
-                                        }
                                     }
-                                }
+                                    Err(e) => {
+                                        warn!(
+                                            "Failed to complete {} blob {} download: {}",
+                                            blob_type, content_hash, e
+                                        );
+                                        all_downloaded = false;
+                                    }
+                                },
                                 Err(e) => {
                                     warn!(
                                         "Failed to start {} blob {} download: {}",

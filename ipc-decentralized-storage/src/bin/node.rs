@@ -182,7 +182,10 @@ async fn main() -> Result<()> {
         "main" | "mainnet" | "f" => Network::Mainnet,
         "test" | "testnet" | "t" => Network::Testnet,
         _ => {
-            anyhow::bail!("Invalid network: {}. Use 'mainnet' or 'testnet'", cli.network);
+            anyhow::bail!(
+                "Invalid network: {}. Use 'mainnet' or 'testnet'",
+                cli.network
+            );
         }
     };
     set_current_network(network);
@@ -306,7 +309,8 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
     let pk = sk.public_key();
     // Use f1 address (secp256k1) instead of f410 (delegated/ethereum) because we're calling
     // a native FVM actor with CBOR params, not an EVM contract with calldata
-    let from_addr = Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
+    let from_addr =
+        Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
     info!("Sender address: {}", from_addr);
 
     // Parse chain RPC URL
@@ -445,8 +449,8 @@ async fn query_blob(args: QueryBlobArgs) -> Result<()> {
     // Parse blob hash - strip 0x prefix if present
     let blob_hash_hex = args.hash.strip_prefix("0x").unwrap_or(&args.hash);
 
-    let blob_hash_bytes = hex::decode(blob_hash_hex)
-        .context("failed to decode blob hash hex string")?;
+    let blob_hash_bytes =
+        hex::decode(blob_hash_hex).context("failed to decode blob hash hex string")?;
 
     if blob_hash_bytes.len() != 32 {
         anyhow::bail!(
@@ -463,8 +467,8 @@ async fn query_blob(args: QueryBlobArgs) -> Result<()> {
     let rpc_url = Url::from_str(&args.rpc_url).context("failed to parse RPC URL")?;
 
     // Create Fendermint client
-    let mut client = FendermintClient::new_http(rpc_url, None)
-        .context("failed to create Fendermint client")?;
+    let mut client =
+        FendermintClient::new_http(rpc_url, None).context("failed to create Fendermint client")?;
 
     // Set query height
     let height = args
@@ -516,7 +520,10 @@ async fn query_object(args: QueryObjectArgs) -> Result<()> {
     use fvm_shared::econ::TokenAmount;
     use ipc_api::ethers_address_to_fil_address;
 
-    info!("Querying object from bucket: {} with key: {}", args.bucket, args.key);
+    info!(
+        "Querying object from bucket: {} with key: {}",
+        args.bucket, args.key
+    );
 
     // Parse bucket address (supports both f-address and eth-address formats)
     let bucket_address = Network::Mainnet
@@ -538,8 +545,8 @@ async fn query_object(args: QueryObjectArgs) -> Result<()> {
     let rpc_url = Url::from_str(&args.rpc_url).context("failed to parse RPC URL")?;
 
     // Create Fendermint client
-    let mut client = FendermintClient::new_http(rpc_url, None)
-        .context("failed to create Fendermint client")?;
+    let mut client =
+        FendermintClient::new_http(rpc_url, None).context("failed to create Fendermint client")?;
 
     // Set query height
     let height = args
@@ -557,7 +564,13 @@ async fn query_object(args: QueryObjectArgs) -> Result<()> {
     // Query the object
     let params = GetParams(args.key.as_bytes().to_vec());
     let maybe_object = client
-        .os_get_call(bucket_address, params, TokenAmount::default(), gas_params, height)
+        .os_get_call(
+            bucket_address,
+            params,
+            TokenAmount::default(),
+            gas_params,
+            height,
+        )
         .await
         .context("failed to query object")?;
 

@@ -51,16 +51,18 @@ impl Default for InMemoryStore {
 
 impl Store for InMemoryStore {
     fn get_last_polled_height(&self) -> Result<Option<u64>> {
-        let guard = self.last_polled_height.read().map_err(|e| {
-            anyhow::anyhow!("failed to acquire read lock: {}", e)
-        })?;
+        let guard = self
+            .last_polled_height
+            .read()
+            .map_err(|e| anyhow::anyhow!("failed to acquire read lock: {}", e))?;
         Ok(*guard)
     }
 
     fn set_last_polled_height(&self, height: u64) -> Result<()> {
-        let mut guard = self.last_polled_height.write().map_err(|e| {
-            anyhow::anyhow!("failed to acquire write lock: {}", e)
-        })?;
+        let mut guard = self
+            .last_polled_height
+            .write()
+            .map_err(|e| anyhow::anyhow!("failed to acquire write lock: {}", e))?;
         *guard = Some(height);
         Ok(())
     }

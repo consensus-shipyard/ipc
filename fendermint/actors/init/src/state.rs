@@ -24,7 +24,11 @@ pub type AddressMap<BS> = Map2<BS, Address, ActorID>;
 impl State {
     pub fn new<BS: Blockstore>(store: &BS, network_name: String) -> Result<Self, ActorError> {
         let empty = AddressMap::flush_empty(store, DEFAULT_HAMT_CONFIG)?;
-        Ok(Self { address_map: empty, next_id: FIRST_NON_SINGLETON_ADDR, network_name })
+        Ok(Self {
+            address_map: empty,
+            next_id: FIRST_NON_SINGLETON_ADDR,
+            network_name,
+        })
     }
 
     /// Maps argument addresses to to a new or existing actor ID.

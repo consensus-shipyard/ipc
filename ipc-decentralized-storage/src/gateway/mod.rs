@@ -353,10 +353,7 @@ where
                 // Get operator RPC URL from cache - skip if not found
                 let Some(operator_info) = self.operator_cache.operator_info.get(operator_addr)
                 else {
-                    warn!(
-                        "Operator {} not found in cache, skipping",
-                        operator_addr
-                    );
+                    warn!("Operator {} not found in cache, skipping", operator_addr);
                     continue;
                 };
 

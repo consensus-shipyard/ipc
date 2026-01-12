@@ -6,7 +6,7 @@
 //! This module provides functionality to start the objects HTTP service
 //! alongside the gateway's blob polling functionality.
 
-use anyhow::{Result};
+use anyhow::Result;
 use iroh_manager::{BlobsClient, IrohNode};
 use std::net::SocketAddr;
 use tracing::info;
@@ -14,18 +14,10 @@ use tracing::info;
 use crate::objects::{self, ObjectsConfig};
 
 /// Configuration for the gateway with objects service
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct GatewayWithObjectsConfig {
     /// Objects service configuration
     pub objects_config: ObjectsConfig,
-}
-
-impl Default for GatewayWithObjectsConfig {
-    fn default() -> Self {
-        Self {
-            objects_config: ObjectsConfig::default(),
-        }
-    }
 }
 
 /// Start the objects HTTP service in a background task

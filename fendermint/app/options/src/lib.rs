@@ -10,8 +10,8 @@ use fvm_shared::address::Network;
 use lazy_static::lazy_static;
 
 use self::{
-    eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs,
-    rpc::RpcArgs, run::RunArgs,
+    eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs, rpc::RpcArgs,
+    run::RunArgs,
 };
 pub mod config;
 pub mod debug;

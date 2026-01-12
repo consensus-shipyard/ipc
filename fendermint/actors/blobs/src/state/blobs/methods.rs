@@ -353,21 +353,17 @@ impl State {
         };
 
         // Check the current status
-        match blob.blob.status {
-            BlobStatus::Resolved => {
-                debug!("blob already resolved {} (id: {})", params.hash, params.id);
-                // Blob is already finalized as resolved.
-                // We can ignore later finalizations, even if they are failed.
-                // Remove from any queue it might be in
-                self.blobs
-                    .added
-                    .remove_entry(store, &params.hash, blob.blob.size)?;
-                self.blobs
-                    .pending
-                    .remove_entry(store, &params.hash, blob.blob.size)?;
-                return Ok(false);
-            }
-            _ => {}
+        if blob.blob.status == BlobStatus::Resolved {
+            // Blob is already finalized as resolved.
+            // We can ignore later finalizations, even if they are failed.
+            // Remove from any queue it might be in
+            self.blobs
+                .added
+                .remove_entry(store, &params.hash, blob.blob.size)?;
+            self.blobs
+                .pending
+                .remove_entry(store, &params.hash, blob.blob.size)?;
+            return Ok(false);
         }
 
         // Check if the blob's size matches the size provided when it was added
