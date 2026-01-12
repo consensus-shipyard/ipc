@@ -13,15 +13,15 @@ deployment:
 # Subnet Configuration
 subnet:
   # Subnet ID - deployed via IPC UI
-  id: "/r31337/t410frfbfip324f66q5yg4hlhfiwenra3hwcnyf4uicy"
+  id: "/r31337/t410f5mrbxelefiiczkv4owvtlcoplbsmu3wk6qmbdfy"
   # Parent chain RPC endpoint (local Anvil)
   parent_rpc: "http://localhost:8545"
   # Parent chain ID
   parent_chain_id: "/r31337"
   # Parent registry contract address (deployed via IPC UI)
-  parent_registry: "0xe3011a37a904ab90c8881a99bd1f6e21401f1522"
+  parent_registry: "0xf953b3a269d80e3eb0f2947630da976b896a8c5b"
   # Parent gateway contract address (deployed on Anvil during subnet init)
-  parent_gateway: "0xab16a69a5a8c12c732e0deff4be56a70bb64c926"
+  parent_gateway: "0xa4899d35897033b927acfcf422bc745916139776"
 # Validator Nodes
 # In local mode, all validators run on 127.0.0.1 with different ports
 # Port allocation: validator-0 uses base ports, validator-1 uses base+100, validator-2 uses base+200, etc.
@@ -78,7 +78,7 @@ network:
 # Paths (local mode uses local directories)
 paths:
   # Path to IPC CLI binary (use your built binary or installed version)
-  ipc_binary: "/Users/philip/github/ipc/target/release/ipc-cli"
+  ipc_binary: "/Users/philip/.cargo/bin/ipc-cli"
   # Base directory for node homes (each validator gets a subdirectory)
   # validator-0 -> /Users/philip/.ipc-local/validator-0
   # validator-1 -> /Users/philip/.ipc-local/validator-1

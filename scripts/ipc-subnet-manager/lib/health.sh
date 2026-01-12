@@ -1021,30 +1021,25 @@ check_validator_health() {
     local validator_idx="$1"
 
     local name="${VALIDATORS[$validator_idx]}"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-    local node_home=$(get_config_value "paths.node_home")
-    local cometbft_port=$(get_config_value "network.cometbft_p2p_port")
-    local libp2p_port=$(get_config_value "network.libp2p_port")
-    local eth_api_port=$(get_config_value "network.eth_api_port")
+    local node_home=$(get_node_home "$validator_idx")
+    local cometbft_rpc_port=$(get_validator_port "$validator_idx" "cometbft_rpc" 26657)
+    local cometbft_p2p_port=$(get_validator_port "$validator_idx" "cometbft_p2p" 26656)
+    local libp2p_port=$(get_validator_port "$validator_idx" "libp2p" 26655)
+    local eth_api_port=$(get_validator_port "$validator_idx" "eth_api" 8546)
 
     local healthy=true
 
     # Check process running
-    local process_status=$(ssh_check_process "$ip" "$ssh_user" "$ipc_user" "ipc-cli node start")
-    # Trim whitespace and newlines
-    process_status=$(echo "$process_status" | tr -d '\n' | xargs)
-    if [ "$process_status" = "running" ]; then
+    if check_process_running "$validator_idx" "ipc-cli node start"; then
         log_check "ok" "Process running"
     else
-        log_check "fail" "Process not running (status: '$process_status')"
+        log_check "fail" "Process not running"
         healthy=false
     fi
 
-    # Check ports listening
-    local ports_check=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "netstat -tuln 2>/dev/null | grep -E \":($cometbft_port|$libp2p_port|$eth_api_port)\" | wc -l")
+    # Check ports listening (use lsof for macOS compatibility, netstat for Linux)
+    local ports_check=$(exec_on_host "$validator_idx" \
+        "(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E \":($cometbft_p2p_port|$libp2p_port|$eth_api_port)\" | wc -l || netstat -tuln 2>/dev/null | grep -E \":($cometbft_p2p_port|$libp2p_port|$eth_api_port)\" | wc -l) 2>/dev/null" | tr -d '[:space:]')
 
     if [ -n "$ports_check" ] && [ "$ports_check" -ge 2 ] 2>/dev/null; then
         log_check "ok" "Ports listening ($ports_check/3)"
@@ -1054,8 +1049,8 @@ check_validator_health() {
     fi
 
     # Check CometBFT peers
-    local comet_peers=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "curl -s http://localhost:26657/net_info 2>/dev/null | jq -r '.result.n_peers // 0' 2>/dev/null || echo 0")
+    local comet_peers=$(exec_on_host "$validator_idx" \
+        "curl -s http://localhost:$cometbft_rpc_port/net_info 2>/dev/null | jq -r '.result.n_peers // 0' 2>/dev/null || echo 0" | tr -d '[:space:]')
 
     local expected_peers=$((${#VALIDATORS[@]} - 1))
     # Ensure comet_peers is a number
@@ -1068,8 +1063,8 @@ check_validator_health() {
     fi
 
     # Check block height
-    local block_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null || echo 0")
+    local block_height=$(exec_on_host "$validator_idx" \
+        "curl -s http://localhost:$cometbft_rpc_port/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null || echo 0" | tr -d '[:space:]')
 
     # Ensure block_height is a number
     block_height=${block_height:-0}
@@ -1081,7 +1076,7 @@ check_validator_health() {
     fi
 
     # Check for recent errors in logs
-    local recent_errors=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local recent_errors=$(exec_on_host "$validator_idx" \
         "tail -100 $node_home/logs/*.log 2>/dev/null | grep -i 'ERROR' | tail -5 || echo ''")
 
     if [ -z "$recent_errors" ]; then
