@@ -7,6 +7,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ELK_DIR="$(dirname "$SCRIPT_DIR")"
 
+# IPC subnet manager config path (can be overridden via environment variable)
+IPC_CONFIG="${IPC_CONFIG:-$HOME/github/ipc/scripts/ipc-subnet-manager/ipc-subnet-config.yml}"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -367,8 +370,12 @@ cmd_clean() {
 
 # Check Filebeat status
 cmd_filebeat_status() {
-    if [ ! -f "$HOME/github/ipc/scripts/ipc-subnet-manager/ipc-subnet-config.yml" ]; then
-        log_error "IPC config not found"
+    if [ ! -f "$IPC_CONFIG" ]; then
+        log_error "Config file not found: $IPC_CONFIG"
+        echo ""
+        echo "Please set IPC_CONFIG environment variable to your config file location:"
+        echo "  export IPC_CONFIG=/path/to/ipc-subnet-config.yml"
+        echo ""
         exit 1
     fi
 
@@ -377,14 +384,13 @@ cmd_filebeat_status() {
     echo "  Filebeat Status on Validators"
     echo "========================================"
     echo ""
+    log_info "Using config: $IPC_CONFIG"
+    echo ""
 
     # Get validator IPs from config
-    local validator_ips=$(yq eval '.validators[].ip' \
-        "$HOME/github/ipc/scripts/ipc-subnet-manager/ipc-subnet-config.yml" 2>/dev/null)
-    local validator_names=$(yq eval '.validators[].name' \
-        "$HOME/github/ipc/scripts/ipc-subnet-manager/ipc-subnet-config.yml" 2>/dev/null)
-    local validator_users=$(yq eval '.validators[].ssh_user' \
-        "$HOME/github/ipc/scripts/ipc-subnet-manager/ipc-subnet-config.yml" 2>/dev/null)
+    local validator_ips=$(yq eval '.validators[].ip' "$IPC_CONFIG" 2>/dev/null)
+    local validator_names=$(yq eval '.validators[].name' "$IPC_CONFIG" 2>/dev/null)
+    local validator_users=$(yq eval '.validators[].ssh_user' "$IPC_CONFIG" 2>/dev/null)
 
     local idx=0
     while read -r ip; do
