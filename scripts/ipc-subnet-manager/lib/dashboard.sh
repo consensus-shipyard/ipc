@@ -135,6 +135,13 @@ fetch_metrics() {
     METRICS[mempool_size]=$(echo "$mempool" | jq -r '.result.n_txs // 0' 2>/dev/null || echo "0")
     METRICS[mempool_bytes]=$(echo "$mempool" | jq -r '.result.total_bytes // 0' 2>/dev/null || echo "0")
 
+    # Fetch mempool max size from CometBFT config (only fetch once if not already set)
+    if [ -z "${METRICS[mempool_max]}" ]; then
+        local mempool_max=$(exec_on_host "$validator_idx" \
+            "grep -E '^size = [0-9]+' $node_home/cometbft/config/config.toml 2>/dev/null | head -1 | grep -oE '[0-9]+'" 2>/dev/null || echo "5000")
+        METRICS[mempool_max]=${mempool_max:-5000}
+    fi
+
     # Calculate block production rate
     local current_time=$(date +%s)
     local time_diff=$((current_time - METRICS[last_check]))
@@ -308,7 +315,7 @@ draw_dashboard() {
     # Mempool Status
     local mempool_size=${METRICS[mempool_size]:-0}
     local mempool_bytes=${METRICS[mempool_bytes]:-0}
-    local mempool_max=10000
+    local mempool_max=${METRICS[mempool_max]:-5000}
     local mempool_pct=0
     if [ $mempool_max -gt 0 ]; then
         mempool_pct=$((mempool_size * 100 / mempool_max))
