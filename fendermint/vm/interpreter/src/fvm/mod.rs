@@ -5,8 +5,6 @@ pub mod constants;
 mod executions;
 mod externs;
 pub mod interpreter;
-pub mod ipc_storage_env;
-pub mod ipc_storage_helpers;
 pub mod observe;
 pub mod state;
 pub mod store;

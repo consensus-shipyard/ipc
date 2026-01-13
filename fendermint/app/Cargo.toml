@@ -33,7 +33,6 @@ mime_guess = { workspace = true }
 urlencoding = { workspace = true }
 entangler = { workspace = true }
 entangler_storage = { workspace = true }
-iroh_manager = { path = "../../ipc-storage/iroh_manager" }
 iroh = { workspace = true }
 iroh-blobs = { workspace = true }
 thiserror = { workspace = true }
@@ -85,7 +84,6 @@ fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
-fendermint_vm_iroh_resolver = { path = "../vm/iroh_resolver" }
 
 # actors needed for objects command
 # fendermint_actor_bucket = { path = "../actors/bucket" } # TODO: depends on machine/ADM (not in main)

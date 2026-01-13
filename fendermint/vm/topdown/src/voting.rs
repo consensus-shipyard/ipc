@@ -11,7 +11,7 @@ use crate::observe::{
     ParentFinalityCommitted, ParentFinalityPeerQuorumReached, ParentFinalityPeerVoteReceived,
     ParentFinalityPeerVoteSent,
 };
-use crate::{Blob, BlockHash, BlockHeight};
+use crate::{BlockHash, BlockHeight};
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
@@ -44,15 +44,15 @@ pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
 /// so that we can ask for proposals that are not going to be voted
 /// down.
 #[derive(Clone)]
-pub struct VoteTally<K = ValidatorKey, V = BlockHash, O = Blob> {
+pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
     /// Current validator weights. These are the ones who will vote on the blocks,
-    /// so these are the weights that need to form a quorum.
+    /// so these are the weights which need to form a quorum.
     power_table: TVar<im::HashMap<K, Weight>>,
 
     /// The *finalized mainchain* of the parent as observed by this node.
     ///
     /// These are assumed to be final because IIRC that's how the syncer works,
-    /// only fetching the info about blocks which are already deep enough.
+    /// only fetching the info about blocks which are already sufficiently deep.
     ///
     /// When we want to propose, all we have to do is walk back this chain and
     /// tally the votes we collected for the block hashes until we reach a quorum.
@@ -60,7 +60,7 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash, O = Blob> {
     /// The block hash is optional to allow for null blocks on Filecoin rootnet.
     chain: TVar<im::OrdMap<BlockHeight, Option<V>>>,
 
-    /// Index votes received by height and hash. This makes it easy to look up
+    /// Index votes received by height and hash, which makes it easy to look up
     /// all the votes for a given block hash and also to verify that a validator
     /// isn't equivocating by trying to vote for two different things at the
     /// same height.
@@ -69,22 +69,14 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash, O = Blob> {
     /// Adding votes can be paused if we observe that looking for a quorum takes too long
     /// and is often retried due to votes being added.
     pause_votes: TVar<bool>,
-
-    /// Index votes received by blob.
-    blob_votes: TVar<im::HashMap<O, im::HashMap<K, bool>>>,
-
-    /// Adding votes can be paused if we observe that looking for a quorum takes too long
-    /// and is often retried due to votes being added.
-    pause_blob_votes: TVar<bool>,
 }
 
-impl<K, V, O> VoteTally<K, V, O>
+impl<K, V> VoteTally<K, V>
 where
     K: Clone + Hash + Eq + Sync + Send + 'static + Debug + Display,
     V: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
-    O: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
 {
-    /// Create an uninitialized instance. Before blocks can be added to it,
+    /// Create an uninitialized instance. Before blocks can be added to it
     /// we will have to set the last finalized block.
     ///
     /// The reason this exists is so that we can delay initialization until
@@ -95,8 +87,6 @@ where
             chain: TVar::default(),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
-            blob_votes: TVar::default(),
-            pause_blob_votes: TVar::new(false),
         }
     }
 
@@ -109,20 +99,13 @@ where
             chain: TVar::new(im::OrdMap::from_iter([(height, Some(hash))])),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
-            blob_votes: TVar::default(),
-            pause_blob_votes: TVar::new(false),
         }
     }
 
     /// Check that a validator key is currently part of the power table.
     pub fn has_power(&self, validator_key: &K) -> Stm<bool> {
         let pt = self.power_table.read()?;
-        // If the power table is empty, we're in a parentless subnet without a topdown view.
-        // This kind of setup is only useful for local dev / testing.
-        if pt.is_empty() {
-            return Ok(true);
-        }
-        // For consistency, consider validators without power unknown.
+        // For consistency consider validators without power unknown.
         match pt.get(validator_key) {
             None => Ok(false),
             Some(weight) => Ok(*weight > 0),
@@ -166,7 +149,7 @@ where
     ///
     /// Returns an error unless it's exactly the next expected height,
     /// so the caller has to call this in every epoch. If the parent
-    /// chain produced no blocks in that epoch, then pass `None` to
+    /// chain produced no blocks in that epoch then pass `None` to
     /// represent that null-round in the tally.
     pub fn add_block(
         &self,
@@ -260,8 +243,7 @@ where
         self.pause_votes.write(true)
     }
 
-    /// Find a block on the (from our perspective) finalized chain that gathered enough votes from
-    /// validators.
+    /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
     pub fn find_quorum(&self) -> Stm<Option<(BlockHeight, V)>> {
         self.pause_votes.write(false)?;
 
@@ -329,7 +311,7 @@ where
 
     /// Call when a new finalized block is added to the ledger, to clear out all preceding blocks.
     ///
-    /// After this operation the minimum item in the chain will be the new finalized block.
+    /// After this operation the minimum item in the chain will the new finalized block.
     pub fn set_finalized(
         &self,
         parent_block_height: BlockHeight,
@@ -343,8 +325,6 @@ where
             chain
         })?;
 
-        // The votes' TVar will be updated such that the only key in the
-        // map of block heights to validator votes per block is the newest finalized block
         self.votes
             .update(|votes| votes.split(&parent_block_height).1)?;
 
@@ -358,126 +338,12 @@ where
         Ok(())
     }
 
-    /// When a blob is finalized in the parent, we can remove it from the blob votes tally.
-    /// Note: Ensure this is called with `atomically`.
-    pub fn clear_blob(&self, blob: O) -> Stm<()> {
-        self.blob_votes.update_mut(|votes| {
-            votes.remove(&blob);
-        })?;
-        Ok(())
-    }
-
-    /// Add a vote for a blob we received.
-    ///
-    /// Returns `true` if this vote was added, `false` if it was ignored as a duplicate,
-    /// and an error if it's an equivocation or from a validator we don't know.
-    pub fn add_blob_vote(
-        &self,
-        validator_key: K,
-        blob: O,
-        resolved: bool,
-    ) -> StmResult<bool, Error<K, O>> {
-        if *self.pause_blob_votes.read()? {
-            retry()?;
-        }
-
-        if !self.has_power(&validator_key)? {
-            return abort(Error::UnpoweredValidator(validator_key));
-        }
-
-        let mut votes = self.blob_votes.read_clone()?;
-        let votes_for_blob = votes.entry(blob).or_default();
-
-        if let Some(existing_vote) = votes_for_blob.get(&validator_key) {
-            if *existing_vote {
-                // A vote for "resolved" was already made, ignore later votes
-                return Ok(false);
-            }
-        }
-        votes_for_blob.insert(validator_key, resolved);
-
-        self.blob_votes.write(votes)?;
-
-        Ok(true)
-    }
-
-    /// Pause adding more votes until we are finished calling `find_quorum` which
-    /// automatically re-enables them.
-    pub fn pause_blob_votes_until_find_quorum(&self) -> Stm<()> {
-        self.pause_blob_votes.write(true)
-    }
-
-    /// Determine if a blob has (from our perspective) gathered enough votes from validators.
-    /// Returns two bools. The first indicates whether the blob has reached quorum,
-    /// and the second indicates if the quorum deems the blob resolved or failed.
-    pub fn find_blob_quorum(&self, blob: &O) -> Stm<(bool, bool)> {
-        self.pause_blob_votes.write(false)?;
-
-        let votes = self.blob_votes.read()?;
-        let power_table = self.power_table.read()?;
-
-        // If the power table is empty, we're in a parentless subnet without a topdown view.
-        // This kind of setup is only useful for local dev / testing.
-        //
-        // There's no way to know how many validators are voting, and therefore no way to calculate
-        // a quorum threshold.
-        // The best we can do is say that at least one vote (yea/nay) is necessary.
-        let quorum_threshold = if power_table.is_empty() {
-            1 as Weight
-        } else {
-            self.quorum_threshold()?
-        };
-
-        let mut resolved_weight = 0;
-        let mut failed_weight = 0;
-        let mut voters = im::HashSet::new();
-
-        let Some(votes_for_blob) = votes.get(blob) else {
-            return Ok((false, false));
-        };
-
-        for (vk, resolved) in votes_for_blob {
-            if voters.insert(vk.clone()).is_none() {
-                // New voter, get their current weight; it might be 0 if they have been removed.
-                let power = if power_table.is_empty() {
-                    1
-                } else {
-                    power_table.get(vk).cloned().unwrap_or_default()
-                };
-
-                tracing::debug!("voter; key={}, power={}", vk.to_string(), power);
-
-                if *resolved {
-                    resolved_weight += power;
-                } else {
-                    failed_weight += power;
-                }
-            }
-        }
-
-        tracing::debug!(
-            resolved_weight,
-            failed_weight,
-            quorum_threshold,
-            "blob quorum; votes={}",
-            votes_for_blob.len()
-        );
-
-        if resolved_weight >= quorum_threshold {
-            Ok((true, true))
-        } else if failed_weight >= quorum_threshold {
-            Ok((true, false))
-        } else {
-            Ok((false, false))
-        }
-    }
-
     /// Overwrite the power table after it has changed to a new snapshot.
     ///
     /// This method expects absolute values, it completely replaces the existing powers.
     pub fn set_power_table(&self, power_table: Vec<(K, Weight)>) -> Stm<()> {
         let power_table = im::HashMap::from_iter(power_table);
-        // We don't have to remove the votes of anyone who is no longer a validator,
+        // We don't actually have to remove the votes of anyone who is no longer a validator,
         // we just have to make sure to handle the case when they are not in the power table.
         self.power_table.write(power_table)
     }
@@ -489,7 +355,7 @@ where
         if power_updates.is_empty() {
             return Ok(());
         }
-        // We don't have to remove the votes of anyone who is no longer a validator,
+        // We don't actually have to remove the votes of anyone who is no longer a validator,
         // we just have to make sure to handle the case when they are not in the power table.
         self.power_table.update_mut(|pt| {
             for (vk, w) in power_updates {
@@ -602,10 +468,10 @@ pub async fn publish_vote_loop<V, F>(
                 }
             }
 
-            // Throttle vote gossiping at periods of fast syncing. For example, if we create a subnet contract on Friday
+            // Throttle vote gossiping at periods of fast syncing. For example if we create a subnet contract on Friday
             // and bring up a local testnet on Monday, all nodes would be ~7000 blocks behind a Lotus parent. CometBFT
             // would be in-sync, and they could rapidly try to gossip votes on previous heights. GossipSub might not like
-            // that, and we can just cast our votes now and then to finalize multiple blocks.
+            // that, and we can just cast our votes every now and then to finalize multiple blocks.
             vote_interval.tick().await;
         }
 

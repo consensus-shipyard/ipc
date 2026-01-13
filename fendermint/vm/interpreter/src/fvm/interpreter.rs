@@ -7,9 +7,6 @@ use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
-use crate::fvm::ipc_storage_helpers::{
-    close_read_request, read_request_callback, set_read_request_pending,
-};
 use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
     activity::ValidatorActivityTracker,
@@ -343,14 +340,6 @@ where
                             return Ok(AttestMessagesResponse::Reject);
                         }
                     }
-                    ChainMessage::Ipc(IpcMessage::ReadRequestPending(_)) => {
-                        // Read request pending messages are validated in prepare_messages_for_block
-                        // Just accept them here
-                    }
-                    ChainMessage::Ipc(IpcMessage::ReadRequestClosed(_)) => {
-                        // Read request closed messages are validated in prepare_messages_for_block
-                        // Just accept them here
-                    }
                     ChainMessage::Signed(signed) => {
                         if signed.message.gas_fee_cap < *base_fee {
                             tracing::warn!(
@@ -477,42 +466,6 @@ where
                         self.top_down_manager.execute_topdown_msg(state, p).await?;
                     Ok(ApplyMessageResponse {
                         applied_message,
-                        domain_hash: None,
-                    })
-                }
-                IpcMessage::ReadRequestPending(read_request) => {
-                    // Set the read request to "pending" state
-                    let ret = set_read_request_pending(state, read_request.id)?;
-
-                    tracing::debug!(
-                        request_id = %read_request.id,
-                        "chain interpreter has set read request to pending"
-                    );
-
-                    Ok(ApplyMessageResponse {
-                        applied_message: ret.into(),
-                        domain_hash: None,
-                    })
-                }
-                IpcMessage::ReadRequestClosed(read_request) => {
-                    // Send the data to the callback address.
-                    // If this fails (e.g., the callback address is not reachable),
-                    // we will still close the request.
-                    //
-                    // We MUST use a non-privileged actor (BLOB_READER_ACTOR_ADDR) to call the callback.
-                    // This is to prevent malicious user from accessing unauthorized APIs.
-                    read_request_callback(state, &read_request)?;
-
-                    // Set the status of the request to closed.
-                    let ret = close_read_request(state, read_request.id)?;
-
-                    tracing::debug!(
-                        hash = %read_request.id,
-                        "chain interpreter has closed read request"
-                    );
-
-                    Ok(ApplyMessageResponse {
-                        applied_message: ret.into(),
                         domain_hash: None,
                     })
                 }

@@ -42,7 +42,6 @@ fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }
 ipc_storage_executor = { path = "../../../ipc-storage/executor" }
 ipc_storage_kernel = { path = "../../../ipc-storage/kernel" }
-fendermint_vm_iroh_resolver = { path = "../iroh_resolver" }
 iroh = { workspace = true }
 iroh-blobs = { workspace = true }
 fil_actor_eam = { workspace = true }
