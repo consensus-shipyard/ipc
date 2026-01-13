@@ -18,7 +18,7 @@ use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
-use ipc_ipld_resolver::{Event as ResolverEvent, IrohConfig, VoteRecord};
+use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -128,7 +128,7 @@ pub async fn run(
     // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver_enabled() {
         let mut service =
-            make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store).await?;
+            make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
 
         // Register all metrics from the IPLD resolver stack
         if let Some(ref registry) = metrics_registry {
@@ -146,11 +146,8 @@ pub async fn run(
             .context("error adding own provided subnet.")?;
 
         if topdown_enabled {
-            if let Some(ref key) = validator_keypair {
+            if let Some(key) = validator_keypair {
                 let parent_finality_votes = parent_finality_votes.clone();
-                let key = key.clone();
-                let client_for_voting = client.clone();
-                let subnet_id_for_voting = own_subnet_id.clone();
 
                 tracing::info!("starting the parent finality vote gossip loop...");
                 tokio::spawn(async move {
@@ -159,8 +156,8 @@ pub async fn run(
                         settings.ipc.vote_interval,
                         settings.ipc.vote_timeout,
                         key,
-                        subnet_id_for_voting,
-                        client_for_voting,
+                        own_subnet_id,
+                        client,
                         |height, block_hash| {
                             AppVote::ParentFinality(IPCParentFinality { height, block_hash })
                         },
@@ -373,7 +370,7 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     Ok(db)
 }
 
-async fn make_resolver_service(
+fn make_resolver_service(
     settings: &Settings,
     db: RocksDb,
     state_store: NamespaceBlockstore,
@@ -388,7 +385,6 @@ async fn make_resolver_service(
     let config = to_resolver_config(settings).context("error creating resolver config")?;
 
     let service = ipc_ipld_resolver::Service::new(config, bitswap_store)
-        .await
         .context("error creating IPLD Resolver Service")?;
 
     Ok(service)
@@ -468,12 +464,6 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
         content: ContentConfig {
             rate_limit_bytes: r.content.rate_limit_bytes,
             rate_limit_period: r.content.rate_limit_period,
-        },
-        iroh: IrohConfig {
-            v4_addr: r.iroh_resolver_config.v4_addr,
-            v6_addr: r.iroh_resolver_config.v6_addr,
-            path: r.iroh_resolver_config.iroh_data_dir.clone(),
-            rpc_addr: r.iroh_resolver_config.rpc_addr,
         },
     };
 

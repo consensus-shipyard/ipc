@@ -1,6 +1,18 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::{Context, Result};
+use cid::Cid;
+use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::ipc::IpcMessage;
+use fendermint_vm_message::query::{FvmQuery, StateParams};
+use fendermint_vm_message::signed::SignedMessage;
+use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::{self};
+use fvm_shared::{address::Address, error::ExitCode};
+use std::sync::Arc;
+use std::time::Instant;
+
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
 use crate::fvm::executions::{
@@ -21,21 +33,10 @@ use crate::selectors::{
 };
 use crate::types::*;
 use crate::MessagesInterpreter;
-use anyhow::{Context, Result};
-use cid::Cid;
-use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::ipc::IpcMessage;
-use fendermint_vm_message::query::{FvmQuery, StateParams};
-use fendermint_vm_message::signed::SignedMessage;
-use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding;
 use fvm_shared::state::ActorState;
 use fvm_shared::ActorID;
-use fvm_shared::{address::Address, error::ExitCode};
 use ipc_observability::emit;
 use std::convert::TryInto;
-use std::sync::Arc;
-use std::time::Instant;
 
 struct Actor {
     id: ActorID,
@@ -280,11 +281,8 @@ where
             .await
             .into_iter();
 
-        let chain_msgs: Vec<ChainMessage> = top_down_iter.chain(signed_msgs_iter).collect();
-
-        // Encode all chain messages to IPLD
-        let mut all_msgs = chain_msgs
-            .into_iter()
+        let mut all_msgs = top_down_iter
+            .chain(signed_msgs_iter)
             .map(|msg| fvm_ipld_encoding::to_vec(&msg).context("failed to encode message as IPLD"))
             .collect::<Result<Vec<Vec<u8>>>>()?;
 

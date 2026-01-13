@@ -29,8 +29,8 @@ use fvm_ipld_hamt::Hamt;
 use fvm_shared::{address::Address, ActorID};
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{
-    Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, IrohConfig,
-    MembershipConfig, NetworkConfig, Resolver, Service, VoteRecord,
+    Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig,
+    NetworkConfig, Resolver, Service, VoteRecord,
 };
 use libipld::Cid as LibipldCid;
 use libp2p::{
@@ -106,7 +106,7 @@ impl ClusterBuilder {
     }
 
     /// Add a node with randomized address, optionally bootstrapping from an existing node.
-    async fn add_node(&mut self, bootstrap: Option<usize>) {
+    fn add_node(&mut self, bootstrap: Option<usize>) {
         let bootstrap_addr = bootstrap.map(|i| {
             let config = &self.agents[i].config;
             let peer_id = config.network.local_peer_id();
@@ -115,7 +115,7 @@ impl ClusterBuilder {
             addr
         });
         let config = make_config(&mut self.rng, self.size, bootstrap_addr);
-        let (service, store) = make_service(config.clone()).await;
+        let (service, store) = make_service(config.clone());
         let client = service.client();
         let events = service.subscribe();
         self.services.push(service);
@@ -294,7 +294,7 @@ async fn single_bootstrap_publish_receive_preemptive() {
 async fn can_register_metrics() {
     let mut rng = rand::rngs::StdRng::seed_from_u64(0);
     let config = make_config(&mut rng, 1, None);
-    let (mut service, _) = make_service(config).await;
+    let (mut service, _) = make_service(config);
     let registry = prometheus::Registry::new();
     service.register_metrics(&registry).unwrap();
 }
@@ -305,9 +305,7 @@ async fn make_cluster_with_bootstrap(cluster_size: u32, bootstrap_idx: usize) ->
 
     // Build a cluster of nodes.
     for i in 0..builder.size {
-        builder
-            .add_node(if i == 0 { None } else { Some(bootstrap_idx) })
-            .await;
+        builder.add_node(if i == 0 { None } else { Some(bootstrap_idx) });
     }
 
     // Start the swarms.
@@ -316,22 +314,13 @@ async fn make_cluster_with_bootstrap(cluster_size: u32, bootstrap_idx: usize) ->
     cluster
 }
 
-async fn make_service(config: Config) -> (Service<TestStoreParams, TestVote>, TestBlockstore) {
+fn make_service(config: Config) -> (Service<TestStoreParams, TestVote>, TestBlockstore) {
     let store = TestBlockstore::default();
-    let svc = Service::new_with_transport(config, store.clone(), build_transport)
-        .await
-        .unwrap();
+    let svc = Service::new_with_transport(config, store.clone(), build_transport).unwrap();
     (svc, store)
 }
 
 fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multiaddr>) -> Config {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let random_id = rng.gen::<u64>();
-
     let config = Config {
         connection: ConnectionConfig {
             listen_addr: Multiaddr::from(Protocol::Memory(rng.gen::<u64>())),
@@ -360,12 +349,6 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
         content: ContentConfig {
             rate_limit_bytes: 1 << 20,
             rate_limit_period: Duration::from_secs(60),
-        },
-        iroh: IrohConfig {
-            v4_addr: None,
-            v6_addr: None,
-            path: std::env::temp_dir().join(format!("iroh-test-{}-{}", timestamp, random_id)),
-            rpc_addr: "127.0.0.1:0".parse().unwrap(),
         },
     };
 

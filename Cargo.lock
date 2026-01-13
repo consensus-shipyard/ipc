@@ -323,18 +323,6 @@ dependencies = [
 
 [[package]]
 name = "ambassador"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e87ccf220415ad6a81b21e21780134c746463fdb821cc2530a001df2c3d13a36"
-dependencies = [
- "itertools 0.10.5",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "ambassador"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e68de4cdc6006162265d0957edb4a860fe4e711b1dc17a5746fd95f952f08285"
@@ -4793,8 +4781,6 @@ dependencies = [
  "ipc-api",
  "ipc-observability",
  "ipc_actors_abis",
- "ipc_storage_executor",
- "ipc_storage_kernel",
  "iroh",
  "iroh-blobs",
  "libipld",
@@ -5724,7 +5710,7 @@ name = "fvm"
 version = "4.7.4"
 source = "git+https://github.com/consensus-shipyard/ref-fvm.git?branch=master#8ab9b7e78a5b4d95dfe18985a2afdd0616da5654"
 dependencies = [
- "ambassador 0.4.2",
+ "ambassador",
  "anyhow",
  "arbitrary",
  "cid 0.11.1",
@@ -7544,7 +7530,6 @@ dependencies = [
  "base64 0.21.7",
  "blake2b_simd",
  "bloom",
- "bytes",
  "cid 0.11.1",
  "env_logger 0.10.2",
  "fvm_ipld_blockstore 0.3.1",
@@ -7555,9 +7540,6 @@ dependencies = [
  "ipc-api",
  "ipc-observability",
  "ipc_ipld_resolver",
- "iroh",
- "iroh-blobs",
- "iroh_manager",
  "lazy_static",
  "libipld",
  "libp2p",
@@ -7595,22 +7577,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipc_storage_executor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "fendermint_actor_blobs_shared",
- "fendermint_vm_actor_interface",
- "fvm",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "num-traits",
- "replace_with",
- "tracing",
-]
-
-[[package]]
 name = "ipc_storage_ipld"
 version = "0.1.0"
 dependencies = [
@@ -7625,26 +7591,6 @@ dependencies = [
  "fvm_shared",
  "integer-encoding 3.0.4",
  "serde",
-]
-
-[[package]]
-name = "ipc_storage_kernel"
-version = "0.1.0"
-dependencies = [
- "ambassador 0.3.7",
- "anyhow",
- "fvm",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_shared",
- "ipc_storage_kernel_ops",
- "ipc_storage_syscalls",
-]
-
-[[package]]
-name = "ipc_storage_kernel_ops"
-version = "0.1.0"
-dependencies = [
- "fvm",
 ]
 
 [[package]]
@@ -7669,19 +7615,6 @@ dependencies = [
  "syn 2.0.114",
  "thiserror 2.0.17",
  "walkdir",
-]
-
-[[package]]
-name = "ipc_storage_syscalls"
-version = "0.1.0"
-dependencies = [
- "fvm",
- "fvm_shared",
- "ipc_storage_kernel_ops",
- "iroh-blobs",
- "iroh_manager",
- "tokio",
- "tracing",
 ]
 
 [[package]]

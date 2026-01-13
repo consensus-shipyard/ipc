@@ -1,13 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
-
 use std::collections::HashMap;
-use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
-use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::behaviour::{
-    content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
+    self, content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
     DiscoveryConfig, MembershipConfig, NetworkConfig,
 };
 use crate::client::Client;
@@ -17,12 +14,6 @@ use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
 use ipc_observability::emit;
-use iroh::NodeAddr;
-use iroh_blobs::net_protocol::DownloadMode;
-use iroh_blobs::rpc::client::blobs::{DownloadOptions, ReadAtLen};
-use iroh_blobs::util::SetTagOption;
-use iroh_blobs::{BlobFormat, Hash, Tag};
-use iroh_manager::{get_blob_hash_and_size, BlobsClient, IrohManager};
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::connection_limits::ConnectionLimits;
@@ -31,7 +22,7 @@ use libp2p::swarm::SwarmEvent;
 use libp2p::{
     core::{muxing::StreamMuxerBox, transport::Boxed},
     identity::Keypair,
-    noise, yamux, Multiaddr, PeerId, Swarm, Transport,
+    noise, Multiaddr, PeerId, Swarm, Transport,
 };
 use libp2p::{identify, ping};
 use libp2p_bitswap::{BitswapResponse, BitswapStore};
@@ -44,19 +35,13 @@ use serde::Serialize;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
-use tokio::sync::oneshot::Sender;
+use tokio::sync::oneshot::{self, Sender};
 
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;
 
-/// Result of attempting to resolve a read request.
-pub type ResolveReadRequestResult = anyhow::Result<bytes::Bytes>;
-
 /// Channel to complete the results with.
-type ResponseChannel = Sender<ResolveResult>;
-
-/// Channel to complete the read request with.
-type ReadRequestResponseChannel = Sender<ResolveReadRequestResult>;
+type ResponseChannel = oneshot::Sender<ResolveResult>;
 
 /// State of a query. The fallback peers can be used
 /// if the current attempt fails.
@@ -100,15 +85,6 @@ pub struct Config {
     pub membership: MembershipConfig,
     pub connection: ConnectionConfig,
     pub content: ContentConfig,
-    pub iroh: IrohConfig,
-}
-
-#[derive(Debug, Clone)]
-pub struct IrohConfig {
-    pub v4_addr: Option<SocketAddrV4>,
-    pub v6_addr: Option<SocketAddrV6>,
-    pub path: PathBuf,
-    pub rpc_addr: SocketAddr,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -121,8 +97,6 @@ pub(crate) enum Request<V> {
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
-    ResolveIroh(Hash, u64, NodeAddr, ResponseChannel),
-    ResolveIrohRead(Hash, u32, u32, ReadRequestResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -158,8 +132,6 @@ where
     background_lookup_filter: BloomFilter,
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
-    /// Iroh node
-    iroh: IrohManager,
 }
 
 impl<P, V> Service<P, V>
@@ -168,17 +140,17 @@ where
     V: Serialize + DeserializeOwned + Clone + Send + 'static,
 {
     /// Build a [`Service`] and a [`Client`] with the default `tokio` transport.
-    pub async fn new<S>(config: Config, store: S) -> Result<Self, ConfigError>
+    pub fn new<S>(config: Config, store: S) -> Result<Self, ConfigError>
     where
         S: BitswapStore<Params = P>,
     {
-        Self::new_with_transport(config, store, build_transport).await
+        Self::new_with_transport(config, store, build_transport)
     }
 
     /// Build a [`Service`] and a [`Client`] by passing in a transport factory function.
     ///
     /// The main goal is to be facilitate testing with a [`MemoryTransport`].
-    pub async fn new_with_transport<S, F>(
+    pub fn new_with_transport<S, F>(
         config: Config,
         store: S,
         transport: F,
@@ -220,8 +192,6 @@ where
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
-        let iroh = config.iroh;
-
         let service = Self {
             peer_id,
             listen_addr: config.connection.listen_addr,
@@ -235,8 +205,6 @@ where
                 config.connection.expected_peer_count,
             ),
             max_peers_per_query: config.connection.max_peers_per_query as usize,
-            iroh: IrohManager::new(iroh.v4_addr, iroh.v6_addr, iroh.path, Some(iroh.rpc_addr))
-                .await?,
         };
 
         Ok(service)
@@ -249,11 +217,6 @@ where
     /// which weren't initiated by the `Client`.
     pub fn client(&self) -> Client<V> {
         Client::new(self.request_tx.clone())
-    }
-
-    /// Returns a reference to the iroh node.
-    pub fn iroh(&self) -> &IrohManager {
-        &self.iroh
     }
 
     /// Create a new [`broadcast::Receiver`] instance bound to this `Service`,
@@ -311,21 +274,18 @@ where
                     // Connection events are handled by the behaviours, passed directly from the Swarm.
                     Some(_) => { },
                     // The connection is closed.
-                    None => {
-                        return Err(anyhow!("connection closed"));
-                    },
+                    None => { break; },
                 },
                 request = self.request_rx.recv() => match request {
                     // A Client sent us a request.
                     Some(req) => self.handle_request(req),
                     // This shouldn't happen because the service has a copy of the sender.
                     // All Client instances have been dropped.
-                    None => {
-                        return Err(anyhow!("all client instances have been dropped"));
-                    }
+                    None => { break; }
                 }
-            }
+            };
         }
+        Ok(())
     }
 
     /// Handle events that the [`NetworkBehaviour`] macro generated for our [`Behaviour`], one for each field.
@@ -490,12 +450,6 @@ where
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
-            Request::ResolveIroh(hash, size, node_addr, response_channel) => {
-                self.start_iroh_query(hash, size, node_addr, response_channel)
-            }
-            Request::ResolveIrohRead(hash, offset, len, response_channel) => {
-                self.start_iroh_read_query(hash, offset, len, response_channel)
-            }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
             }
@@ -537,42 +491,6 @@ where
 
             self.queries.insert(query_id, query);
         }
-    }
-
-    /// Start a CID resolution using iroh.
-    fn start_iroh_query(
-        &mut self,
-        hash: Hash,
-        size: u64,
-        node_addr: NodeAddr,
-        response_channel: ResponseChannel,
-    ) {
-        let client = self.iroh.blobs_client().clone();
-        tokio::spawn(async move {
-            let res = download_blob(&client, hash, size, node_addr).await;
-            match res {
-                Ok(_) => send_resolve_result(response_channel, Ok(())),
-                Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
-            }
-        });
-    }
-
-    /// Start a read request resolution using iorh.
-    fn start_iroh_read_query(
-        &mut self,
-        hash: Hash,
-        offset: u32,
-        len: u32,
-        response_channel: ReadRequestResponseChannel,
-    ) {
-        let client = self.iroh.blobs_client().clone();
-        tokio::spawn(async move {
-            let res = read_blob(&client, hash, offset, len).await;
-            match res {
-                Ok(bytes) => send_read_request_result(response_channel, Ok(bytes)),
-                Err(e) => send_read_request_result(response_channel, Err(anyhow!(e))),
-            }
-        });
     }
 
     /// Handle the results from a resolve attempt. If it succeeded, notify the
@@ -622,13 +540,13 @@ where
 
     // The following are helper functions because Rust Analyzer has trouble with recognising that `swarm.behaviour_mut()` is a legal call.
 
-    fn discovery_mut(&mut self) -> &mut discovery::Behaviour {
+    fn discovery_mut(&mut self) -> &mut behaviour::discovery::Behaviour {
         self.swarm.behaviour_mut().discovery_mut()
     }
-    fn membership_mut(&mut self) -> &mut membership::Behaviour<V> {
+    fn membership_mut(&mut self) -> &mut behaviour::membership::Behaviour<V> {
         self.swarm.behaviour_mut().membership_mut()
     }
-    fn content_mut(&mut self) -> &mut content::Behaviour<P> {
+    fn content_mut(&mut self) -> &mut behaviour::content::Behaviour<P> {
         self.swarm.behaviour_mut().content_mut()
     }
 }
@@ -637,15 +555,6 @@ where
 fn send_resolve_result(tx: Sender<ResolveResult>, res: ResolveResult) {
     if tx.send(res).is_err() {
         error!("error sending resolve result; listener closed")
-    }
-}
-
-fn send_read_request_result(
-    tx: Sender<anyhow::Result<bytes::Bytes>>,
-    res: anyhow::Result<bytes::Bytes>,
-) {
-    if tx.send(res).is_err() {
-        error!("error sending read request result; listener closed")
     }
 }
 
@@ -661,11 +570,7 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
     let mplex_config = {
         let mut mplex_config = MplexConfig::new();
         mplex_config.set_max_buffer_size(usize::MAX);
-
-        // FIXME: Yamux will end up beaing deprecated.
-        let yamux_config = yamux::Config::default();
-        // yamux_config.set_window_update_mode(WindowUpdateMode::OnRead);
-        libp2p::core::upgrade::SelectUpgrade::new(yamux_config, mplex_config)
+        mplex_config
     };
 
     transport
@@ -674,59 +579,4 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
         .multiplex(mplex_config)
         .timeout(Duration::from_secs(20))
         .boxed()
-}
-
-async fn download_blob(
-    iroh: &BlobsClient,
-    seq_hash: Hash,
-    size: u64,
-    node_addr: NodeAddr,
-) -> anyhow::Result<()> {
-    // Download top-level blob
-    // Use an explicit tag so we can keep track of it
-
-    let tag = Tag(format!("stored-seq-{seq_hash}").into());
-    info!("downloading {} from {:?}", tag, node_addr);
-    iroh.download_with_opts(
-        seq_hash,
-        DownloadOptions {
-            format: BlobFormat::HashSeq,
-            nodes: vec![node_addr],
-            tag: SetTagOption::Named(tag),
-            mode: DownloadMode::Queued,
-        },
-    )
-    .await?
-    .await?;
-
-    // Verify downloaded size of user blob matches the expected size
-    let (_, size_actual) = get_blob_hash_and_size(iroh, seq_hash).await?;
-    if size != size_actual {
-        return Err(anyhow!(
-            "downloaded blob size {} does not match expected size {}",
-            size_actual,
-            size
-        ));
-    }
-
-    // Delete the temporary tag (this might fail as not all nodes will have one).
-    let tag = Tag(format!("temp-seq-{seq_hash}").into());
-    iroh.tags().delete(tag).await.ok();
-
-    debug!("downloaded blob {}", seq_hash);
-
-    Ok(())
-}
-
-async fn read_blob(
-    iroh: &BlobsClient,
-    hash: Hash,
-    offset: u32,
-    len: u32,
-) -> anyhow::Result<bytes::Bytes> {
-    let (hash, _) = get_blob_hash_and_size(iroh, hash).await?;
-    let len = ReadAtLen::AtMost(len as u64);
-    let res = iroh.read_at_to_bytes(hash, offset as u64, len).await?;
-    debug!("read blob {}: {:?}", hash, res);
-    Ok(res)
 }

@@ -66,10 +66,6 @@ members = [
   "fendermint/actors/ipc_storage_config/shared",
 
   # storage components (netwatch patched for socket2 0.5 compatibility!)
-  "ipc-storage/kernel",
-  "ipc-storage/kernel/ops",
-  "ipc-storage/syscalls",
-  "ipc-storage/executor",
   "ipc-storage/iroh_manager",
   "ipc-storage/ipld",
   "ipc-storage/actor_sdk",

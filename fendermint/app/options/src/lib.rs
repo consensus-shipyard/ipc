@@ -13,6 +13,7 @@ use self::{
     eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs,
     proof_cache::ProofCacheArgs, rpc::RpcArgs, run::RunArgs,
 };
+
 pub mod config;
 pub mod debug;
 pub mod eth;

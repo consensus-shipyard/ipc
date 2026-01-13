@@ -148,7 +148,7 @@ pub trait QueryClient: Sync {
         if response.value.code.is_err() {
             return Err(anyhow!("{}", response.value.info));
         }
-        println!("os_get_call: {:?}", response.value);
+
         let return_data = decode_os_get(&response.value)
             .context("error decoding data from deliver_tx in call")?;
 
