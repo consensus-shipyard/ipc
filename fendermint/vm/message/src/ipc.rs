@@ -8,13 +8,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum IpcMessage {
-    /// A top-down checkpoint parent finality proposal. This proposal should contain the latest parent
-    /// state that to be checked and voted by validators.
+    /// A top-down checkpoint parent finality proposal (legacy voting-based)
     TopDownExec(ParentFinality),
-    /// Proof-based topdown finality with cryptographic F3 certificates and proof bundles.
-    /// This is the v2 approach that replaces voting with deterministic verification.
-    /// The bundle can span multiple blocks as F3 certificates finalize chains of epochs.
-    TopDownWithProof(TopDownProofBundle),
+    /// Generalized top-down finality with extensible certificate types
+    GeneralisedTopDown(GeneralisedTopDown),
 }
 
 /// A proposal of the parent view that validators will be voting on.
@@ -26,20 +23,21 @@ pub struct ParentFinality {
     pub block_hash: Vec<u8>,
 }
 
-/// Proof-based topdown finality bundle with cryptographic verification.
-///
-/// This contains:
-/// - A validated F3 certificate with instance ID and finalized epochs (chain of blocks)
-/// - A proof bundle with storage proofs (completeness) and event proofs (topdown messages/validator changes)
-///
-/// Validators verify this deterministically without requiring gossip-based voting.
-/// The certificate can finalize multiple blocks, so height/block_hash are not in the bundle itself.
+/// Generalized top-down finality structure
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TopDownProofBundle {
-    /// Validated F3 certificate (serializable for consensus)
-    pub certificate: fendermint_vm_topdown_proof_service::types::SerializableF3Certificate,
-    /// Cryptographic proof bundle (storage + event proofs + witness blocks)
-    pub proof_bundle: proofs::proofs::common::bundle::UnifiedProofBundle,
+pub struct GeneralisedTopDown {
+    /// The chain epoch this finality is for (height)
+    pub height: ChainEpoch,
+    /// The certificate that certifies finality (type-specific, proof is fetched from local cache)
+    pub certificate: Certificate,
+}
+
+/// Certificate types (extensible for future certificate types)
+/// Each variant contains the certificate data. Proofs are fetched from local cache when needed.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Certificate {
+    /// Filecoin F3 certificate (proof bundle is fetched from local cache using instance ID)
+    FilecoinF3(fendermint_vm_topdown_proof_service::types::SerializableF3Certificate),
 }
 
 #[cfg(feature = "arb")]

@@ -31,7 +31,6 @@ fendermint_actor_f3_light_client = { path = "../../../actors/f3-light-client" }
 fendermint_vm_genesis = { path = "../../genesis" }
 
 # IPC
-ipc-provider = { path = "../../../../ipc/provider" }
 ipc-api = { path = "../../../../ipc/api" }
 ipc-observability = { path = "../../../../ipc/observability" }
 

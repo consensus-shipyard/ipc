@@ -12,22 +12,19 @@ use fvm_shared::clock::ChainEpoch;
 /// F3 Light Client State - maintains verifiable parent finality from the parent chain.
 ///
 /// This structure represents the essential state needed to track F3 finality:
-/// - Instance ID: The current F3 instance (can increment during protocol upgrades)
-/// - Finalized Epochs: Complete chain of finalized epochs (not just the latest)
+/// - Latest Instance ID: The latest F3 instance that has been committed
+/// - Latest Finalized Height: The highest epoch that has been finalized (None if nothing finalized yet)
 /// - Power Table: Current validator power table (can change between instances)
 ///
 /// This state is extracted from F3 certificates received from the parent chain
 /// and stored by the actor for use in finality proofs.
 #[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone, PartialEq, Eq)]
 pub struct LightClientState {
-    /// Current F3 instance ID
-    pub instance_id: u64,
-    /// Finalized chain - full list of finalized epochs
-    /// Matches ECChain from F3 certificates
-    /// Empty initially at genesis until first update
-    pub finalized_epochs: Vec<ChainEpoch>,
+    /// Latest F3 instance ID that has been committed
+    pub latest_instance_id: u64,
+    /// The latest finalized height (None if nothing has been finalized yet)
+    pub latest_finalized_height: Option<ChainEpoch>,
     /// Current power table for this instance
-    /// Power table can change between instances
     pub power_table: Vec<PowerEntry>,
 }
 
@@ -44,11 +41,11 @@ pub struct PowerEntry {
 #[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone, PartialEq, Eq)]
 pub struct ConstructorParams {
     /// Initial F3 instance ID (from genesis)
-    pub instance_id: u64,
+    pub latest_instance_id: u64,
     /// Initial power table (from genesis)
     pub power_table: Vec<PowerEntry>,
-    /// Initial finalized epochs (from genesis certificate)
-    pub finalized_epochs: Vec<ChainEpoch>,
+    /// Initial finalized height (None if nothing finalized yet, Some(height) from genesis certificate if available)
+    pub latest_finalized_height: Option<ChainEpoch>,
 }
 
 /// Parameters for updating the light client state
@@ -61,12 +58,10 @@ pub struct UpdateStateParams {
 /// Response containing the current light client state
 #[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone, PartialEq, Eq)]
 pub struct GetStateResponse {
-    /// Current F3 instance ID
-    pub instance_id: u64,
-    /// Finalized chain - full list of finalized epochs
-    pub finalized_epochs: Vec<ChainEpoch>,
+    /// Latest F3 instance ID that has been committed
+    pub latest_instance_id: u64,
+    /// The latest finalized height (None if nothing finalized yet)
+    pub latest_finalized_height: Option<ChainEpoch>,
     /// Current power table
     pub power_table: Vec<PowerEntry>,
-    /// Latest finalized height (convenience field - max of finalized_epochs)
-    pub latest_finalized_height: ChainEpoch,
 }

@@ -17,12 +17,13 @@ use fendermint_vm_topdown::{
 use fvm_shared::clock::ChainEpoch;
 use std::sync::Arc;
 
-use crate::fvm::state::ipc::{F3LightClientCaller, GatewayCaller};
+use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::FvmExecState;
 use anyhow::{bail, Context};
 use fvm_ipld_blockstore::Blockstore;
 
 use crate::fvm::end_block_hook::PowerUpdates;
+use crate::fvm::f3::F3FinalityHandler;
 use crate::fvm::state::ipc::tokens_to_mint;
 use crate::types::AppliedMessage;
 use ipc_api::cross::IpcEnvelope;
@@ -38,15 +39,9 @@ where
     votes: VoteTally,
     // Gateway caller for IPC gateway interactions
     gateway_caller: GatewayCaller<DB>,
-    // F3 Light Client caller for querying F3 state
-    f3_light_client_caller: F3LightClientCaller,
-    // Proof cache for F3-based parent finality (optional for gradual rollout)
-    // Using Arc<RwLock<Option>> to allow updating after creation
-    proof_cache: std::sync::Arc<
-        tokio::sync::RwLock<
-            Option<std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>>,
-        >,
-    >,
+    // F3 finality handler (None means use legacy voting-based finality)
+    // Set once during startup before any concurrent access
+    pub f3: Option<F3FinalityHandler>,
 }
 
 impl<DB> TopDownManager<DB>
@@ -56,39 +51,17 @@ where
     pub fn new(
         provider: TopDownFinalityProvider,
         votes: VoteTally,
-        proof_cache: Option<std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>>,
+        f3: Option<F3FinalityHandler>,
     ) -> Self {
         Self {
             provider,
             votes,
             gateway_caller: GatewayCaller::default(),
-            f3_light_client_caller: F3LightClientCaller::new(),
-            proof_cache: std::sync::Arc::new(tokio::sync::RwLock::new(proof_cache)),
+            f3,
         }
     }
 
-    /// Update the proof cache after creation
-    /// This is used when the proof service is initialized after the app
-    pub async fn set_proof_cache(
-        &self,
-        cache: std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>,
-    ) {
-        let mut guard = self.proof_cache.write().await;
-        *guard = Some(cache);
-        tracing::info!("Updated TopDownManager with proof cache");
-    }
-
-    /// Check if we have a certificate in our local cache
-    /// Used during attestation to avoid redundant F3 validation
-    pub async fn has_certificate_in_cache(&self, instance_id: u64) -> bool {
-        if let Some(cache) = self.proof_cache.read().await.as_ref() {
-            cache.contains(instance_id)
-        } else {
-            false
-        }
-    }
-
-    pub async fn is_finality_valid(&self, finality: ParentFinality) -> bool {
+    pub async fn attest_legacy(&self, finality: ParentFinality) -> bool {
         let prop = IPCParentFinality {
             height: finality.height as u64,
             block_hash: finality.block_hash,
@@ -102,7 +75,7 @@ where
     /// both the next parent's proposal and the quorum of votes. If either the parent's proposal or the quorum is missing,
     /// the function returns `None`. When both are available, it selects the finality with the lower block height and wraps
     /// it into a `ChainMessage` for top-down execution.
-    pub async fn chain_message_from_finality_or_quorum(&self) -> Option<ChainMessage> {
+    async fn chain_message_from_finality_or_quorum(&self) -> Option<ChainMessage> {
         // Prepare top down proposals.
         // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
         atomically(|| self.votes.pause_votes_until_find_quorum()).await;
@@ -152,130 +125,41 @@ where
         })))
     }
 
-    /// Query proof cache for next uncommitted proof and create a chain message with proof bundle.
+    /// Get the chain message for parent finality proposal.
     ///
-    /// This is the v2 proof-based approach that replaces voting with cryptographic verification.
+    /// This method encapsulates the decision of which finality mechanism to use:
+    /// - If F3 is configured and has a proof available, use F3 proof-based finality
+    /// - Otherwise, use legacy voting-based finality
     ///
-    /// Returns `None` if:
-    /// - Proof cache is not configured
-    /// - No proof available for next height
-    /// - Cache is temporarily empty (graceful degradation)
-    pub async fn chain_message_from_proof_cache(&self) -> Option<ChainMessage> {
-        let guard = self.proof_cache.read().await;
-        let cache = guard.as_ref()?;
-
-        // Get next uncommitted proof (instance after last_committed)
-        let entry = cache.get_next_uncommitted()?;
-
-        tracing::debug!(
-            instance_id = entry.certificate.gpbft_instance,
-            epochs = ?entry.certificate.finalized_epochs,
-            "found proof in cache for proposal"
-        );
-
-        Some(ChainMessage::Ipc(IpcMessage::TopDownWithProof(
-            fendermint_vm_message::ipc::TopDownProofBundle {
-                certificate: entry.certificate,
-                proof_bundle: entry.proof_bundle,
-            },
-        )))
-    }
-
-    /// Deterministically verify a proof bundle against F3 certificate (read-only attestation).
-    ///
-    /// This performs cryptographic verification of:
-    /// 1. Storage proofs (contract state at parent height - completeness via topDownNonce)
-    /// 2. Event proofs (emitted events at parent height)
-    ///
-    /// All correct validators will reach the same decision (deterministic).
-    /// Full verification including state queries happens during execution.
-    pub fn verify_proof_bundle_attestation(
-        &self,
-        bundle: &fendermint_vm_message::ipc::TopDownProofBundle,
-    ) -> anyhow::Result<()> {
-        // TODO Karel - implement this
-        use fendermint_vm_topdown_proof_service::verifier::ProofsVerifier;
-
-        // Verify cryptographic proofs (storage + events)
-        verify_proof_bundle(&bundle.proof_bundle, &bundle.certificate)
-            .context("proof bundle cryptographic verification failed")?;
-
-        tracing::debug!(
-            instance_id = bundle.certificate.instance_id,
-            "proof bundle verified successfully (attestation)"
-        );
-
-        Ok(())
-    }
-
-    /// Verify proof bundle with full state validation (during execution).
-    ///
-    /// This performs:
-    /// 1. Certificate chain continuity check (validates against F3LightClientActor state)
-    /// 2. Cryptographic proof verification
-    fn verify_proof_bundle_with_state(
-        &self,
-        state: &mut FvmExecState<DB>,
-        bundle: &fendermint_vm_message::ipc::TopDownProofBundle,
-    ) -> anyhow::Result<()> {
-        // Step 1: Verify certificate chain continuity
-        // Query F3LightClientActor for last committed instance
-        let f3_state = self
-            .f3_light_client_caller
-            .get_state(state)
-            .context("failed to query F3LightClientActor state")?;
-
-        // Ensure bundle.certificate.instance_id == last_committed + 1
-        if bundle.certificate.gpbft_instance != f3_state.instance_id + 1 {
-            bail!(
-                "Certificate instance ID {} is not sequential (expected {})",
-                bundle.certificate.gpbft_instance,
-                f3_state.instance_id + 1
-            );
-        }
-
-        tracing::debug!(
-            current_instance = f3_state.instance_id,
-            new_instance = bundle.certificate.gpbft_instance,
-            "verified certificate chain continuity"
-        );
-
-        // Step 2: Verify cryptographic proofs (already done in attestation, but verify again)
-        self.verify_proof_bundle_attestation(bundle)?;
-
-        // Step 3: Check if we need to validate F3 certificate
-        // If we have it in our cache, we already validated it with our F3 client
-        // If not, we would need to validate (but this is rare - means we're behind)
-        // Note: Using blocking try_read since this is not an async function
-        if let Ok(guard) = self.proof_cache.try_read() {
-            if let Some(cache) = guard.as_ref() {
-                if cache.contains(bundle.certificate.gpbft_instance) {
-                    tracing::debug!(
-                        instance = bundle.certificate.gpbft_instance,
-                        "Certificate found in local cache - already validated by our F3 client"
-                    );
-                    // We validated this ourselves, trust it
-                    return Ok(());
-                }
+    /// The caller doesn't need to know which mechanism is being used.
+    pub async fn chain_message_for_proposal(&self) -> Option<ChainMessage> {
+        // Use F3 finality (if configured)
+        if let Some(f3) = &self.f3 {
+            if let Some(proof_msg) = f3.chain_message_from_proof_cache() {
+                tracing::info!("using F3 proof-based parent finality in proposal");
+                return Some(proof_msg);
             }
         }
 
-        // Certificate not in our cache - this means we're behind
-        // However, the certificate has already passed storage/event proof verification
-        // which cryptographically proves it's valid for the parent state
-        tracing::info!(
-            instance = bundle.certificate.gpbft_instance,
-            "Certificate not in local cache - validator is behind but certificate is proven valid via storage/event proofs"
-        );
+        // Fall back to legacy voting-based finality
+        tracing::debug!("using legacy voting-based finality");
+        self.chain_message_from_finality_or_quorum().await
+    }
 
-        // The storage and event proofs already guarantee:
-        // 1. The certificate was used to finalize the parent chain
-        // 2. The topdown messages and validator changes are correct
-        // 3. The state transition is valid
-        //
-        // We don't need to re-validate F3 signatures since the proofs already
-        // demonstrate the certificate was accepted by the parent chain
-        Ok(())
+    /// Attest a generalised top-down message during the attestation phase.
+    ///
+    /// Delegates to F3 handler if F3 is configured, otherwise returns error.
+    pub async fn attest_generalised(
+        &self,
+        msg: &fendermint_vm_message::ipc::GeneralisedTopDown,
+    ) -> anyhow::Result<()> {
+        if let Some(f3) = &self.f3 {
+            f3.attest(msg).await
+        } else {
+            Err(anyhow::anyhow!(
+                "F3 not configured - cannot attest generalised top-down message"
+            ))
+        }
     }
 
     pub async fn update_voting_power_table(&self, power_updates: &PowerUpdates) {
@@ -288,55 +172,23 @@ where
         atomically(|| self.votes.update_power_table(power_updates_mapped.clone())).await
     }
 
-    /// Execute proof-based topdown finality (v2).
-    ///
-    /// Steps:
-    /// 1. Extract topdown messages from proof bundle (via ABI decoding)
-    /// 2. Extract validator changes from proof bundle (via ABI decoding)
-    /// 3. Commit parent finality to gateway (use highest epoch from certificate)
-    /// 4. Store validator changes in gateway
-    /// 5. Execute topdown messages
-    /// 6. Update F3LightClientActor with new certificate state
-    /// 7. Mark instance as committed in cache
-    pub async fn execute_proof_based_topdown(
+    /// Execute generalised top-down message.
+    /// Delegates F3-specific logic to F3 module, handles common top-down execution.
+    pub async fn execute_generalised(
         &self,
         state: &mut FvmExecState<DB>,
-        bundle: fendermint_vm_message::ipc::TopDownProofBundle,
+        msg: fendermint_vm_message::ipc::GeneralisedTopDown,
     ) -> anyhow::Result<AppliedMessage> {
-        if !self.provider.is_enabled() {
-            bail!("cannot execute IPC top-down message: parent provider disabled");
-        }
+        // Get F3 handler - all F3-specific logic is delegated to it
+        let f3 = self.f3.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("F3 not configured - cannot execute without F3 handler")
+        })?;
 
-        tracing::debug!(
-            instance = bundle.certificate.gpbft_instance,
-            "executing proof-based topdown finality"
-        );
+        // Execute F3-specific logic (certificate validation, proof extraction, state updates)
+        let (msgs, validator_changes) = f3.execute(state, &msg)?;
 
-        // Step 0: Verify proof bundle with state (chain continuity check)
-        self.verify_proof_bundle_with_state(state, &bundle)
-            .context("proof bundle verification with state failed")?;
-
-        // Step 1 & 2: Extract topdown effects from proof bundle
-        let msgs = self.extract_topdown_messages_from_bundle(&bundle.proof_bundle)?;
-        let validator_changes = self.extract_validator_changes_from_bundle(&bundle.proof_bundle)?;
-
-        tracing::debug!(
-            message_count = msgs.len(),
-            validator_changes_count = validator_changes.len(),
-            "extracted topdown effects from proof bundle"
-        );
-
-        // Step 3: Commit parent finality to gateway
-        // Use the highest finalized epoch from the certificate
-        let highest_epoch = bundle
-            .certificate
-            .finalized_epochs
-            .iter()
-            .max()
-            .copied()
-            .context("certificate has no finalized epochs")?;
-        let finality = IPCParentFinality::new(highest_epoch as i64, vec![]);
-
+        // Commit parent finality to gateway
+        let finality = IPCParentFinality::new(msg.height as i64, vec![]);
         let (prev_height, _prev_finality) = self
             .commit_finality(state, finality.clone())
             .await
@@ -348,98 +200,27 @@ where
             "committed parent finality"
         );
 
-        // Step 4: Store validator changes in gateway
+        // Store validator changes in gateway
         self.gateway_caller
             .store_validator_changes(state, validator_changes)
             .context("failed to store validator changes")?;
 
-        // Step 5: Execute topdown messages
+        // Execute topdown messages
         let ret = self
             .execute_topdown_msgs(state, msgs)
             .await
             .context("failed to execute top down messages")?;
 
-        tracing::debug!("applied topdown messages");
-
-        // Step 6: Update F3LightClientActor with new certificate state
-        // Convert power table from proof service format to actor format
-        let power_table: Vec<fendermint_vm_actor_interface::f3_light_client::PowerEntry> = bundle
-            .certificate
-            .power_table
-            .iter()
-            .map(
-                |pe| fendermint_vm_actor_interface::f3_light_client::PowerEntry {
-                    public_key: pe.public_key.clone(),
-                    power: pe.power,
-                },
-            )
-            .collect();
-
-        let new_light_client_state =
-            fendermint_vm_actor_interface::f3_light_client::LightClientState {
-                instance_id: bundle.certificate.gpbft_instance,
-                finalized_epochs: bundle.certificate.finalized_epochs.clone(),
-                power_table,
-            };
-
-        self.f3_light_client_caller
-            .update_state(state, new_light_client_state)
-            .context("failed to update F3LightClientActor state")?;
-
-        tracing::debug!(
-            instance = bundle.certificate.gpbft_instance,
-            "updated F3LightClientActor state"
-        );
-
-        // Step 7: Mark instance as committed in cache
-        {
-            let guard = self.proof_cache.read().await;
-            if let Some(cache) = guard.as_ref() {
-                cache.mark_committed(bundle.certificate.gpbft_instance);
-                tracing::debug!(
-                    instance = bundle.certificate.gpbft_instance,
-                    "marked instance as committed in cache"
-                );
-            }
-        }
-
         tracing::info!(
-            instance = bundle.certificate.gpbft_instance,
-            height = finality.height,
-            "proof-based topdown finality executed successfully"
+            height = msg.height,
+            "generalised top-down executed successfully"
         );
 
         Ok(ret)
     }
 
-    /// Extract topdown messages from proof bundle event proofs.
-    ///
-    /// Decodes `NewTopDownMessage` events from the proof bundle using ABI decoding.
-    ///
-    /// Event signature: `NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id)`
-    fn extract_topdown_messages_from_bundle(
-        &self,
-        proof_bundle: &proofs::proofs::common::bundle::UnifiedProofBundle,
-    ) -> anyhow::Result<Vec<IpcEnvelope>> {
-        // Use the dedicated event extraction module
-        crate::fvm::event_extraction::extract_topdown_messages(proof_bundle)
-    }
-
-    /// Extract validator changes from proof bundle event proofs.
-    ///
-    /// Decodes `NewPowerChangeRequest` events from the proof bundle using ABI decoding.
-    ///
-    /// Event signature: `NewPowerChangeRequest(uint8 op, address validator, bytes payload, uint64 configurationNumber)`
-    fn extract_validator_changes_from_bundle(
-        &self,
-        proof_bundle: &proofs::proofs::common::bundle::UnifiedProofBundle,
-    ) -> anyhow::Result<Vec<ipc_api::staking::PowerChangeRequest>> {
-        // Use the dedicated event extraction module
-        crate::fvm::event_extraction::extract_validator_changes(proof_bundle)
-    }
-
     // TODO Karel - separate this huge function and clean up
-    pub async fn execute_topdown_msg(
+    pub async fn execute_legacy(
         &self,
         state: &mut FvmExecState<DB>,
         finality: ParentFinality,

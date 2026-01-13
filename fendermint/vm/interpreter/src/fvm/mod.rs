@@ -4,11 +4,13 @@
 pub mod constants;
 mod executions;
 mod externs;
+pub mod f3;
 pub mod interpreter;
 pub mod observe;
 pub mod state;
 pub mod store;
 pub mod topdown;
+pub use f3::F3FinalityHandler;
 pub mod upgrades;
 pub use interpreter::FvmMessagesInterpreter;
 

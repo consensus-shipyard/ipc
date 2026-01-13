@@ -75,6 +75,9 @@ fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 fendermint_vm_topdown_proof_service = { path = "../vm/topdown/proof-service" }
 
+# F3 certificate handling
+filecoin-f3-gpbft = { git = "https://github.com/moshababo/rust-f3", branch = "cargo-git-compat" }
+
 # .car file wrapped in a crate
 actors-builtin-car = { path = "../actors-builtin-car" }
 actors-custom-car = { path = "../actors-custom-car", default-features = false }

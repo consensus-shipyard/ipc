@@ -40,9 +40,9 @@ impl F3LightClientActor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         let state = State::new(
-            params.instance_id,
+            params.latest_instance_id,
+            params.latest_finalized_height,
             params.power_table,
-            params.finalized_epochs,
         )?;
 
         rt.create(&state)?;
@@ -70,10 +70,9 @@ impl F3LightClient for F3LightClientActor {
         let lc = &state.light_client_state;
 
         Ok(GetStateResponse {
-            instance_id: lc.instance_id,
-            finalized_epochs: lc.finalized_epochs.clone(),
+            latest_instance_id: lc.latest_instance_id,
+            latest_finalized_height: lc.latest_finalized_height,
             power_table: lc.power_table.clone(),
-            latest_finalized_height: lc.finalized_epochs.iter().max().copied().unwrap_or(0),
         })
     }
 }
@@ -100,17 +99,18 @@ mod tests {
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
+    use fvm_shared::clock::ChainEpoch;
     use fvm_shared::error::ExitCode;
 
     /// Helper function to create test light client state
     fn create_test_state(
-        instance_id: u64,
-        finalized_epochs: Vec<i64>,
+        current_instance_id: u64,
+        latest_finalized_epoch: Option<ChainEpoch>,
         power_table: Vec<PowerEntry>,
     ) -> LightClientState {
         LightClientState {
-            instance_id,
-            finalized_epochs,
+            latest_instance_id: current_instance_id,
+            latest_finalized_height: latest_finalized_epoch,
             power_table,
         }
     }
@@ -131,9 +131,9 @@ mod tests {
 
     /// Construct the actor and verify initialization
     pub fn construct_and_verify(
-        instance_id: u64,
+        current_instance_id: u64,
         power_table: Vec<PowerEntry>,
-        finalized_epochs: Vec<i64>,
+        latest_finalized_epoch: Option<ChainEpoch>,
     ) -> MockRuntime {
         let rt = MockRuntime {
             receiver: Address::new_id(10),
@@ -145,9 +145,9 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         let constructor_params = ConstructorParams {
-            instance_id,
+            latest_instance_id: current_instance_id,
+            latest_finalized_height: latest_finalized_epoch,
             power_table,
-            finalized_epochs,
         };
 
         let result = rt
@@ -166,33 +166,26 @@ mod tests {
 
     #[test]
     fn test_constructor_empty_power_table() {
-        let _rt = construct_and_verify(0, vec![], vec![]);
+        let _rt = construct_and_verify(0, vec![], Some(10));
         // Constructor test passed if we get here without panicking
     }
 
     #[test]
     fn test_constructor_with_power_table() {
         let power_entries = create_test_power_entries();
-        let _rt = construct_and_verify(1, power_entries, vec![]);
-        // Constructor test passed if we get here without panicking
-    }
-
-    #[test]
-    fn test_constructor_with_finalized_epochs() {
-        let power_entries = create_test_power_entries();
-        let _rt = construct_and_verify(1, power_entries, vec![100, 101, 102]);
+        let _rt = construct_and_verify(1, power_entries, Some(10));
         // Constructor test passed if we get here without panicking
     }
 
     #[test]
     fn test_update_state_success() {
-        let rt = construct_and_verify(1, create_test_power_entries(), vec![]);
+        let rt = construct_and_verify(1, create_test_power_entries(), Some(10));
 
         // Set caller to system actor
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
-        let new_state = create_test_state(1, vec![100, 101, 102], create_test_power_entries());
+        let new_state = create_test_state(1, Some(10), create_test_power_entries());
         let update_params = UpdateStateParams {
             state: new_state.clone(),
         };
@@ -210,12 +203,12 @@ mod tests {
 
     #[test]
     fn test_update_state_non_advancing_height() {
-        let rt = construct_and_verify(1, create_test_power_entries(), vec![]);
+        let rt = construct_and_verify(1, create_test_power_entries(), Some(10));
 
         // First update to set the finalized height to 102
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let initial_state = create_test_state(1, vec![100, 101, 102], create_test_power_entries());
+        let initial_state = create_test_state(1, Some(10), create_test_power_entries());
         let initial_params = UpdateStateParams {
             state: initial_state,
         };
@@ -229,8 +222,7 @@ mod tests {
         // Try to update with same height
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let same_height_state =
-            create_test_state(1, vec![100, 101, 102], create_test_power_entries());
+        let same_height_state = create_test_state(1, Some(10), create_test_power_entries());
         let update_params = UpdateStateParams {
             state: same_height_state,
         };
@@ -248,14 +240,14 @@ mod tests {
 
     #[test]
     fn test_update_state_unauthorized_caller() {
-        let rt = construct_and_verify(1, create_test_power_entries(), vec![]);
+        let rt = construct_and_verify(1, create_test_power_entries(), Some(10));
 
         // Set caller to non-system actor
         let unauthorized_caller = Address::new_id(999);
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, unauthorized_caller);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
-        let new_state = create_test_state(1, vec![100, 101, 102], create_test_power_entries());
+        let new_state = create_test_state(1, Some(11), create_test_power_entries());
         let update_params = UpdateStateParams { state: new_state };
 
         let result = rt.call::<F3LightClientActor>(
@@ -272,12 +264,12 @@ mod tests {
     #[test]
     fn test_get_state() {
         let power_entries = create_test_power_entries();
-        let rt = construct_and_verify(42, power_entries.clone(), vec![]);
+        let rt = construct_and_verify(42, power_entries.clone(), Some(10));
 
         // Update state first
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let new_state = create_test_state(42, vec![100, 101, 102], power_entries.clone());
+        let new_state = create_test_state(42, Some(11), power_entries.clone());
         let update_params = UpdateStateParams { state: new_state };
         rt.call::<F3LightClientActor>(
             Method::UpdateState as u64,
@@ -294,20 +286,19 @@ mod tests {
             .unwrap();
 
         let response = result.deserialize::<GetStateResponse>().unwrap();
-        assert_eq!(response.instance_id, 42);
-        assert_eq!(response.finalized_epochs, vec![100, 101, 102]);
+        assert_eq!(response.latest_instance_id, 42);
+        assert_eq!(response.latest_finalized_height, Some(11));
         assert_eq!(response.power_table, power_entries);
-        assert_eq!(response.latest_finalized_height, 102);
     }
 
     #[test]
     fn test_state_progression() {
-        let rt = construct_and_verify(1, create_test_power_entries(), vec![]);
+        let rt = construct_and_verify(1, create_test_power_entries(), Some(10));
 
         // Update with first state
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let state1 = create_test_state(1, vec![100, 101, 102], create_test_power_entries());
+        let state1 = create_test_state(1, Some(100), create_test_power_entries());
         let params1 = UpdateStateParams { state: state1 };
         rt.call::<F3LightClientActor>(
             Method::UpdateState as u64,
@@ -319,7 +310,7 @@ mod tests {
         // Update with second state (higher height)
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let state2 = create_test_state(1, vec![200, 201, 202], create_test_power_entries());
+        let state2 = create_test_state(1, Some(200), create_test_power_entries());
         let params2 = UpdateStateParams { state: state2 };
         let result = rt.call::<F3LightClientActor>(
             Method::UpdateState as u64,
@@ -330,12 +321,12 @@ mod tests {
 
     #[test]
     fn test_instance_id_progression_next_instance() {
-        let rt = construct_and_verify(100, create_test_power_entries(), vec![]);
+        let rt = construct_and_verify(100, create_test_power_entries(), Some(10));
 
         // First state at instance 100
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let initial_state = create_test_state(100, vec![50, 51, 52], create_test_power_entries());
+        let initial_state = create_test_state(100, Some(10), create_test_power_entries());
         let initial_params = UpdateStateParams {
             state: initial_state,
         };
@@ -349,8 +340,7 @@ mod tests {
         // Update to next instance (100 -> 101) should succeed
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let next_instance_state =
-            create_test_state(101, vec![10, 11, 12], create_test_power_entries());
+        let next_instance_state = create_test_state(101, Some(10), create_test_power_entries());
         let update_params = UpdateStateParams {
             state: next_instance_state,
         };
@@ -364,12 +354,12 @@ mod tests {
 
     #[test]
     fn test_instance_id_skip_rejected() {
-        let rt = construct_and_verify(100, create_test_power_entries(), vec![]);
+        let rt = construct_and_verify(100, create_test_power_entries(), Some(10));
 
         // First state at instance 100
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let initial_state = create_test_state(100, vec![50, 51, 52], create_test_power_entries());
+        let initial_state = create_test_state(100, Some(10), create_test_power_entries());
         let initial_params = UpdateStateParams {
             state: initial_state,
         };
@@ -383,8 +373,7 @@ mod tests {
         // Try to skip instance (100 -> 102) should fail
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let skipped_state =
-            create_test_state(102, vec![100, 101, 102], create_test_power_entries());
+        let skipped_state = create_test_state(102, Some(10), create_test_power_entries());
         let update_params = UpdateStateParams {
             state: skipped_state,
         };
@@ -400,13 +389,13 @@ mod tests {
 
     #[test]
     fn test_empty_epochs_rejected() {
-        let rt = construct_and_verify(1, create_test_power_entries(), vec![]);
+        let rt = construct_and_verify(1, create_test_power_entries(), Some(10));
 
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         // Try to update with empty finalized_epochs
-        let invalid_state = create_test_state(1, vec![], create_test_power_entries());
+        let invalid_state = create_test_state(1, Some(10), create_test_power_entries());
         let update_params = UpdateStateParams {
             state: invalid_state,
         };

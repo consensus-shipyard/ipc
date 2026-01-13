@@ -9,9 +9,9 @@ use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, R
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
-use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
+use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
@@ -39,6 +39,10 @@ use crate::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::{AccountKind, Settings};
 
 use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
+use fendermint_vm_interpreter::fvm::state::ipc::F3LightClientCaller;
+use filecoin_f3_gpbft::PowerEntries;
+use fvm_shared::clock::ChainEpoch;
+use std::path::PathBuf;
 
 // Database collection names.
 namespaces! {
@@ -245,14 +249,136 @@ pub async fn run(
         None
     };
 
-    // Initialize without proof cache first - we'll set it up after app creation
-    let proof_cache = None;
-
     let end_block_manager = EndBlockManager::new();
+
+    // Validate F3 configuration consistency: config and genesis must match
+    // Query F3 state from genesis to check if F3 is enabled there
+    let app_namespace = ns.app.clone();
+    let exec_state = crate::app::create_read_only_exec_state::<_, _, AppStore>(
+        &db,
+        &state_store,
+        app_namespace.clone(),
+    )
+    .context("failed to create read-only exec state")?;
+
+    let f3_in_genesis = match exec_state {
+        Some(mut state) => {
+            crate::app::query_f3_state(&mut state)
+                .context("failed to query F3 state from genesis")?
+                .is_some()
+        }
+        None => false, // Genesis not initialized yet - will be checked below
+    };
+
+    // Check F3 configuration in settings
+    let f3_in_config = topdown_enabled
+        && settings
+            .ipc
+            .topdown_config()
+            .ok()
+            .and_then(|tc| tc.f3.as_ref())
+            .is_some();
+
+    // Validate: F3 must be enabled in BOTH config and genesis, or NEITHER
+    match (f3_in_config, f3_in_genesis) {
+        (true, false) => {
+            anyhow::bail!(
+                "F3 is enabled in config but F3 Light Client Actor state not found in genesis. \
+                 F3 must be configured in both config and genesis, or neither."
+            );
+        }
+        (false, true) => {
+            anyhow::bail!(
+                "F3 is enabled in genesis but not in config. \
+                 F3 must be configured in both config and genesis, or neither."
+            );
+        }
+        (true, true) => {
+            // Both enabled - proceed with F3 initialization
+        }
+        (false, false) => {
+            // Both disabled - F3 not used
+        }
+    }
+
+    // Create F3 cache and handler if F3 is configured
+    let (f3_handler, f3_service_config) = if f3_in_config && f3_in_genesis {
+        let topdown_config = settings
+            .ipc
+            .topdown_config()
+            .ok()
+            .context("topdown config required when topdown is enabled")?;
+
+        let f3_config = topdown_config
+            .f3
+            .as_ref()
+            .expect("F3 config should exist if f3_in_config is true");
+
+        // Query F3 state - we know it exists from validation above
+        let exec_state = crate::app::create_read_only_exec_state::<_, _, AppStore>(
+            &db,
+            &state_store,
+            app_namespace,
+        )
+        .context("failed to create read-only exec state")?;
+
+        let f3_initial_state = exec_state
+            .and_then(|mut state| {
+                crate::app::query_f3_state(&mut state)
+                    .context("failed to query F3 state")
+                    .transpose()
+            })
+            .transpose()?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "F3 is enabled but F3 Light Client Actor state not found in genesis"
+                )
+            })?;
+
+        // Use queried F3 state to initialize cache correctly
+        let (initial_instance, initial_epoch) = match f3_initial_state {
+            (inst, Some(epoch)) => (inst, epoch),
+            (inst, None) => (inst, 0),
+        };
+
+        let db_path = Some(settings.data_dir().join("proof-cache"));
+        let cache = if let Some(path) = &db_path {
+            Arc::new(
+                fendermint_vm_topdown_proof_service::ProofCache::new_with_persistence(
+                    initial_epoch,
+                    initial_instance,
+                    f3_config.proof_service.cache_config.clone(),
+                    path,
+                )?,
+            )
+        } else {
+            Arc::new(fendermint_vm_topdown_proof_service::ProofCache::new(
+                initial_epoch,
+                initial_instance,
+                f3_config.proof_service.cache_config.clone(),
+            ))
+        };
+
+        // Create F3 handler with cache
+        use fendermint_vm_interpreter::fvm::F3FinalityHandler;
+        let handler = F3FinalityHandler::new(cache, settings.ipc.subnet_id.to_string());
+
+        // Store config for service creation later
+        let mut proof_config = f3_config.proof_service.clone();
+        proof_config.parent_rpc_url = topdown_config.parent_http_endpoint.to_string();
+
+        (Some(handler), Some((proof_config, db_path)))
+    } else {
+        (None, None)
+    };
+    } else {
+        (None, None)
+    };
+
     let top_down_manager = TopDownManager::new(
         parent_finality_provider.clone(),
         parent_finality_votes.clone(),
-        proof_cache,
+        f3_handler, // F3 handler created upfront
     );
 
     let interpreter = FvmMessagesInterpreter::new(
@@ -279,72 +405,42 @@ pub async fn run(
         snapshots,
     )?;
 
-    // Launch F3 proof service after app creation if configured
-    // This allows us to query the F3LightClientActor for the correct initial state
-    if topdown_enabled {
-        let topdown_config = settings.ipc.topdown_config().ok();
-        if let Some(tc) = topdown_config {
-            if let Some(proof_settings) = &tc.proof_service {
-                if proof_settings.enabled {
-                    tracing::info!("F3 proof service enabled, querying initial state");
-                    
-                    // Query F3 state from the app after genesis
-                    match app.query_f3_state().await? {
-                        Some((instance_id, power_table)) => {
-                            tracing::info!(
-                                instance_id = instance_id,
-                                power_entries = power_table.0.len(),
-                                "Found F3 state in genesis, launching proof service"
-                            );
+    // Launch F3 proof service if configured
+    if let Some((proof_config, _db_path)) = f3_service_config {
+        tracing::info!("F3 proof service enabled");
 
-                            let mut proof_config = proof_settings.to_proof_service_config(
-                                &settings.ipc.subnet_id.to_string()
-                            );
-                            proof_config.parent_rpc_url = tc.parent_http_endpoint.to_string();
-                            proof_config.subnet_id = Some(settings.ipc.subnet_id.to_string());
+        // Get cache from F3 handler
+        let cache = app
+            .interpreter()
+            .top_down_manager
+            .f3
+            .as_ref()
+            .map(|f3| f3.proof_cache().clone())
+            .expect("F3 handler should exist if f3_service_config is Some");
 
-                            let db_path = Some(settings.data_dir().join("proof-cache"));
+        // Create service - it will fetch initial state from cache
+        use fendermint_vm_topdown_proof_service::ProofGeneratorService;
+        let service = ProofGeneratorService::new(
+            proof_config.clone(),
+            cache.clone(),
+            &settings.ipc.subnet_id,
+            0, // Service will fetch actual instance ID from cache
+            PowerEntries(vec![]), // Service will fetch actual power table from parent
+        )
+        .await
+        .context("Failed to create F3 proof service")?;
 
-                            match fendermint_vm_topdown_proof_service::launch_service(
-                                proof_config.clone(),
-                                instance_id,
-                                power_table,
-                                db_path,
-                            ).await {
-                                Ok((cache, service_handle)) => {
-                                    tracing::info!(
-                                        f3_network = proof_config.f3_network_name,
-                                        lookahead = proof_config.lookahead_instances,
-                                        "F3 proof service launched successfully with correct initial state"
-                                    );
-                                    
-                                    // Spawn service in background
-                                    tokio::spawn(async move {
-                                        service_handle.await.ok();
-                                    });
-                                    
-                                    // Connect the proof cache to the TopDownManager
-                                    // This allows the TopDownManager to use cached proofs in proposals
-                                    app.interpreter().set_proof_cache(cache).await;
-                                    tracing::info!("Connected proof cache to TopDownManager");
-                                }
-                                Err(e) => {
-                                    tracing::error!(
-                                        error = %e,
-                                        "Failed to launch F3 proof service despite F3 being configured"
-                                    );
-                                }
-                            }
-                        }
-                        None => {
-                            tracing::info!("F3 not configured in genesis, skipping proof service");
-                        }
-                    }
-                } else {
-                    tracing::debug!("F3 proof service disabled in configuration");
-                }
-            }
-        }
+        tracing::info!(
+            f3_network = proof_config.f3_network_name(&settings.ipc.subnet_id),
+            lookahead = proof_config.cache_config.lookahead_instances,
+            "F3 proof service initialized successfully"
+        );
+
+        // Spawn service in background
+        tokio::spawn(async move {
+            service.run().await;
+        });
+    }
     }
 
     if let Some((agent_proxy, config)) = ipc_tuple {

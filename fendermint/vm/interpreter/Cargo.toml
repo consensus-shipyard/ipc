@@ -50,6 +50,7 @@ ipc-observability = { path = "../../../ipc/observability" }
 async-trait = { workspace = true }
 async-stm = { workspace = true }
 anyhow = { workspace = true }
+arc-swap = "1.6"
 base64 = { workspace = true }
 ethers = { workspace = true }
 hex = { workspace = true }

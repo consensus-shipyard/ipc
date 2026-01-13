@@ -260,6 +260,24 @@ impl ProofCache {
         self.last_committed_instance.load(Ordering::Acquire)
     }
 
+    /// Get the next uncommitted epoch (last_committed_epoch + 1)
+    /// Returns None if no proof is available for that epoch
+    pub fn get_next_uncommitted_epoch(&self) -> Option<ChainEpoch> {
+        let next_epoch = self.last_committed_epoch() + 1;
+        if self.contains_epoch_proof(next_epoch) {
+            Some(next_epoch)
+        } else {
+            None
+        }
+    }
+
+    /// Get the next uncommitted proof entry (epoch + certificate)
+    /// Returns None if no proof is available for next epoch
+    pub fn get_next_uncommitted(&self) -> Option<EpochProofWithCertificate> {
+        let next_epoch = self.get_next_uncommitted_epoch()?;
+        self.get_epoch_proof_with_certificate(next_epoch)
+    }
+
     /// Get the number of cached epoch proofs
     pub fn epoch_proof_count(&self) -> usize {
         self.epoch_proofs.read().len()
