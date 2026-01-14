@@ -296,7 +296,7 @@ impl IpcSettings {
     /// Returns true by default if bottomup config is not specified, matching the intended
     /// default behavior where bottom-up checkpointing is enabled by default.
     pub fn bottomup_enabled(&self) -> bool {
-        self.bottomup.as_ref().map_or(true, |config| config.enabled)
+        self.bottomup.as_ref().is_none_or(|config| config.enabled)
     }
 }
 
