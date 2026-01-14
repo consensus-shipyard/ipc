@@ -7,7 +7,7 @@ import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "./interfaces/IDiamondLoupe.sol";
 import {IERC165} from "./interfaces/IERC165.sol";
 import {Validator, Membership} from "./structs/Subnet.sol";
-import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} from "./errors/IPCErrors.sol";
+import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage, TooManyValidators} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
@@ -18,6 +18,7 @@ error FunctionNotFound(bytes4 _functionSelector);
 bool constant FEATURE_MULTILEVEL_CROSSMSG = true;
 bool constant FEATURE_GENERAL_PUPRPOSE_CROSSMSG = true;
 uint8 constant FEATURE_SUBNET_DEPTH = 10;
+uint16 constant MAX_VALIDATORS_SIZE = 256;
 
 contract GatewayDiamond {
     GatewayActorStorage internal s;
@@ -58,10 +59,12 @@ contract GatewayDiamond {
         s.networkName = params.networkName;
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
         s.majorityPercentage = params.majorityPercentage;
-        s.checkpointQuorumMap.retentionHeight = 1;
         s.commitSha = params.commitSha;
 
+        // the validator bitmap is a uint256, which is 256 bits, this allows only 256 validators
+        if (params.activeValidatorsLimit > MAX_VALIDATORS_SIZE) revert TooManyValidators();
         s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;
+
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
         s.validatorsTracker.changes.nextConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
         // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have

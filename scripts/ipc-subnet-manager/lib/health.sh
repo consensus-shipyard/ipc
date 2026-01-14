@@ -6,261 +6,44 @@
 backup_all_nodes() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-        local node_home=$(get_node_home "$idx")
+        local ip=$(get_config_value "validators[$idx].ip")
+        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
+        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
+        local node_home=$(get_config_value "paths.node_home")
 
         local timestamp=$(date +%Y%m%d%H%M%S)
         local backup_path="${node_home}.backup.${timestamp}"
 
         log_info "Creating backup for $name at $backup_path..."
-        exec_on_host "$idx" "if [ -d $node_home ]; then cp -r $node_home $backup_path; fi"
+        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "if [ -d $node_home ]; then cp -r $node_home $backup_path; fi"
     done
 }
 
 wipe_all_nodes() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-        local node_home=$(get_node_home "$idx")
+        local ip=$(get_config_value "validators[$idx].ip")
+        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
+        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
+        local node_home=$(get_config_value "paths.node_home")
 
         log_info "Wiping $name..."
-        exec_on_host "$idx" "rm -rf $node_home"
+        ssh_exec "$ip" "$ssh_user" "$ipc_user" "rm -rf $node_home"
     done
-}
-
-# Generate systemd service file for node
-generate_node_systemd_service() {
-    local validator_idx="$1"
-    local output_file="$2"
-
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-    local ipc_binary=$(get_config_value "paths.ipc_binary")
-    local node_home=$(get_config_value "paths.node_home")
-
-    # Ensure SCRIPT_DIR is set
-    if [ -z "$SCRIPT_DIR" ]; then
-        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-    fi
-
-    sed -e "s|__IPC_USER__|$ipc_user|g" \
-        -e "s|__IPC_BINARY__|$ipc_binary|g" \
-        -e "s|__NODE_HOME__|$node_home|g" \
-        "${SCRIPT_DIR}/templates/ipc-node.service.template" > "$output_file"
-}
-
-# Generate systemd service file for relayer
-generate_relayer_systemd_service() {
-    local validator_idx="$1"
-    local output_file="$2"
-
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-    local ipc_binary=$(get_config_value "paths.ipc_binary")
-    local node_home=$(get_config_value "paths.node_home")
-    local subnet_id=$(get_config_value "subnet.id")
-    local checkpoint_interval=$(get_config_value "relayer.checkpoint_interval")
-    local max_parallelism=$(get_config_value "relayer.max_parallelism")
-    local eth_api_port=$(get_config_value "network.eth_api_port")
-
-    # Fendermint RPC URL is the local ETH API endpoint
-    local fendermint_rpc_url="http://localhost:${eth_api_port}"
-
-    # Get submitter address
-    local submitter=$(get_validator_address_from_keystore "$validator_idx")
-
-    if [ -z "$submitter" ]; then
-        log_error "Failed to get submitter address for systemd service"
-        return 1
-    fi
-
-    # Ensure SCRIPT_DIR is set
-    if [ -z "$SCRIPT_DIR" ]; then
-        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-    fi
-
-    sed -e "s|__IPC_USER__|$ipc_user|g" \
-        -e "s|__IPC_BINARY__|$ipc_binary|g" \
-        -e "s|__NODE_HOME__|$node_home|g" \
-        -e "s|__SUBNET_ID__|$subnet_id|g" \
-        -e "s|__FENDERMINT_RPC_URL__|$fendermint_rpc_url|g" \
-        -e "s|__CHECKPOINT_INTERVAL__|$checkpoint_interval|g" \
-        -e "s|__MAX_PARALLELISM__|$max_parallelism|g" \
-        -e "s|__SUBMITTER_ADDRESS__|$submitter|g" \
-        "${SCRIPT_DIR}/templates/ipc-relayer.service.template" > "$output_file"
-}
-
-# Check if systemd is available
-check_systemd_available() {
-    local ip="$1"
-    local ssh_user="$2"
-
-    # Check if systemd is available (just check the system one)
-    local result=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "systemctl --version >/dev/null 2>&1 && echo 'yes' || echo 'no'" 2>/dev/null)
-
-    echo "$result"
-}
-
-# Install systemd services on a validator
-install_systemd_services() {
-    local validator_idx="$1"
-
-    local name="${VALIDATORS[$validator_idx]}"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-    local node_home=$(get_config_value "paths.node_home")
-
-    log_info "Checking systemd availability on $name..."
-
-    # Check if systemd is available
-    local systemd_available=$(check_systemd_available "$ip" "$ssh_user")
-
-    if [ "$systemd_available" != "yes" ]; then
-        log_warn "✗ Systemd not available on $name"
-        log_info "  You can still manage processes manually without systemd"
-        return 1
-    fi
-
-    log_info "Installing systemd service on $name..."
-
-    # Generate node service file
-    local node_service_file="/tmp/ipc-node-${name}.service"
-    generate_node_systemd_service "$validator_idx" "$node_service_file"
-
-    if [ ! -f "$node_service_file" ]; then
-        log_error "Failed to generate service file for $name"
-        return 1
-    fi
-
-    # Ensure logs directory exists
-    ssh_exec "$ip" "$ssh_user" "$ipc_user" "mkdir -p $node_home/logs" 2>/dev/null || true
-
-    # Copy service file to /etc/systemd/system/ (requires sudo)
-    log_info "  Copying service file to $name..."
-    if ! scp -o StrictHostKeyChecking=no "$node_service_file" "$ssh_user@$ip:/tmp/ipc-node.service" >/dev/null 2>&1; then
-        log_error "Failed to copy service file to $name"
-        rm -f "$node_service_file"
-        return 1
-    fi
-
-    log_info "  Moving to /etc/systemd/system/..."
-    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo mv /tmp/ipc-node.service /etc/systemd/system/ipc-node.service && sudo chmod 644 /etc/systemd/system/ipc-node.service" >/dev/null 2>&1; then
-        log_error "Failed to install service file on $name"
-        rm -f "$node_service_file"
-        return 1
-    fi
-
-    # Reload systemd
-    log_info "  Reloading systemd..."
-    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo systemctl daemon-reload" >/dev/null 2>&1; then
-        log_error "Failed to reload systemd on $name"
-        rm -f "$node_service_file"
-        return 1
-    fi
-
-    # Enable node service
-    log_info "  Enabling service..."
-    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo systemctl enable ipc-node.service" >/dev/null 2>&1 || true
-
-    log_success "✓ Node service installed on $name"
-
-    # Cleanup
-    rm -f "$node_service_file"
-    return 0
-}
-
-# Install relayer systemd service on primary validator
-install_relayer_systemd_service() {
-    local validator_idx="$1"
-
-    local name="${VALIDATORS[$validator_idx]}"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-
-    # Check if systemd is available
-    local systemd_available=$(check_systemd_available "$ip" "$ssh_user")
-
-    if [ "$systemd_available" != "yes" ]; then
-        log_warn "✗ Systemd not available on $name"
-        log_info "  Relayer will need to be managed manually"
-        return 1
-    fi
-
-    log_info "Installing relayer systemd service on $name..."
-
-    # Generate relayer service file
-    local relayer_service_file="/tmp/ipc-relayer-${name}.service"
-    generate_relayer_systemd_service "$validator_idx" "$relayer_service_file"
-
-    if [ ! -f "$relayer_service_file" ]; then
-        log_error "Failed to generate relayer service file"
-        return 1
-    fi
-
-    # Copy service file to /etc/systemd/system/ (requires sudo)
-    log_info "  Copying relayer service file to $name..."
-    if ! scp -o StrictHostKeyChecking=no "$relayer_service_file" "$ssh_user@$ip:/tmp/ipc-relayer.service" >/dev/null 2>&1; then
-        log_error "Failed to copy relayer service file to $name"
-        rm -f "$relayer_service_file"
-        return 1
-    fi
-
-    log_info "  Moving to /etc/systemd/system/..."
-    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo mv /tmp/ipc-relayer.service /etc/systemd/system/ipc-relayer.service && sudo chmod 644 /etc/systemd/system/ipc-relayer.service" >/dev/null 2>&1; then
-        log_error "Failed to install relayer service file on $name"
-        rm -f "$relayer_service_file"
-        return 1
-    fi
-
-    # Reload systemd
-    log_info "  Reloading systemd..."
-    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo systemctl daemon-reload" >/dev/null 2>&1; then
-        log_error "Failed to reload systemd on $name"
-        rm -f "$relayer_service_file"
-        return 1
-    fi
-
-    # Enable relayer service
-    log_info "  Enabling relayer service..."
-    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo systemctl enable ipc-relayer.service" >/dev/null 2>&1 || true
-
-    log_success "✓ Relayer service installed on $name"
-
-    # Cleanup
-    rm -f "$relayer_service_file"
-    return 0
 }
 
 stop_all_nodes() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-
-        log_info "Stopping $name..."
-
-        if is_local_mode; then
-            # Local mode: just kill the process
-            kill_process "$idx" "ipc-cli.*node start"
-        else
-            # Remote mode: try systemd first, fall back to manual kill
         local ip=$(get_config_value "validators[$idx].ip")
         local ssh_user=$(get_config_value "validators[$idx].ssh_user")
         local ipc_user=$(get_config_value "validators[$idx].ipc_user")
 
-        local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-            "systemctl is-active ipc-node 2>/dev/null | grep -q active && echo yes || echo no" 2>/dev/null)
+        log_info "Stopping $name..."
+        ssh_kill_process "$ip" "$ssh_user" "$ipc_user" "ipc-cli node start"
 
-        if [ "$has_systemd" = "yes" ]; then
-            ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "sudo systemctl stop ipc-node" >/dev/null 2>&1 || true
-        else
-            ssh_kill_process "$ip" "$ssh_user" "$ipc_user" "ipc-cli node start"
-            fi
-        fi
-
+        # Wait a moment for graceful shutdown
         sleep 2
     done
 }
@@ -286,358 +69,17 @@ start_validator_node() {
     local validator_idx="$1"
 
     local name="${VALIDATORS[$validator_idx]}"
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local ipc_binary=$(get_config_value "paths.ipc_binary")
-    local node_home=$(get_node_home "$validator_idx")
+    local node_home=$(get_config_value "paths.node_home")
 
     log_info "Starting $name..."
 
-    if is_local_mode; then
-        # Local mode: always use nohup (macOS doesn't have systemd)
-        # Expand tilde in paths
-        ipc_binary="${ipc_binary/#\~/$HOME}"
-        node_home="${node_home/#\~/$HOME}"
-
-        # Ensure logs directory exists
-        mkdir -p "$node_home/logs"
-
-        # Start with nohup
-        nohup "$ipc_binary" node start --home "$node_home" > "$node_home/logs/node.stdout.log" 2>&1 &
-
-        log_info "Started $name (PID: $!)"
-    else
-        # Remote mode: try systemd first, fall back to nohup
-        local ip=$(get_config_value "validators[$validator_idx].ip")
-        local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-
-    local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "systemctl list-unit-files ipc-node.service 2>/dev/null | grep -q ipc-node && echo yes || echo no" 2>/dev/null)
-
-    if [ "$has_systemd" = "yes" ]; then
-        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "sudo systemctl start ipc-node" >/dev/null 2>&1 || true
-    else
-        # Fall back to nohup
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "nohup $ipc_binary node start --home $node_home > $node_home/logs/node.stdout.log 2>&1 &"
-        fi
-    fi
-}
-
-# Deploy subnet using ipc-cli subnet init
-deploy_subnet() {
-    # All logs go to stderr, only subnet ID goes to stdout for capture
-    log_info "Deploying subnet with gateway contracts..." >&2
-
-    local ipc_binary=$(get_config_value "paths.ipc_binary")
-    local ipc_binary_expanded="${ipc_binary/#\~/$HOME}"
-    local parent_rpc=$(get_config_value "subnet.parent_rpc")
-    local parent_chain_id=$(get_config_value "subnet.parent_chain_id")
-
-    # Get validator information
-    local validator_count=${#VALIDATORS[@]}
-    local validator_pubkeys=()
-    local validator_powers=()
-    local primary_validator_idx=$(get_primary_validator)
-    local primary_private_key=$(get_config_value "validators[$primary_validator_idx].private_key")
-
-    # Extract Ethereum address from private key
-    # This is a placeholder - we'll use the address from config if available
-    local from_address=$(yq eval ".validators[$primary_validator_idx].address // null" "$CONFIG_FILE")
-
-    # If no address in config, we need to derive it from private key
-    # For Anvil test accounts, we know the addresses
-    if [ "$from_address" = "null" ] || [ -z "$from_address" ]; then
-        # Map known Anvil private keys to addresses
-        case "$primary_private_key" in
-            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-                from_address="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-                ;;
-            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
-                from_address="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
-                ;;
-            "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a")
-                from_address="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
-                ;;
-            *)
-                log_error "Cannot derive address from private key. Please add 'address' field to validator config."
-                return 1
-                ;;
-        esac
-    fi
-
-    # Collect validator public keys (we'll need to generate these from private keys)
-    # For now, we'll use placeholder pubkeys that need to be generated
-    log_info "Generating subnet-init.yaml configuration..."
-
-    # Get permission mode and supply source from config
-    local permission_mode=$(get_config_value "init.permission_mode")
-    local supply_source=$(get_config_value "init.subnet_supply_source_kind")
-    local base_fee=$(get_config_value "init.genesis.base_fee")
-    local power_scale=$(get_config_value "init.genesis.power_scale")
-    local min_validators=$(get_config_value "init.min_validators" 2>/dev/null || echo "$validator_count")
-    local activate_subnet=$(get_config_value "init.activate_subnet" 2>/dev/null || echo "true")
-
-    # Create subnet-init.yaml
-    local subnet_init_config="/tmp/subnet-init-$$.yaml"
-
-    # Generate a unique chain ID for the subnet
-    # Use a hash-based approach: take the parent chain ID and add a unique offset
-    # For subnets, we'll use parent_chain_id + a large offset to ensure uniqueness
-    local parent_numeric_id=$(echo "$parent_chain_id" | sed 's/\/r//')
-    local subnet_chain_id=$((parent_numeric_id + 1000000))  # Add 1M to parent ID for subnet
-
-    log_info "Parent chain ID: $parent_numeric_id" >&2
-    log_info "Subnet chain ID: $subnet_chain_id" >&2
-
-    cat > "$subnet_init_config" << EOF
-import-wallets:
-  - wallet-type: evm
-    private-key: $primary_private_key
-
-deploy:
-  enabled: true
-  url: $parent_rpc
-  from: $from_address
-  chain-id: $parent_numeric_id
-
-create:
-  parent: $parent_chain_id
-  from: $from_address
-  chain-id: $subnet_chain_id
-  min-validator-stake: 1.0
-  min-validators: $min_validators
-  bottomup-check-period: 50
-  permission-mode: $permission_mode
-  supply-source-kind: $supply_source
-  min-cross-msg-fee: 0.000001
-  genesis-subnet-ipc-contracts-owner: $from_address
-EOF
-
-    # Add activation section only if enabled
-    if [ "$activate_subnet" = "true" ]; then
-        cat >> "$subnet_init_config" << EOF
-
-activate:
-  mode: $permission_mode
-  from: $from_address
-EOF
-
-    # Add validator configuration based on permission mode
-    if [ "$permission_mode" = "collateral" ]; then
-        cat >> "$subnet_init_config" << EOF
-  validators:
-EOF
-        # For collateral mode, add join configurations
-        for idx in "${!VALIDATORS[@]}"; do
-            local val_address=$(yq eval ".validators[$idx].address // null" "$CONFIG_FILE")
-            local val_private_key=$(yq eval ".validators[$idx].private_key" "$CONFIG_FILE")
-
-            # Derive address from private key if not in config
-            if [ "$val_address" = "null" ] || [ -z "$val_address" ]; then
-                case "$val_private_key" in
-                    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-                        val_address="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-                        ;;
-                    "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
-                        val_address="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
-                        ;;
-                    "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a")
-                        val_address="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
-                        ;;
-                esac
-            fi
-
-            cat >> "$subnet_init_config" << EOF
-    - from: "$val_address"
-      collateral: 1.0
-      initial-balance: 10.0
-EOF
-        done
-    else
-        # For federated/static mode, add validator public keys
-        # Derive public keys from private keys using cast
-        local pubkeys=()
-        local powers=()
-
-        for idx in "${!VALIDATORS[@]}"; do
-            local val_private_key=$(yq eval ".validators[$idx].private_key" "$CONFIG_FILE")
-
-            # Derive secp256k1 public key from private key using cast
-            # cast returns 64 bytes, we need to prepend 0x04 for uncompressed format (65 bytes)
-            local pubkey_raw=$(cast wallet pubkey --private-key "$val_private_key" 2>/dev/null)
-
-            if [ -z "$pubkey_raw" ]; then
-                log_error "Failed to derive public key from private key for validator $idx"
-                return 1
-            fi
-
-            # Prepend 0x04 to make it a 65-byte uncompressed public key
-            local pubkey="0x04${pubkey_raw#0x}"
-
-            pubkeys+=("$pubkey")
-            powers+=(100)  # Equal power for all validators
-        done
-
-        cat >> "$subnet_init_config" << EOF
-  validator-pubkeys:
-EOF
-        for pubkey in "${pubkeys[@]}"; do
-            cat >> "$subnet_init_config" << EOF
-    - "$pubkey"
-EOF
-        done
-
-        cat >> "$subnet_init_config" << EOF
-  validator-power:
-EOF
-        for power in "${powers[@]}"; do
-            cat >> "$subnet_init_config" << EOF
-    - $power
-EOF
-        done
-    fi
-    fi  # End of if [ "$activate_subnet" = "true" ]
-
-    # Show generated config in debug mode
-    if [ "${DEBUG:-false}" = true ]; then
-        log_debug "Generated subnet-init.yaml:"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        cat "$subnet_init_config"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    fi
-
-    # Run subnet init
-    log_info "Running ipc-cli subnet init..."
-    log_info "This will deploy gateway contracts, create the subnet, and generate genesis files..."
-
-    local init_output
-    if [ "${DEBUG:-false}" = true ]; then
-        # In debug mode, show output in real-time
-        log_info "Debug mode: showing real-time output..."
-        $ipc_binary_expanded subnet init --config "$subnet_init_config" 2>&1 | tee /tmp/subnet-init-output-$$.log
-        exit_code=${PIPESTATUS[0]}
-        init_output=$(cat /tmp/subnet-init-output-$$.log)
-        rm -f /tmp/subnet-init-output-$$.log
-    else
-        init_output=$($ipc_binary_expanded subnet init --config "$subnet_init_config" 2>&1)
-        exit_code=$?
-    fi
-
-    if [ $exit_code -ne 0 ]; then
-        log_error "Subnet deployment failed"
-        echo ""
-        echo "Error output:"
-        echo "$init_output"
-        echo ""
-        log_info "Troubleshooting tips:"
-        log_info "  1. Make sure Anvil is running: lsof -i :8545"
-        log_info "  2. Check that parent gateway and registry addresses are correct"
-        log_info "  3. Try running with --debug flag for more details"
-        rm -f "$subnet_init_config"
-        return 1
-    fi
-
-    # Show output summary
-    log_info "Subnet init completed. Output summary:"
-    echo "$init_output" | grep -E "(Deployed|deployed|Created|created|Subnet|Gateway|Registry)" | head -20
-
-    # Extract subnet ID from ~/.ipc/config.toml
-    # The subnet init command adds the new subnet to the config
-    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-    ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
-    local ipc_config_file="$ipc_config_dir/config.toml"
-
-    # Get all subnet IDs from config, filter for child of parent_chain_id
-    local subnet_id=$(grep '^id = ' "$ipc_config_file" | cut -d'"' -f2 | grep -E "^$parent_chain_id/t[a-z0-9]+" | head -1)
-
-    if [ -z "$subnet_id" ]; then
-        log_error "Could not extract subnet ID from IPC config at $ipc_config_file"
-        log_info "Full CLI output:"
-        echo "$init_output"
-        rm -f "$subnet_init_config"
-        return 1
-    fi
-
-    log_success "Subnet deployed successfully: $subnet_id"
-
-    # Update config with new subnet ID
-    log_info "Updating configuration with new subnet ID..."
-    yq eval ".subnet.id = \"$subnet_id\"" -i "$CONFIG_FILE"
-
-    # Try to extract gateway addresses from IPC config store
-    # The subnet init command updates ~/.ipc/config.toml with the new subnet
-    log_info "Reading deployed contract addresses from IPC config..."
-
-    # The parent gateway and registry should already be in the config
-    # The child subnet's gateway and registry are now in ~/.ipc/config.toml
-    # We can update our config to reference them
-
-    log_info "✅ Subnet deployment complete!"
-    log_info "   Subnet ID: $subnet_id"
-    log_info "   Genesis files generated in ~/.ipc/"
-    log_info "   IPC config updated at ~/.ipc/config.toml"
-
-    # Clean up
-    rm -f "$subnet_init_config"
-
-    # Return subnet ID with marker (only this line without color codes)
-    echo "SUBNET_ID:$subnet_id"
-}
-
-# Create bootstrap genesis for non-activated subnets (Anvil/local development)
-create_bootstrap_genesis() {
-    local subnet_id="$1"
-
-    log_info "Creating genesis using ipc-cli subnet create-genesis..."
-
-    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-    ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
-    local ipc_binary=$(get_config_value "paths.ipc_binary")
-    ipc_binary="${ipc_binary/#\~/$HOME}"
-
-    # Get genesis parameters from config
-    local base_fee=$(get_config_value "init.genesis.base_fee")
-    local power_scale=$(get_config_value "init.genesis.power_scale")
-    local network_version=$(get_config_value "init.genesis.network_version")
-
-    log_info "Running: ipc-cli subnet create-genesis --subnet $subnet_id --out-dir $ipc_config_dir"
-
-    # Use ipc-cli to create genesis (this works for both activated and non-activated subnets)
-    local create_output=$($ipc_binary subnet create-genesis \
-        --subnet "$subnet_id" \
-        --network-version "$network_version" \
-        --base-fee "$base_fee" \
-        --power-scale "$power_scale" \
-        --out-dir "$ipc_config_dir" 2>&1)
-
-    local exit_code=$?
-
-    if [ $exit_code -ne 0 ]; then
-        log_error "Failed to create genesis using ipc-cli" >&2
-        echo "$create_output" >&2
-        return 1
-    fi
-
-    log_info "$create_output" >&2
-
-    # Check if genesis files were created
-    # ipc-cli subnet create-genesis creates files with format: genesis_r31337_... (single underscore)
-    local subnet_id_no_slash="${subnet_id#/}"  # Remove leading /
-    local genesis_file="$ipc_config_dir/genesis_${subnet_id_no_slash//\//_}.json"
-    local sealed_file="$ipc_config_dir/genesis_sealed_${subnet_id_no_slash//\//_}.json"
-
-    if [ ! -f "$genesis_file" ] || [ ! -f "$sealed_file" ]; then
-        log_error "Genesis files not found after creation" >&2
-        log_error "Expected: $genesis_file" >&2
-        log_error "Expected: $sealed_file" >&2
-        return 1
-    fi
-
-    log_success "Genesis created successfully using ipc-cli"
-    log_info "    Genesis file: $genesis_file"
-    log_info "    Sealed file: $sealed_file"
-
-    return 0
+    # Start node in background
+    ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "nohup $ipc_binary node start --home $node_home > $node_home/node.log 2>&1 &"
 }
 
 initialize_primary_node() {
@@ -656,97 +98,21 @@ initialize_primary_node() {
     local temp_config="/tmp/node-init-${name}.yml"
     generate_node_init_yml "$validator_idx" "$temp_config" ""
 
-    # Show generated config for debugging
-    if [ "${DEBUG:-false}" = true ]; then
-        log_debug "Generated node-init.yml for $name:"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        cat "$temp_config"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    else
-        log_info "Generated node-init.yml for $name (use --debug to view full config)"
-    fi
-
-    # Copy to target location or use temp config in local mode
-    local actual_config
-    if ! is_local_mode; then
-        copy_to_host "$validator_idx" "$temp_config" "$node_init_config"
+    # Copy to remote
+    scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_config" "$node_init_config"
     rm -f "$temp_config"
-        actual_config="$node_init_config"
-    else
-        # In local mode, use the temp config directly
-        actual_config="$temp_config"
-    fi
 
-    # Test parent chain connectivity
-    log_info "Testing parent chain connectivity from $name..."
-    local parent_rpc=$(get_config_value "subnet.parent_rpc")
-    local parent_test=$(exec_on_host "$validator_idx" \
-        "curl -s -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' '$parent_rpc' 2>&1")
+    # Run init
+    local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "$ipc_binary node init --config $node_init_config 2>&1")
 
-    if echo "$parent_test" | grep -q "error\|failed\|refused"; then
-        log_error "Cannot reach parent chain RPC at $parent_rpc from $name"
-        echo "$parent_test"
-        log_info "Please verify:"
-        log_info "  1. Parent RPC URL is correct: $parent_rpc"
-        log_info "  2. Parent chain is running and accessible from the validator node"
-        log_info "  3. No firewall blocking the connection"
-        return 1
-    else
-        log_success "Parent chain connectivity OK"
-    fi
-
-    # Expand paths for local mode
-    local ipc_binary_expanded="${ipc_binary/#\~/$HOME}"
-    local actual_config_expanded="${actual_config/#\~/$HOME}"
-
-    # Run init with verbose logging if debug mode
-    if [ "${DEBUG:-false}" = true ]; then
-        log_info "Running ipc-cli node init with verbose logging..."
-        local init_output=$(exec_on_host "$validator_idx" \
-            "RUST_LOG=debug,ipc_cli=trace $ipc_binary_expanded node init --config $actual_config_expanded 2>&1")
-    else
-        log_info "Running ipc-cli node init..."
-        local init_output=$(exec_on_host "$validator_idx" \
-            "$ipc_binary_expanded node init --config $actual_config_expanded 2>&1")
-    fi
-
-    # Check if initialization succeeded by looking for success message
-    if echo "$init_output" | grep -q "Node initialization completed successfully"; then
-        log_success "Node $name initialized successfully"
-        if [ "${DEBUG:-false}" = true ]; then
-            echo "$init_output" | tail -20
-        fi
-        return 0
-    fi
-
-    # If we get here, there was an error
+    if echo "$init_output" | grep -q "Error\|error\|failed"; then
         log_error "Initialization failed for $name"
+        echo "$init_output"
+        exit 1
+    fi
 
-        if [ "${DEBUG:-false}" = true ]; then
-            echo ""
-            echo "━━━━━━━━━━━━━━━━━━━━━━━ DETAILED ERROR OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "$init_output"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
-        else
-            # Show just the error line(s)
-            echo ""
-            echo "Error summary:"
-        echo "$init_output" | grep "❌" | head -5
-            echo ""
-            log_info "Run with --debug flag to see full output"
-        fi
-
-        echo ""
-        log_info "Troubleshooting tips:"
-        log_info "  1. Check if parent_registry and parent_gateway addresses are correct"
-        log_info "  2. Verify subnet already exists on parent chain: $parent_rpc"
-        log_info "  3. Check if the subnet ID is correct: $(get_config_value 'subnet.id')"
-        log_info "  4. Try querying parent chain manually:"
-        log_info "     curl -X POST -H 'Content-Type: application/json' \\"
-        log_info "          --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \\"
-        log_info "          '$parent_rpc'"
-    return 1
+    log_success "$name initialized successfully"
 }
 
 initialize_secondary_nodes() {
@@ -765,22 +131,11 @@ initialize_secondary_node() {
     local primary_peer_info="$2"
 
     local name="${VALIDATORS[$validator_idx]}"
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local ipc_binary=$(get_config_value "paths.ipc_binary")
-    local node_init_config
-    local peer_file_path=""
-
-    if is_local_mode; then
-        node_init_config="/tmp/node-init-${name}.yml"
-        if [ -n "$primary_peer_info" ]; then
-            peer_file_path="/tmp/peer1-${name}.json"
-        fi
-    else
-        local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-        node_init_config=$(get_config_value "paths.node_init_config")
-        if [ -n "$primary_peer_info" ]; then
-            peer_file_path="/home/$ipc_user/peer1.json"
-        fi
-    fi
+    local node_init_config=$(get_config_value "paths.node_init_config")
 
     log_info "Initializing $name..."
 
@@ -788,120 +143,48 @@ initialize_secondary_node() {
     if [ -n "$primary_peer_info" ]; then
         local temp_peer_file="/tmp/peer1-${name}.json"
         echo "$primary_peer_info" > "$temp_peer_file"
-        copy_to_host "$validator_idx" "$temp_peer_file" "$peer_file_path"
-        if ! is_local_mode; then
+        scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_peer_file" "/home/$ipc_user/peer1.json"
         rm -f "$temp_peer_file"
-        fi
     fi
 
     # Generate node-init.yml with peer file reference
     local temp_config="/tmp/node-init-${name}.yml"
+    local peer_file_path=""
+    if [ -n "$primary_peer_info" ]; then
+        peer_file_path="/home/$ipc_user/peer1.json"
+    fi
     generate_node_init_yml "$validator_idx" "$temp_config" "$peer_file_path"
 
-    # Show generated config for debugging
-    if [ "${DEBUG:-false}" = true ]; then
-        log_debug "Generated node-init.yml for $name:"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        cat "$temp_config"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    else
-        log_info "Generated node-init.yml for $name (use --debug to view full config)"
-    fi
-
-    # Copy to target location
-    if ! is_local_mode; then
-        copy_to_host "$validator_idx" "$temp_config" "$node_init_config"
+    # Copy to remote
+    scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_config" "$node_init_config"
     rm -f "$temp_config"
-    fi
 
-    # Expand paths for local mode
-    local ipc_binary_expanded="${ipc_binary/#\~/$HOME}"
-    local node_init_config_expanded="${node_init_config/#\~/$HOME}"
+    # Run init
+    local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "$ipc_binary node init --config $node_init_config 2>&1")
 
-    # Run init with verbose logging if debug mode
-    if [ "${DEBUG:-false}" = true ]; then
-        log_info "Running ipc-cli node init with verbose logging..."
-        local init_output=$(exec_on_host "$validator_idx" \
-            "RUST_LOG=debug,ipc_cli=trace $ipc_binary_expanded node init --config $node_init_config_expanded 2>&1")
-    else
-        log_info "Running ipc-cli node init..."
-        local init_output=$(exec_on_host "$validator_idx" \
-            "$ipc_binary_expanded node init --config $node_init_config_expanded 2>&1")
-    fi
-
-    # Check if initialization succeeded by looking for success message
-    if echo "$init_output" | grep -q "Node initialization completed successfully"; then
-        log_success "Node $name initialized successfully"
-        if [ "${DEBUG:-false}" = true ]; then
-            echo "$init_output" | tail -20
-        fi
-        return 0
-    fi
-
-    # If we get here, there was an error
+    if echo "$init_output" | grep -q "Error\|error\|failed"; then
         log_error "Initialization failed for $name"
+        echo "$init_output"
+        exit 1
+    fi
 
-        if [ "${DEBUG:-false}" = true ]; then
-            echo ""
-            echo "━━━━━━━━━━━━━━━━━━━━━━━ DETAILED ERROR OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "$init_output"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
-        else
-            # Show just the error line(s)
-            echo ""
-            echo "Error summary:"
-        echo "$init_output" | grep "❌" | head -5
-            echo ""
-            log_info "Run with --debug flag to see full output"
-        fi
-
-        echo ""
-        log_info "Troubleshooting tips:"
-        log_info "  1. Check if parent_registry and parent_gateway addresses are correct"
-        log_info "  2. Verify subnet already exists on parent chain"
-        log_info "  3. Check if the subnet ID is correct: $(get_config_value 'subnet.id')"
-    return 1
+    log_success "$name initialized successfully"
 }
 
 set_federated_power() {
     local primary_idx=$(get_primary_validator)
     local name="${VALIDATORS[$primary_idx]}"
+    local ip=$(get_config_value "validators[$primary_idx].ip")
+    local ssh_user=$(get_config_value "validators[$primary_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$primary_idx].ipc_user")
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local subnet_id=$(get_config_value "subnet.id")
     local validator_power=$(get_config_value "init.validator_power")
 
-    # Expand ipc_binary path for local mode
-    ipc_binary="${ipc_binary/#\~/$HOME}"
-
-    # Get address for --from parameter
-    local from_address=$(yq eval ".validators[$primary_idx].address // null" "$CONFIG_FILE")
-    local primary_private_key=$(get_config_value "validators[$primary_idx].private_key")
-
-    # If no address in config, derive it from private key for known Anvil accounts
-    if [ "$from_address" = "null" ] || [ -z "$from_address" ]; then
-        case "$primary_private_key" in
-            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-                from_address="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-                ;;
-            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
-                from_address="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
-                ;;
-            "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a")
-                from_address="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
-                ;;
-            *)
-                log_error "Cannot determine --from address. Please add 'address' field to primary validator config."
-                return 1
-                ;;
-        esac
-    fi
-
-    log_info "Using address for transaction: $from_address"
-
     # Collect all validator public keys (without 0x prefix)
     local pubkeys=""
-    for idx in "${!VALIDATOR_PUBKEYS[@]}"; do
+    for idx in "${!VALIDATORS[@]}"; do
         if [ -n "${VALIDATOR_PUBKEYS[$idx]:-}" ]; then
             local clean_pubkey="${VALIDATOR_PUBKEYS[$idx]#0x}"
             pubkeys+="${clean_pubkey},"
@@ -917,10 +200,10 @@ set_federated_power() {
     log_info "Setting federated power for ${#VALIDATOR_PUBKEYS[@]} validators..."
     log_info "Power per validator: $validator_power"
 
-    # Run set-federated-power from primary node with dynamic address
-    local cmd="$ipc_binary subnet set-federated-power --subnet $subnet_id --validator-pubkeys $pubkeys --validator-power $validator_power --from $from_address"
+    # Run set-federated-power from primary node
+    local cmd="$ipc_binary subnet set-federated-power --subnet $subnet_id --validator-pubkeys $pubkeys --validator-power $validator_power --from t1d4gxuxytb6vg7cxzvxqk3cvbx4hv7vrtd6oa2mi"
 
-    local output=$(exec_on_host "$primary_idx" "$cmd 2>&1")
+    local output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" "$cmd 2>&1")
 
     if echo "$output" | grep -q "Error\|error\|failed"; then
         log_error "Failed to set federated power"
@@ -930,141 +213,35 @@ set_federated_power() {
     fi
 }
 
-# Update binaries on a single validator
-update_validator_binaries() {
-    local validator_idx="$1"
-    local branch="$2"
-
-    local name="${VALIDATORS[$validator_idx]}"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-    local ipc_repo=$(get_config_value "paths.ipc_repo")
-
-    log_info "[$name] Updating binaries from branch '$branch'..."
-
-    # Build update commands
-    local update_cmd="cd $ipc_repo && \
-        git fetch origin && \
-        git checkout $branch && \
-        git pull origin $branch && \
-        make"
-
-    # Execute build
-    log_info "[$name] Pulling latest changes and building..."
-    local build_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" "$update_cmd 2>&1")
-    local build_exit=$?
-
-    if [ $build_exit -ne 0 ]; then
-        log_error "[$name] Build failed"
-        echo "$build_output" | tail -20
-        return 1
-    fi
-
-    log_success "[$name] Build completed successfully"
-
-    # Copy binaries to /usr/local/bin (requires sudo)
-    log_info "[$name] Installing binaries to /usr/local/bin..."
-    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo cp $ipc_repo/target/release/ipc-cli /usr/local/bin/ipc-cli && \
-         sudo cp $ipc_repo/target/release/fendermint /usr/local/bin/fendermint && \
-         sudo chmod +x /usr/local/bin/ipc-cli /usr/local/bin/fendermint" >/dev/null 2>&1
-
-    if [ $? -ne 0 ]; then
-        log_error "[$name] Failed to install binaries"
-        return 1
-    fi
-
-    log_success "[$name] Binaries installed successfully"
-
-    # Verify installation
-    local ipc_version=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "/usr/local/bin/ipc-cli --version 2>&1 | head -1")
-    log_info "[$name] ipc-cli version: $ipc_version"
-
-    return 0
-}
-
-# Update binaries on all validators
-update_all_binaries() {
-    local branch="${1:-main}"
-
-    log_header "Updating IPC Binaries"
-    log_info "Branch: $branch"
-    log_info "Validators: ${#VALIDATORS[@]}"
-    echo ""
-
-    # Array to track background jobs
-    local pids=()
-    local results=()
-
-    # Start updates in parallel
-    for idx in "${!VALIDATORS[@]}"; do
-        update_validator_binaries "$idx" "$branch" &
-        pids[$idx]=$!
-    done
-
-    # Wait for all jobs to complete
-    log_info "Waiting for all builds to complete..."
-    local all_success=true
-
-    for idx in "${!VALIDATORS[@]}"; do
-        wait ${pids[$idx]}
-        results[$idx]=$?
-        if [ ${results[$idx]} -ne 0 ]; then
-            all_success=false
-        fi
-    done
-
-    echo ""
-    log_section "Update Summary"
-
-    for idx in "${!VALIDATORS[@]}"; do
-        local name="${VALIDATORS[$idx]}"
-        if [ ${results[$idx]} -eq 0 ]; then
-            log_success "✓ $name: Update successful"
-        else
-            log_error "✗ $name: Update failed"
-        fi
-    done
-
-    if [ "$all_success" = true ]; then
-        echo ""
-        log_success "✓ All validators updated successfully"
-        log_info "You may need to restart nodes for changes to take effect:"
-        log_info "  $0 restart"
-        return 0
-    else
-        echo ""
-        log_error "✗ Some validators failed to update"
-        return 1
-    fi
-}
-
 # Health check for single validator
 check_validator_health() {
     local validator_idx="$1"
 
     local name="${VALIDATORS[$validator_idx]}"
-    local node_home=$(get_node_home "$validator_idx")
-    local cometbft_rpc_port=$(get_validator_port "$validator_idx" "cometbft_rpc" 26657)
-    local cometbft_p2p_port=$(get_validator_port "$validator_idx" "cometbft_p2p" 26656)
-    local libp2p_port=$(get_validator_port "$validator_idx" "libp2p" 26655)
-    local eth_api_port=$(get_validator_port "$validator_idx" "eth_api" 8546)
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+    local node_home=$(get_config_value "paths.node_home")
+    local cometbft_port=$(get_config_value "network.cometbft_p2p_port")
+    local libp2p_port=$(get_config_value "network.libp2p_port")
+    local eth_api_port=$(get_config_value "network.eth_api_port")
 
     local healthy=true
 
     # Check process running
-    if check_process_running "$validator_idx" "ipc-cli node start"; then
+    local process_status=$(ssh_check_process "$ip" "$ssh_user" "$ipc_user" "ipc-cli node start")
+    # Trim whitespace and newlines
+    process_status=$(echo "$process_status" | tr -d '\n' | xargs)
+    if [ "$process_status" = "running" ]; then
         log_check "ok" "Process running"
     else
-        log_check "fail" "Process not running"
+        log_check "fail" "Process not running (status: '$process_status')"
         healthy=false
     fi
 
-    # Check ports listening (use lsof for macOS compatibility, netstat for Linux)
-    local ports_check=$(exec_on_host "$validator_idx" \
-        "(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E \":($cometbft_p2p_port|$libp2p_port|$eth_api_port)\" | wc -l || netstat -tuln 2>/dev/null | grep -E \":($cometbft_p2p_port|$libp2p_port|$eth_api_port)\" | wc -l) 2>/dev/null" | tr -d '[:space:]')
+    # Check ports listening
+    local ports_check=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "netstat -tuln 2>/dev/null | grep -E \":($cometbft_port|$libp2p_port|$eth_api_port)\" | wc -l")
 
     if [ -n "$ports_check" ] && [ "$ports_check" -ge 2 ] 2>/dev/null; then
         log_check "ok" "Ports listening ($ports_check/3)"
@@ -1074,8 +251,8 @@ check_validator_health() {
     fi
 
     # Check CometBFT peers
-    local comet_peers=$(exec_on_host "$validator_idx" \
-        "curl -s http://localhost:$cometbft_rpc_port/net_info 2>/dev/null | jq -r '.result.n_peers // 0' 2>/dev/null || echo 0" | tr -d '[:space:]')
+    local comet_peers=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "curl -s http://localhost:26657/net_info 2>/dev/null | jq -r '.result.n_peers // 0' 2>/dev/null || echo 0")
 
     local expected_peers=$((${#VALIDATORS[@]} - 1))
     # Ensure comet_peers is a number
@@ -1088,8 +265,8 @@ check_validator_health() {
     fi
 
     # Check block height
-    local block_height=$(exec_on_host "$validator_idx" \
-        "curl -s http://localhost:$cometbft_rpc_port/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null || echo 0" | tr -d '[:space:]')
+    local block_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null || echo 0")
 
     # Ensure block_height is a number
     block_height=${block_height:-0}
@@ -1101,7 +278,7 @@ check_validator_health() {
     fi
 
     # Check for recent errors in logs
-    local recent_errors=$(exec_on_host "$validator_idx" \
+    local recent_errors=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
         "tail -100 $node_home/logs/*.log 2>/dev/null | grep -i 'ERROR' | tail -5 || echo ''")
 
     if [ -z "$recent_errors" ]; then
@@ -1209,11 +386,15 @@ measure_all_block_times() {
 # Get chain ID from a validator
 get_chain_id() {
     local validator_idx="${1:-0}"
+
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local eth_api_port=$(get_config_value "network.eth_api_port")
 
-    # Query eth_chainId via JSON-RPC
-    local response=$(exec_on_host "$validator_idx" \
-        "curl -s -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' http://localhost:${eth_api_port}" 2>/dev/null)
+    # Query eth_chainId via JSON-RPC - using simpler quoting
+    local response=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo su - $ipc_user -c \"curl -s -X POST -H 'Content-Type: application/json' --data '{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"method\\\":\\\"eth_chainId\\\",\\\"params\\\":[],\\\"id\\\":1}' http://localhost:${eth_api_port}\"" 2>/dev/null)
 
     local chain_id=$(echo "$response" | jq -r '.result // ""' 2>/dev/null)
 
@@ -1244,40 +425,7 @@ show_subnet_info() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
         local ip=$(get_config_value "validators[$idx].ip")
-
-        # Get node home path (local or remote)
-        local node_home
-        if is_local_mode; then
-            local node_home_base=$(get_config_value "paths.node_home_base")
-            node_home="${node_home_base/#\~/$HOME}/$name"
-        else
-            node_home=$(get_config_value "paths.node_home")
-        fi
-
-        # Get validator public key
-        local pubkey=$(exec_on_host "$idx" "cat $node_home/fendermint/validator.pk 2>/dev/null || echo ''")
-
-        if [ -n "$pubkey" ]; then
-            # Convert validator key to Ethereum address using fendermint
-            local eth_address=$(exec_on_host "$idx" \
-                "fendermint key into-eth --secret-key $node_home/fendermint/validator.sk --name temp --out-dir /tmp 2>/dev/null && cat /tmp/temp.addr 2>/dev/null && rm -f /tmp/temp.* || echo ''")
-
-            # Add 0x prefix if address was successfully converted
-            if [ -n "$eth_address" ] && [ "$eth_address" != "" ]; then
-                eth_address="0x${eth_address}"
-            fi
-
-            log_info "    - $name ($ip)"
-            log_info "      Public Key: $pubkey"
-            if [ -n "$eth_address" ]; then
-                log_info "      Address: $eth_address"
-            else
-                log_warn "      Address: Unable to convert"
-            fi
-        else
-            log_info "    - $name ($ip)"
-            log_warn "      Public Key: Not found"
-        fi
+        log_info "    - $name ($ip)"
     done
     echo
 
@@ -1300,15 +448,18 @@ show_subnet_info() {
 
     # Get current block info from first validator
     log_info "Current Block Information (from ${VALIDATORS[0]}):"
+    local ip=$(get_config_value "validators[0].ip")
+    local ssh_user=$(get_config_value "validators[0].ssh_user")
+    local ipc_user=$(get_config_value "validators[0].ipc_user")
 
-    local block_height=$(exec_on_host "0" \
+    local block_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // \"\"' 2>/dev/null")
-    local block_time=$(exec_on_host "0" \
+    local block_time=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_time // \"\"' 2>/dev/null")
-    local catching_up=$(exec_on_host "0" \
+    local catching_up=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.catching_up // \"\"' 2>/dev/null")
 
-    if [ -n "$block_height" ] && [ "$block_height" != "null" ] && [ "$block_height" != "" ]; then
+    if [ -n "$block_height" ] && [ "$block_height" != "null" ]; then
         log_info "  Latest Block Height: $block_height"
         log_info "  Latest Block Time: $block_time"
         log_info "  Catching Up: $catching_up"
@@ -1319,9 +470,9 @@ show_subnet_info() {
 
     # Get network info
     log_info "Network Status:"
-    local n_peers=$(exec_on_host "0" \
+    local n_peers=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
         "curl -s http://localhost:26657/net_info 2>/dev/null | jq -r '.result.n_peers // 0' 2>/dev/null")
-    local listening=$(exec_on_host "0" \
+    local listening=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
         "curl -s http://localhost:26657/net_info 2>/dev/null | jq -r '.result.listening // false' 2>/dev/null")
 
     log_info "  CometBFT Peers: $n_peers"
@@ -1332,24 +483,16 @@ show_subnet_info() {
     log_info "Libp2p Infrastructure (required for voting):"
     local libp2p_port=$(get_config_value "network.libp2p_port")
 
-    # Get node home for first validator (local or remote)
-    local node_home_0
-    if is_local_mode; then
-        local node_home_base=$(get_config_value "paths.node_home_base")
-        node_home_0="${node_home_base/#\~/$HOME}/${VALIDATORS[0]}"
-    else
-        node_home_0=$(get_config_value "paths.node_home")
-    fi
-
     # Check if libp2p port is listening and on correct address
-    local libp2p_listening=$(exec_on_host "0" \
-        "ss -tulpn 2>/dev/null | grep ':$libp2p_port ' | head -1 || lsof -iTCP:$libp2p_port -sTCP:LISTEN 2>/dev/null | tail -1" 2>/dev/null)
+    local libp2p_listening=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "ss -tulpn 2>/dev/null | grep ':$libp2p_port ' | head -1" 2>/dev/null)
 
     if [ -n "$libp2p_listening" ]; then
-        if echo "$libp2p_listening" | grep -q "0.0.0.0:$libp2p_port\|\\*:$libp2p_port"; then
+        if echo "$libp2p_listening" | grep -q "0.0.0.0:$libp2p_port"; then
             log_info "  ✓ Libp2p port $libp2p_port listening on 0.0.0.0 (can accept connections)"
         elif echo "$libp2p_listening" | grep -q "127.0.0.1:$libp2p_port"; then
-            log_warn "  ⚠ Libp2p port $libp2p_port listening: 127.0.0.1"
+            log_warn "  ✗ Libp2p port $libp2p_port bound to 127.0.0.1 (cannot accept external connections!)"
+            log_warn "    Run: ./ipc-manager update-config to fix"
         else
             log_info "  ⚠ Libp2p port $libp2p_port listening: $(echo $libp2p_listening | awk '{print $5}')"
         fi
@@ -1358,22 +501,22 @@ show_subnet_info() {
     fi
 
     # Check if resolver is enabled in config
-    local resolver_enabled=$(exec_on_host "0" \
-        "grep -A3 '\\[resolver\\]' $node_home_0/fendermint/config/default.toml 2>/dev/null | grep enabled | grep -o 'true\\|false' | head -1" 2>/dev/null | tr -d '\n\r ')
+    local resolver_enabled=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo su - $ipc_user -c 'grep -A3 \"\\[resolver\\]\" ~/.ipc-node/fendermint/config/default.toml | grep enabled | grep -o \"true\\|false\"'" 2>/dev/null | head -1 | tr -d '\n\r ')
 
     if [ "$resolver_enabled" = "true" ]; then
         log_info "  ✓ Resolver enabled in config"
 
         # Check if resolver service started
-        local resolver_started=$(exec_on_host "0" \
-            "grep 'starting the IPLD Resolver Service' $node_home_0/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' \n\r')
+        local resolver_started=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "sudo su - $ipc_user -c 'grep \"starting the IPLD Resolver Service\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
 
         if [ -n "$resolver_started" ] && [ "$resolver_started" -gt 0 ] 2>/dev/null; then
             log_info "  ✓ Resolver service started ($resolver_started times)"
 
             # Check if vote gossip loop started
-            local vote_loop=$(exec_on_host "0" \
-                "grep 'parent finality vote gossip loop' $node_home_0/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' \n\r')
+            local vote_loop=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+                "sudo su - $ipc_user -c 'grep \"parent finality vote gossip loop\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
 
             if [ -n "$vote_loop" ] && [ "$vote_loop" -gt 0 ] 2>/dev/null; then
                 log_info "  ✓ Vote gossip loop active"
@@ -1388,8 +531,8 @@ show_subnet_info() {
     fi
 
     # Check listen_addr configuration
-    local listen_addr=$(exec_on_host "0" \
-        "grep 'listen_addr' $node_home_0/fendermint/config/default.toml 2>/dev/null | head -1" 2>/dev/null)
+    local listen_addr=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "grep 'listen_addr' ~/.ipc-node/fendermint/config/default.toml 2>/dev/null | head -1" 2>/dev/null)
 
     if echo "$listen_addr" | grep -q "0.0.0.0"; then
         log_info "  ✓ Listen address configured correctly (0.0.0.0)"
@@ -1403,21 +546,15 @@ show_subnet_info() {
     for idx in "${!VALIDATORS[@]}"; do
         local v_name="${VALIDATORS[$idx]}"
         local v_ip=$(get_config_value "validators[$idx].ip")
-
-        # Get node home path (local or remote)
-        local v_node_home
-        if is_local_mode; then
-            local node_home_base=$(get_config_value "paths.node_home_base")
-            v_node_home="${node_home_base/#\~/$HOME}/$v_name"
-        else
-            v_node_home=$(get_config_value "paths.node_home")
-        fi
+        local v_ssh_user=$(get_config_value "validators[$idx].ssh_user")
+        local v_ipc_user=$(get_config_value "validators[$idx].ipc_user")
+        local v_node_home=$(get_config_value "paths.node_home")
 
         log_info "  $v_name ($v_ip):"
 
         # Get external_addresses
-        local ext_addrs=$(exec_on_host "$idx" \
-            "grep external_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null" 2>/dev/null)
+        local ext_addrs=$(ssh -o StrictHostKeyChecking=no "$v_ssh_user@$v_ip" \
+            "sudo su - $v_ipc_user -c 'grep external_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null'" 2>/dev/null)
 
         if [ -n "$ext_addrs" ] && echo "$ext_addrs" | grep -q "/ip4/$v_ip/tcp/$libp2p_port"; then
             log_info "    ✓ external_addresses: Contains own IP ($v_ip)"
@@ -1429,8 +566,8 @@ show_subnet_info() {
         fi
 
         # Get static_addresses
-        local static_addrs=$(exec_on_host "$idx" \
-            "grep static_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null" 2>/dev/null)
+        local static_addrs=$(ssh -o StrictHostKeyChecking=no "$v_ssh_user@$v_ip" \
+            "sudo su - $v_ipc_user -c 'grep static_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null'" 2>/dev/null)
 
         if [ -n "$static_addrs" ]; then
             # Count how many peer IPs are in static_addresses
@@ -1457,8 +594,8 @@ show_subnet_info() {
         fi
 
         # Check if libp2p connections are actually established
-        local libp2p_connections=$(exec_on_host "$idx" \
-            "ss -tn 2>/dev/null | grep :$libp2p_port | grep ESTAB | wc -l || netstat -an 2>/dev/null | grep $libp2p_port | grep ESTABLISHED | wc -l" 2>/dev/null | tr -d ' \n\r')
+        local libp2p_connections=$(ssh -o StrictHostKeyChecking=no "$v_ssh_user@$v_ip" \
+            "sudo su - $v_ipc_user -c 'ss -tn | grep :$libp2p_port | grep ESTAB | wc -l'" 2>/dev/null | tr -d ' \n\r')
 
         if [ -n "$libp2p_connections" ] && [ "$libp2p_connections" -gt 0 ] 2>/dev/null; then
             log_info "    ✓ Active libp2p connections: $libp2p_connections"
@@ -1472,14 +609,14 @@ show_subnet_info() {
     log_info "Parent Chain Connectivity:"
 
     # Check if parent RPC is reachable
-    local parent_rpc_errors=$(exec_on_host "0" \
-        "grep -i 'failed to get.*parent\\|parent.*connection.*failed\\|parent.*RPC.*error' $node_home_0/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' \n\r')
+    local parent_rpc_errors=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo su - $ipc_user -c 'grep -i \"failed to get.*parent\\|parent.*connection.*failed\\|parent.*RPC.*error\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
 
     if [ -n "$parent_rpc_errors" ] && [ "$parent_rpc_errors" -gt 0 ] 2>/dev/null; then
         log_warn "  ✗ Parent RPC errors detected ($parent_rpc_errors occurrences)"
         # Show a sample error
-        local sample_error=$(exec_on_host "0" \
-            "grep -i 'failed to get.*parent\\|parent.*connection.*failed' $node_home_0/logs/*.log 2>/dev/null | tail -1" 2>/dev/null)
+        local sample_error=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "sudo su - $ipc_user -c 'grep -i \"failed to get.*parent\\|parent.*connection.*failed\" ~/.ipc-node/logs/*.log 2>/dev/null | tail -1'" 2>/dev/null)
         if [ -n "$sample_error" ]; then
             log_warn "    Sample: $(echo "$sample_error" | tail -c 120)"
         fi
@@ -1488,8 +625,8 @@ show_subnet_info() {
     fi
 
     # Check if parent blocks are being fetched
-    local parent_blocks_fetched=$(exec_on_host "0" \
-        "grep -i 'parent.*block.*height\\|fetched.*parent' $node_home_0/logs/*.log 2>/dev/null | tail -1" 2>/dev/null)
+    local parent_blocks_fetched=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo su - $ipc_user -c 'grep -i \"parent.*block.*height\\|fetched.*parent\" ~/.ipc-node/logs/*.log 2>/dev/null | tail -1'" 2>/dev/null)
 
     if [ -n "$parent_blocks_fetched" ]; then
         log_info "  ✓ Parent block data being fetched"
@@ -1503,15 +640,15 @@ show_subnet_info() {
     log_info "Parent Finality Status:"
 
     # Check recent logs for parent finality activity using separate greps
-    local parent_finality_count=$(exec_on_host "0" \
-        "grep -i 'ParentFinalityCommitted' $node_home_0/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' ')
+    local parent_finality_count=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "grep -i 'ParentFinalityCommitted' ~/.ipc-node/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' ')
 
     if [ -n "$parent_finality_count" ] && [ "$parent_finality_count" -gt 0 ] 2>/dev/null; then
         log_info "  ✓ Parent finality commits detected: $parent_finality_count total"
 
         # Get the most recent one
-        local last_finality=$(exec_on_host "0" \
-            "grep -i 'ParentFinalityCommitted' $node_home_0/logs/*.log 2>/dev/null | tail -1" 2>/dev/null)
+        local last_finality=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "grep -i 'ParentFinalityCommitted' ~/.ipc-node/logs/*.log 2>/dev/null | tail -1" 2>/dev/null)
 
         if [ -n "$last_finality" ]; then
             # Extract timestamp
@@ -1522,8 +659,8 @@ show_subnet_info() {
         fi
 
         # Check for top-down message execution
-        local topdown_count=$(exec_on_host "0" \
-            "grep -i 'topdown' $node_home_0/logs/*.log 2>/dev/null | grep -i 'exec\|apply\|message' | wc -l" 2>/dev/null | tr -d ' ')
+        local topdown_count=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "grep -i 'topdown' ~/.ipc-node/logs/*.log 2>/dev/null | grep -i 'exec\|apply\|message' | wc -l" 2>/dev/null | tr -d ' ')
 
         if [ -n "$topdown_count" ] && [ "$topdown_count" -gt 0 ] 2>/dev/null; then
             log_info "  ✓ Top-down message activity: $topdown_count entries"
@@ -1559,7 +696,7 @@ show_subnet_info() {
     log_info "Validator Status & Voting Power:"
 
     # Get validator set from CometBFT (from first validator)
-    local validators_json=$(exec_on_host "0" \
+    local validators_json=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
         "curl -s http://localhost:26657/validators 2>/dev/null" 2>/dev/null)
 
     local total_voting_power=0
@@ -1638,8 +775,8 @@ show_subnet_info() {
     log_info "Recent Cross-Chain Activity (last 5 entries):"
 
     # Get recent topdown-related logs
-    local cross_msg_logs=$(exec_on_host "0" \
-        "grep -i 'topdown' $node_home_0/logs/*.log 2>/dev/null | tail -5" 2>/dev/null)
+    local cross_msg_logs=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "grep -i 'topdown' ~/.ipc-node/logs/*.log 2>/dev/null | tail -5" 2>/dev/null)
 
     if [ -n "$cross_msg_logs" ] && [ "$cross_msg_logs" != "" ]; then
         echo "$cross_msg_logs" | while IFS= read -r line; do
@@ -1652,25 +789,6 @@ show_subnet_info() {
     else
         log_info "  No recent topdown activity found in logs"
     fi
-    echo
-
-    # Get contract commitSHA values
-    log_info "Contract Versions (commitSHA):"
-
-    local parent_rpc=$(get_config_value "subnet.parent_rpc")
-    local child_rpc=$(get_config_value "ipc_cli.child.provider_http")
-    local parent_gateway_addr=$(get_config_value "subnet.parent_gateway")
-    local parent_registry_addr=$(get_config_value "subnet.parent_registry")
-    local child_gateway_addr=$(get_config_value "ipc_cli.child.gateway_addr")
-    local child_registry_addr=$(get_config_value "ipc_cli.child.registry_addr")
-
-    log_info "  Parent Contracts (RPC: $parent_rpc):"
-    log_info "    Gateway ($parent_gateway_addr): $(get_contract_commit_sha "$parent_rpc" "$parent_gateway_addr")"
-    log_info "    Registry ($parent_registry_addr): $(get_contract_commit_sha "$parent_rpc" "$parent_registry_addr")"
-
-    log_info "  Child Contracts (RPC: $child_rpc):"
-    log_info "    Gateway ($child_gateway_addr): $(get_contract_commit_sha "$child_rpc" "$child_gateway_addr")"
-    log_info "    Registry ($child_registry_addr): $(get_contract_commit_sha "$child_rpc" "$child_registry_addr")"
     echo
 }
 
@@ -2122,269 +1240,5 @@ show_voting_status() {
         "tail -20 ~/.ipc-node/logs/2025-10-20.consensus.log 2>/dev/null | grep -v 'received complete proposal' | tail -10" || true
 
     echo ""
-}
-
-# Get address from keystore for a validator
-get_validator_address_from_keystore() {
-    local validator_idx="$1"
-
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-
-    # Try to get address from evm_keystore.json
-    # First check if it's an array or object
-    local keystore_content=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "cat $ipc_config_dir/evm_keystore.json 2>/dev/null" 2>/dev/null)
-
-    if [ -z "$keystore_content" ]; then
-        log_warn "Could not read keystore file"
-        return 1
-    fi
-
-    # Try as array first (most common), then as object
-    local address=$(echo "$keystore_content" | jq -r '
-        if type == "array" then
-            .[0].address // .[0].Address // empty
-        else
-            .address // .Address // empty
-        end
-    ' 2>/dev/null)
-
-    if [ -n "$address" ] && [ "$address" != "null" ]; then
-        # Add 0x prefix if not present
-        if [[ ! "$address" =~ ^0x ]]; then
-            address="0x${address}"
-        fi
-        echo "$address"
-        return 0
-    fi
-
-    log_warn "Could not extract address from keystore"
-    return 1
-}
-
-# Start checkpoint relayer on primary validator
-start_relayer() {
-    log_header "Starting Checkpoint Relayer"
-
-    # Get primary validator
-    local primary_idx=$(get_primary_validator)
-    local name="${VALIDATORS[$primary_idx]}"
-
-    log_info "Starting relayer on $name (primary validator)..."
-
-    local ip=$(get_config_value "validators[$primary_idx].ip")
-    local ssh_user=$(get_config_value "validators[$primary_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$primary_idx].ipc_user")
-    local node_home=$(get_config_value "paths.node_home")
-    local subnet_id=$(get_config_value "subnet.id")
-    local checkpoint_interval=$(get_config_value "relayer.checkpoint_interval")
-    local max_parallelism=$(get_config_value "relayer.max_parallelism")
-
-    log_info "  Subnet: $subnet_id"
-    log_info "  Checkpoint interval: ${checkpoint_interval}s"
-    log_info "  Max parallelism: $max_parallelism"
-
-    # Try systemd first, fall back to nohup
-    local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "systemctl list-unit-files ipc-relayer.service 2>/dev/null | grep -q ipc-relayer && echo yes || echo no" 2>/dev/null)
-
-    if [ "$has_systemd" = "yes" ]; then
-        log_info "Using systemd to start relayer..."
-        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "sudo systemctl start ipc-relayer" >/dev/null 2>&1 || true
-        sleep 2
-
-        # Check status
-        local is_active=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-            "systemctl is-active ipc-relayer 2>/dev/null" | tr -d ' \n\r')
-
-        if [ "$is_active" = "active" ]; then
-            log_success "✓ Relayer started successfully via systemd"
-            log_info "View logs: sudo journalctl -u ipc-relayer -f"
-            log_info "Or: tail -f $node_home/logs/relayer.log"
-            return 0
-        else
-            log_error "✗ Failed to start relayer via systemd"
-            log_info "Check status: sudo systemctl status ipc-relayer"
-            return 1
-        fi
-    else
-        # Fall back to nohup
-        log_info "Systemd service not found, using nohup..."
-
-        # Get submitter address from keystore
-        log_info "Extracting submitter address from keystore..."
-        local submitter=$(get_validator_address_from_keystore "$primary_idx")
-
-        if [ -z "$submitter" ]; then
-            log_error "Failed to get submitter address from keystore"
-            return 1
-        fi
-
-        log_info "Submitter address: $submitter"
-
-        local ipc_binary=$(get_config_value "paths.ipc_binary")
-        local relayer_log="$node_home/logs/relayer.log"
-
-        # Ensure logs directory exists
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" "mkdir -p $node_home/logs" || true
-
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "nohup $ipc_binary checkpoint relayer \
-            --subnet $subnet_id \
-            --checkpoint-interval-sec $checkpoint_interval \
-            --max-parallelism $max_parallelism \
-            --submitter $submitter \
-            > $relayer_log 2>&1 &"
-
-        sleep 2
-
-        # Verify it started
-        local relayer_pid=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "ps aux | grep '[i]pc-cli checkpoint relayer' | grep -v grep | awk '{print \$2}' | head -1" 2>/dev/null | tr -d ' \n\r')
-
-        if [ -n "$relayer_pid" ]; then
-            log_success "✓ Relayer started successfully (PID: $relayer_pid)"
-            log_info "Log file: $relayer_log"
-            return 0
-        else
-            log_error "✗ Failed to start relayer"
-            return 1
-        fi
-    fi
-}
-
-# Stop checkpoint relayer
-stop_relayer() {
-    log_header "Stopping Checkpoint Relayer"
-
-    local primary_idx=$(get_primary_validator)
-    local name="${VALIDATORS[$primary_idx]}"
-
-    log_info "Stopping relayer on $name..."
-
-    local ip=$(get_config_value "validators[$primary_idx].ip")
-    local ssh_user=$(get_config_value "validators[$primary_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$primary_idx].ipc_user")
-
-    # Try systemd first, fall back to manual kill
-    local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "systemctl list-unit-files ipc-relayer.service 2>/dev/null | grep -q ipc-relayer && echo yes || echo no" 2>/dev/null)
-
-    if [ "$has_systemd" = "yes" ]; then
-        log_info "Using systemd to stop relayer..."
-        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "sudo systemctl stop ipc-relayer" >/dev/null 2>&1 || true
-    else
-        # Find and kill the relayer process by PID
-        local pids=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "ps aux | grep '[i]pc-cli checkpoint relayer' | grep -v grep | awk '{print \$2}'" 2>/dev/null | tr '\n' ' ')
-
-        if [ -n "$pids" ]; then
-            log_info "Killing relayer process(es): $pids"
-            ssh_exec "$ip" "$ssh_user" "$ipc_user" "kill $pids 2>/dev/null || true" || true
-            sleep 1
-            # Force kill if still running
-            ssh_exec "$ip" "$ssh_user" "$ipc_user" "kill -9 $pids 2>/dev/null || true" || true
-        else
-            log_info "No relayer processes found"
-        fi
-    fi
-
-    log_success "✓ Relayer stopped"
-}
-
-# Check relayer status
-check_relayer_status() {
-    log_header "Checkpoint Relayer Status"
-
-    local primary_idx=$(get_primary_validator)
-    local name="${VALIDATORS[$primary_idx]}"
-
-    local ip=$(get_config_value "validators[$primary_idx].ip")
-    local ssh_user=$(get_config_value "validators[$primary_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$primary_idx].ipc_user")
-
-    log_info "Checking relayer on $name..."
-
-    local node_home=$(get_config_value "paths.node_home")
-    local relayer_log="$node_home/logs/relayer.log"
-
-    # Check systemd first
-    local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "systemctl list-unit-files ipc-relayer.service 2>/dev/null | grep -q ipc-relayer && echo yes || echo no" 2>/dev/null)
-
-    if [ "$has_systemd" = "yes" ]; then
-        local is_active=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-            "systemctl is-active ipc-relayer 2>/dev/null" | tr -d ' \n\r')
-
-        if [ "$is_active" = "active" ]; then
-            log_success "✓ Relayer is running (systemd)"
-            log_info "Check status: sudo systemctl status ipc-relayer"
-            log_info "View logs: sudo journalctl -u ipc-relayer -f"
-        else
-            log_warn "✗ Relayer is not running (systemd service exists but inactive)"
-            log_info "Status: $is_active"
-            log_info "Check with: sudo systemctl status ipc-relayer"
-        fi
-
-        # Show recent journal logs
-        log_info "Recent relayer activity (from journal):"
-        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-            "sudo journalctl -u ipc-relayer -n 20 --no-pager 2>/dev/null || echo 'No journal logs found'"
-    else
-        # Check for relayer process using ps
-        local relayer_pid=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "ps aux | grep '[i]pc-cli checkpoint relayer' | grep -v grep | awk '{print \$2}' | head -1" 2>/dev/null | tr -d ' \n\r')
-
-        if [ -n "$relayer_pid" ]; then
-            log_success "✓ Relayer is running (PID: $relayer_pid)"
-            log_info "Log file: $relayer_log"
-
-            # Show recent log lines
-            log_info "Recent relayer activity:"
-            ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-                "tail -20 $relayer_log 2>/dev/null || echo 'No logs found'"
-        else
-            log_warn "✗ Relayer is not running"
-
-            # Check if log file exists with any content
-            local log_exists=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-                "test -f $relayer_log && echo 'yes' || echo 'no'" 2>/dev/null)
-
-            if [ "$log_exists" = "yes" ]; then
-                log_info "Last relayer output from $relayer_log:"
-                ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-                    "tail -20 $relayer_log 2>/dev/null || echo 'Could not read log'"
-            fi
-        fi
-    fi
-}
-
-# Get commitSHA from contract
-get_contract_commit_sha() {
-    local rpc_url="$1"
-    local contract_address="$2"
-
-    # Call the commitSHA() function (selector: 0x66a9f38a)
-    local result=$(curl -s -X POST -H "Content-Type: application/json" \
-        --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"$contract_address\",\"data\":\"0x66a9f38a\"},\"latest\"],\"id\":1}" \
-        "$rpc_url" 2>/dev/null | jq -r '.result // empty')
-
-    if [ -n "$result" ] && [ "$result" != "null" ] && [ "$result" != "0x" ]; then
-        # Decode the bytes32 result to a string
-        # Remove 0x prefix and trailing zeros
-        result="${result#0x}"
-        # Convert hex to ASCII
-        local decoded=$(echo "$result" | xxd -r -p 2>/dev/null | tr -d '\0' | strings)
-        if [ -n "$decoded" ]; then
-            echo "$decoded"
-        else
-            echo "$result"
-        fi
-    else
-        echo "N/A"
-    fi
 }
 

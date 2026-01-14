@@ -14,7 +14,6 @@ task(
             { name: 'AccountHelper' },
             { name: 'SubnetIDHelper' },
             { name: 'LibPower' },
-            { name: 'LibQuorum' },
             { name: 'CrossMsgHelper', libraries: ['SubnetIDHelper'] },
         ]
 

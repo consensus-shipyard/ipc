@@ -3,7 +3,6 @@ pragma solidity ^0.8.23;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {SubnetID, ValidatorSet, PowerChangeLog, StakingReleaseQueue, Asset, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -11,8 +10,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         /// @notice initial circulating supply provided by genesis validators to use when bootstrapping
         /// the network.
         uint256 genesisCircSupply;
-        /// @notice The height of the last committed bottom-up checkpoint.
-        uint256 lastBottomUpCheckpointHeight;
         /// @notice Minimal activation collateral
         uint256 minActivationCollateral;
         /// @notice number of blocks in a bottom-up epoch
@@ -58,8 +55,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         mapping(address => string) bootstrapNodes;
         /// @notice the list ov validators that announces bootstrap nodes
         EnumerableSet.AddressSet bootstrapOwners;
-        /// @notice contains all committed bottom-up checkpoint at specific epoch
-        mapping(uint256 => BottomUpCheckpoint) committedCheckpoints;
+        string chainID;
         /// @notice initial set of validators joining in genesis
         Validator[] genesisValidators;
         /// @notice genesis balance to be allocated to the subnet in genesis.
@@ -68,6 +64,13 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         address[] genesisBalanceKeys;
         /// @notice The validator gater, if address(0), no validator gating is performed
         address validatorGater;
+        /// @notice F3 instance ID from parent chain at subnet creation time
+        /// @dev Used for deterministic genesis creation. All nodes fetch F3 data for this instance.
+        /// Only set when parent is Filecoin mainnet/calibration (has F3 running).
+        /// Value of 0 with hasGenesisF3InstanceId=false means parent doesn't have F3.
+        uint64 genesisF3InstanceId;
+        /// @notice Whether F3 instance ID was explicitly set (to distinguish from instance ID 0)
+        bool hasGenesisF3InstanceId;
     }
 
 library LibSubnetActorStorage {

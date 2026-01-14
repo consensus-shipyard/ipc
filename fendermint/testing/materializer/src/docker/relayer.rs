@@ -89,7 +89,7 @@ impl DockerRelayer {
                 --config-path /fendermint/.ipc/config.toml \
                 checkpoint relayer \
                     --subnet {} \
-                    --submitter {:?} \
+                    --submitter {:?}
             ",
             subnet.subnet_id,
             submitter.eth_addr()

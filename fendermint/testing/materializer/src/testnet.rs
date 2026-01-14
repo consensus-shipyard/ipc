@@ -595,6 +595,7 @@ where
 
             // Create relayers for bottom-up checkpointing.
             let mut relayers = Vec::<(RelayerName, M::Relayer)>::new();
+
             for (id, relayer) in &subnet.relayers {
                 let submitter = self
                     .account(&relayer.submitter)

@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::collections::{BTreeSet, HashMap};
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
@@ -19,12 +18,11 @@ use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::{
-    account, activity, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system,
-    EMPTY_ARR,
+    account, activity, burntfunds, chainmetadata, cron, eam, f3_light_client, gas_market, init,
+    ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
-use futures_util::io::Cursor;
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::{load_car, CarHeader};
@@ -41,8 +39,6 @@ use crate::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_genesis::ipc::{GatewayParams, IpcParams};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use tokio_stream::StreamExt;
-use tokio_util::compat::TokioAsyncWriteCompatExt;
 
 /// The sealed genesis state metadata
 #[serde_as]
@@ -132,7 +128,8 @@ pub async fn read_genesis_car<DB: Blockstore + 'static + Send + Sync>(
     bytes: Vec<u8>,
     store: &DB,
 ) -> anyhow::Result<(Vec<Validator<Power>>, FvmStateParams)> {
-    let roots = load_car(store, Cursor::new(&bytes)).await?;
+    // In FVM 4.7, load_car is synchronous
+    let roots = load_car(store, Cursor::new(&bytes))?;
 
     let metadata_cid = roots
         .first()
@@ -201,8 +198,6 @@ impl<'a> GenesisBuilder<'a> {
         out_path: PathBuf,
         store: MemoryBlockstore,
     ) -> anyhow::Result<()> {
-        let file = tokio::fs::File::create(&out_path).await?;
-
         tracing::info!(state_root = state_root.to_string(), "state root");
 
         let metadata = GenesisMetadata::new(state_root, genesis_state);
@@ -214,12 +209,27 @@ impl<'a> GenesisBuilder<'a> {
         // create the target car header with the metadata cid as the only root
         let car = CarHeader::new(vec![metadata_cid], 1);
 
-        // create the stream to stream all the data into the car file
+        // In FVM 4.7, CAR API is synchronous, collect stream first
         let mut streamer = tokio_stream::iter(vec![(metadata_cid, metadata_bytes)]).merge(streamer);
 
-        let mut write = file.compat_write();
-        car.write_stream_async(&mut Pin::new(&mut write), &mut streamer)
-            .await?;
+        use tokio_stream::StreamExt;
+        let mut blocks = Vec::new();
+        while let Some((cid, data)) = streamer.next().await {
+            blocks.push((cid, data));
+        }
+
+        // Write synchronously in a blocking task
+        let out_path_clone = out_path.clone();
+        tokio::task::spawn_blocking(move || {
+            use fvm_ipld_car::{Block, CarWriter};
+            let file_std = std::fs::File::create(out_path_clone)?;
+            let mut writer = CarWriter::new(car, file_std)?;
+            for (cid, data) in blocks {
+                writer.write(Block { cid, data })?;
+            }
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         tracing::info!("written sealed genesis state to file");
 
@@ -432,6 +442,32 @@ impl<'a> GenesisBuilder<'a> {
             )
             .context("failed to create activity tracker actor")?;
 
+        // F3 Light Client actor - manages F3 light client state for proof-based parent finality
+        if let Some(f3_params) = &genesis.f3 {
+            // For subnets with F3 parameters, initialize with the provided F3 data
+            // Note: finalized_epochs always starts empty at genesis
+            let constructor_params = fendermint_actor_f3_light_client::types::ConstructorParams {
+                instance_id: f3_params.instance_id,
+                power_table: f3_params.power_table.clone(),
+                finalized_epochs: Vec::new(),
+            };
+            let f3_state = fendermint_actor_f3_light_client::state::State::new(
+                constructor_params.instance_id,
+                constructor_params.power_table,
+                constructor_params.finalized_epochs,
+            )?;
+
+            state
+                .create_custom_actor(
+                    fendermint_actor_f3_light_client::F3_LIGHT_CLIENT_ACTOR_NAME,
+                    f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID,
+                    &f3_state,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create F3 light client actor")?;
+        };
+
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
         // The next ID is going to be _after_ the accounts, which have already been assigned an ID by the `Init` actor.
@@ -499,6 +535,16 @@ struct DeployConfig<'a> {
     deployer_addr: ethers::types::Address,
 }
 
+/// Get the commit SHA for genesis contract deployment.
+/// For genesis, we use a default value as genesis is typically built at compile time.
+fn get_genesis_commit_sha() -> [u8; 32] {
+    // Use default value for genesis (matches test default)
+    let default_sha = b"c7d8f53f";
+    let mut result = [0u8; 32];
+    result[..default_sha.len()].copy_from_slice(default_sha);
+    result
+}
+
 fn deploy_contracts(
     ipc_contracts: Vec<ContractSourceAndName>,
     top_level_contracts: &EthContractMap,
@@ -529,7 +575,9 @@ fn deploy_contracts(
             GatewayParams::new(SubnetID::new(config.chain_id.into(), vec![]))
         };
 
-        let params = ConstructorParameters::new(ipc_params, validators)
+        // Get commit SHA for genesis deployment
+        let commit_sha = get_genesis_commit_sha();
+        let params = ConstructorParameters::new(ipc_params, validators, commit_sha)
             .context("failed to create gateway constructor")?;
 
         let facets = deployer

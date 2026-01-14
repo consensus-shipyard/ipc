@@ -154,7 +154,7 @@ fn main() {
         .expect("checksum missing");
     let mut hasher = Sha256::new();
     hasher.update(&data);
-    if hasher.finalize().as_slice() != &hex_decode(expected).unwrap()[..] {
+    if *hasher.finalize() != hex_decode(expected).unwrap()[..] {
         eprintln!("Checksum mismatch for {}", asset_name);
         exit(1);
     }

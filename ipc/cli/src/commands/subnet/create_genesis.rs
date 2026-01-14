@@ -168,6 +168,11 @@ pub(crate) async fn create_genesis(
             subnet_id: subnet_id.clone(),
             parent_endpoint: parent.rpc_http().clone(),
             parent_auth_token: parent.auth_token(),
+            // For F3 data, use the same endpoint as parent_endpoint by default.
+            // In practice, for Filecoin/Calibration, both EVM and Lotus APIs are on the same endpoint.
+            // When using ipc-cli, the parent is typically Filecoin, so F3 is available.
+            parent_filecoin_rpc: Some(parent.rpc_http().clone()),
+            parent_filecoin_auth_token: parent.auth_token(),
             parent_gateway: parent.gateway_addr(),
             parent_registry: parent.registry_addr(),
             network_version: cfg.network_version,

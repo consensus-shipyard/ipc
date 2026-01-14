@@ -27,7 +27,7 @@ use libp2p::swarm::{
     ToSwarm,
 };
 use libp2p::{Multiaddr, PeerId};
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::time::{Instant, Interval};

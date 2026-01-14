@@ -14,5 +14,6 @@ description = "Depend on all individual actors to be included."
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 fendermint_actor_activity_tracker = { path = "activity-tracker", features = ["fil-actor"] }
 fendermint_actor_chainmetadata = { path = "chainmetadata", features = ["fil-actor"] }
+fendermint_actor_f3_light_client = { path = "f3-light-client", features = ["fil-actor"] }
 fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559", features = ["fil-actor"] }
 fendermint_actor_eam = { path = "eam", features = ["fil-actor"] }

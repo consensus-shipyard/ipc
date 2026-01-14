@@ -5,7 +5,8 @@
 //! See https://ipld.io/specs/transport/car/carv1/
 
 use anyhow::{self, Context as AnyhowContext};
-use futures::{future, io::Cursor, StreamExt};
+use futures::{future, StreamExt};
+use std::io::Cursor;
 use std::path::Path;
 
 use fvm_ipld_car::{CarHeader, CarReader};
@@ -34,33 +35,58 @@ where
     let input_car = input_car.into();
     let output_dir = output_dir.to_path_buf();
 
+    // In FVM 4.7, CarReader is synchronous
     let input_car = Cursor::new(input_car);
-    let reader: CarReader<_> = CarReader::new_unchecked(input_car)
-        .await
-        .context("failed to open CAR reader")?;
+    let reader: CarReader<_> = CarReader::new(input_car).context("failed to open CAR reader")?;
 
     // Create a Writer that opens new files when the maximum is reached.
     let mut writer = ChunkWriter::new(output_dir, max_size, file_name);
 
     let header = CarHeader::new(reader.header.roots.clone(), reader.header.version);
 
+    // Collect blocks from the synchronous iterator into a stream
     let block_streamer = BlockStreamer::new(reader);
-    // We shouldn't see errors when reading the CAR files, as we have written them ourselves,
-    // but for piece of mind let's log any errors and move on.
     let mut block_streamer = block_streamer.filter_map(|res| match res {
         Ok(b) => future::ready(Some(b)),
         Err(e) => {
-            // TODO: It would be better to stop if there are errors.
             tracing::warn!(error = e.to_string(), "CAR block failure");
             future::ready(None)
         }
     });
 
-    // Copy the input CAR into an output CAR.
-    header
-        .write_stream_async(&mut writer, &mut block_streamer)
-        .await
-        .context("failed to write CAR file")?;
+    // In FVM 4.7, need to manually write CAR format to the async writer
+    use futures::io::AsyncWriteExt;
+    use fvm_ipld_encoding::to_vec;
+
+    // Write header with length prefix (only once for chunk 0)
+    let header_bytes = to_vec(&header).context("failed to encode header")?;
+    let mut len_buf = unsigned_varint::encode::u64_buffer();
+    // unsigned_varint::encode::u64 returns a slice of the buffer containing the encoded bytes
+    let len_encoded = unsigned_varint::encode::u64(header_bytes.len() as u64, &mut len_buf);
+
+    writer.write_all(len_encoded).await?;
+    writer.write_all(&header_bytes).await?;
+    // Flush after header to trigger file closing (ChunkWriter closes after first chunk)
+    writer.flush().await?;
+
+    // Write all blocks with length prefix
+    while let Some((cid, data)) = block_streamer.next().await {
+        let cid_bytes = cid.to_bytes();
+        let total_len = cid_bytes.len() + data.len();
+
+        let mut len_buf = unsigned_varint::encode::u64_buffer();
+        // unsigned_varint::encode::u64 returns a slice of the buffer containing the encoded bytes
+        let len_encoded = unsigned_varint::encode::u64(total_len as u64, &mut len_buf);
+
+        writer.write_all(len_encoded).await?;
+        writer.write_all(&cid_bytes).await?;
+        writer.write_all(&data).await?;
+        // Flush after each block to allow ChunkWriter to chunk properly
+        writer.flush().await?;
+    }
+
+    // Final flush and close
+    writer.close().await?;
 
     Ok(writer.chunk_created())
 }

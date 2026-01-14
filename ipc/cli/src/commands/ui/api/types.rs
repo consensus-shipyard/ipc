@@ -220,18 +220,6 @@ impl Default for SubnetSetupChecklist {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubnetInstanceResponse {
-    pub id: String,
-    pub name: String,
-    pub parent: String,
-    pub status: SubnetLifecycleState,
-    pub status_info: SubnetStatusInfo,
-    pub validators: Vec<serde_json::Value>,
-    pub created_at: Option<String>,
-    pub config: Option<serde_json::Value>,
-}
-
 /// Test transaction request
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -265,29 +253,6 @@ pub struct WalletAddress {
     pub balance: Option<String>,      // Balance in the current subnet context
     pub custom_label: Option<String>, // User-defined name for the address
     pub is_default: bool,             // Whether this is the default address for this wallet type
-}
-
-/// Gateway information
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct GatewayInfo {
-    pub id: String,
-    pub address: String,
-    pub registry_address: String,
-    pub deployer_address: String,
-    pub parent_network: String,
-    pub name: Option<String>,
-    pub subnet_count: u64,
-    pub is_active: bool,
-    pub deployed_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Subnet metadata for tracking
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SubnetMetadata {
-    pub id: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub name: Option<String>,
-    pub template: Option<String>,
 }
 
 /// Error types for better error handling

@@ -8,7 +8,8 @@
 
 use std::collections::HashSet;
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
+use ethers_core::abi::AbiEncode;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
 use ethers_core::types::{self as et, BlockNumber};
 use ethers_core::utils::rlp;
@@ -28,6 +29,7 @@ use fvm_shared::bigint::BigInt;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::{chainid::ChainID, error::ExitCode};
 use jsonrpc_v2::Params;
+
 use rand::Rng;
 use tendermint::block::Height;
 use tendermint_rpc::endpoint::{self, status};
@@ -49,6 +51,9 @@ use crate::{
     },
     error, JsonRpcData, JsonRpcResult,
 };
+
+// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
 
 /// Returns a list of addresses owned by client.
 ///
@@ -105,8 +110,7 @@ where
         .context("failed to get consensus params")?;
     let mut block_gas_limit = consensus_params.consensus_params.block.max_gas;
     if block_gas_limit <= 0 {
-        block_gas_limit =
-            i64::try_from(fvm_shared::BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
+        block_gas_limit = i64::try_from(BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
     };
 
     let mut premiums = Vec::new();
@@ -236,8 +240,7 @@ where
 
         let mut block_gas_limit = consensus_params.consensus_params.block.max_gas;
         if block_gas_limit <= 0 {
-            block_gas_limit =
-                i64::try_from(fvm_shared::BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
+            block_gas_limit = i64::try_from(BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
         };
 
         // The latest block might not have results yet.
@@ -786,10 +789,12 @@ where
     C: Client + Sync + Send,
 {
     let encode = |data: Option<uints::U256>| {
-        let mut bz = [0u8; 32];
-        if let Some(data) = data {
-            data.to_big_endian(&mut bz);
-        }
+        let bz = if let Some(data) = data {
+            // In FVM 4.7, to_big_endian() returns the array instead of taking a mutable reference
+            data.to_big_endian()
+        } else {
+            [0u8; 32]
+        };
         // The client library expects hex encoded string. The JS client might want a prefix too.
         Ok(format!("0x{}", hex::encode(bz)))
     };
@@ -1191,6 +1196,39 @@ where
             ),
         },
     }
+}
+
+/// Obtain the precommit signed header from cometbft
+pub async fn get_commit_signed_header<C>(
+    data: JsonRpcData<C>,
+    Params((block_number,)): Params<(et::BlockNumber,)>,
+) -> JsonRpcResult<et::Bytes>
+where
+    C: Client + Sync + Send,
+{
+    let h = block_number
+        .as_number()
+        .ok_or_else(|| anyhow!("invalid block #{}", block_number))?
+        .as_u32();
+    let query_response = data.tm().commit(tendermint::block::Height::from(h)).await?;
+
+    let header = ipc_provider::manager::cometbft::SignedHeader::from(query_response.signed_header);
+    Ok(et::Bytes::from(header.encode()))
+}
+
+pub async fn get_state_root<C>(
+    data: JsonRpcData<C>,
+    Params((block_number,)): Params<(et::BlockNumber,)>,
+) -> JsonRpcResult<et::Bytes>
+where
+    C: Client + Sync + Send,
+{
+    let h = block_number
+        .as_number()
+        .ok_or_else(|| anyhow!("invalid block #{}", block_number))?
+        .as_u64();
+    let query_response = data.client.state_params(FvmQueryHeight::Height(h)).await?;
+    Ok(et::Bytes::from(query_response.value.state_root))
 }
 
 /// Unsubscribe from the filter registered by this websocket.

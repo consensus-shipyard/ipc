@@ -51,6 +51,8 @@ use crate::{
     TestnetName, TestnetResource,
 };
 
+pub use node::container_name;
+
 mod container;
 mod dropper;
 mod network;
@@ -76,6 +78,8 @@ const DOCKER_ENTRY_FILE_NAME: &str = "docker-entry.sh";
 
 const PORT_RANGE_START: u32 = 30000;
 const PORT_RANGE_SIZE: u32 = 100;
+
+const DEFAULT_TEST_CHAIN_ID: u64 = 10000;
 
 lazy_static! {
     static ref STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
@@ -672,7 +676,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             // TODO: Some of these hardcoded values can go into the manifest.
             let genesis = Genesis {
                 chain_name,
-                chain_id: None,
+                chain_id: DEFAULT_TEST_CHAIN_ID,
                 timestamp: Timestamp::current(),
                 network_version: NetworkVersion::V21,
                 base_fee: TokenAmount::zero(),
@@ -704,6 +708,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                     },
                 }),
                 ipc_contracts_owner,
+                f3: None, // No F3 parameters for root chains
             };
             Ok(genesis)
         })
@@ -821,7 +826,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 --bottomup-check-period {} \
                 --permission-mode collateral \
                 --supply-source-kind native \
-                --genesis-subnet-ipc-contracts-owner {:?}
+                --genesis-subnet-ipc-contracts-owner {:?} \
+                --chain-id {}
                 ",
             parent_submit_config.subnet.subnet_id,
             subnet_config.creator.eth_addr(),
@@ -829,6 +835,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             TokenAmount::from_nano(1), // The minimum for native mode that the CLI parses
             subnet_config.bottom_up_checkpoint.period,
             subnet_config.creator.eth_addr(),
+            DEFAULT_TEST_CHAIN_ID,
         );
 
         // Now run the command and capture the output.
@@ -966,9 +973,15 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             .find_node(|n| n.internal_ethapi_http_endpoint(), |u| Some(u.clone()))
             .ok_or_else(|| anyhow!("there has to be some nodes with eth API enabled"))?;
 
+        // Check if any parent node is external (Filecoin/Lotus) to determine if we need F3 data
+        let has_external_parent = parent_submit_config
+            .nodes
+            .iter()
+            .any(|tc| matches!(tc, TargetConfig::External(_)));
+
         // TODO: Move --base-fee to config
         // TODO: Move --power-scale to config
-        let cmd = format!(
+        let mut cmd = format!(
             "genesis \
                 --genesis-file /fendermint/subnet/genesis.json \
                 ipc from-parent \
@@ -977,8 +990,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                     --parent-gateway {:?} \
                     --parent-registry {:?} \
                     --base-fee {} \
-                    --power-scale {} \
-                ",
+                    --power-scale {} ",
             subnet.subnet_id,
             parent_url,
             parent_submit_config.deployment.gateway,
@@ -986,6 +998,12 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             TokenAmount::zero().atto(),
             9, // to work with nanoFIL
         );
+
+        // Only provide --parent-filecoin-rpc for external (Filecoin) parents
+        // Internal (Fendermint) parents don't have F3 available
+        if has_external_parent {
+            cmd.push_str(&format!("--parent-filecoin-rpc {} ", parent_url));
+        }
 
         let runner = self.fendermint_cli_runner(&subnet.name, network_name.as_ref())?;
 
