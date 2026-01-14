@@ -5,6 +5,7 @@ use crate::cmd;
 use crate::options::proof_cache::{ProofCacheArgs, ProofCacheCommands};
 use fendermint_vm_topdown_proof_service::persistence::ProofCachePersistence;
 use std::path::Path;
+use std::path::PathBuf;
 
 cmd! {
     ProofCacheArgs(self) {

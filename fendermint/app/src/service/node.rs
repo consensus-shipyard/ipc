@@ -11,7 +11,6 @@ use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
-use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
@@ -39,10 +38,7 @@ use crate::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::{AccountKind, Settings};
 
 use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
-use fendermint_vm_interpreter::fvm::state::ipc::F3LightClientCaller;
 use filecoin_f3_gpbft::PowerEntries;
-use fvm_shared::clock::ChainEpoch;
-use std::path::PathBuf;
 
 // Database collection names.
 namespaces! {
@@ -52,6 +48,24 @@ namespaces! {
         state_store,
         bit_store
     }
+}
+
+/// Post-`App::new()` tasks for the chosen topdown mode.
+///
+/// Some topdown background tasks depend on having a live `App` instance (e.g. legacy polling syncer),
+/// so we collect them here and run them in one place right after app creation.
+enum TopDownPostInit {
+    None,
+    Legacy {
+        agent_proxy: Arc<IPCProviderProxyWithLatency>,
+        config: fendermint_vm_topdown::Config,
+        parent_finality_provider: Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>,
+        parent_finality_votes: VoteTally,
+    },
+    F3 {
+        proof_config: fendermint_vm_topdown_proof_service::ProofServiceConfig,
+        proof_cache: Arc<fendermint_vm_topdown_proof_service::ProofCache>,
+    },
 }
 
 /// Runs the ABCI server. If a CancellationToken is provided (i.e. Some(token)),
@@ -129,98 +143,109 @@ pub async fn run(
     let parent_finality_votes = VoteTally::empty();
 
     let topdown_enabled = settings.topdown_enabled();
-
-    // If enabled, start a resolver that communicates with the application through the resolve pool.
-    if settings.resolver_enabled() {
-        let mut service =
-            make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
-
-        // Register all metrics from the IPLD resolver stack
-        if let Some(ref registry) = metrics_registry {
-            service
-                .register_metrics(registry)
-                .context("failed to register IPLD resolver metrics")?;
-        }
-
-        let client = service.client();
-
-        let own_subnet_id = settings.ipc.subnet_id.clone();
-
-        client
-            .add_provided_subnet(own_subnet_id.clone())
-            .context("error adding own provided subnet.")?;
-
-        if topdown_enabled {
-            if let Some(key) = validator_keypair {
-                let parent_finality_votes = parent_finality_votes.clone();
-
-                tracing::info!("starting the parent finality vote gossip loop...");
-                tokio::spawn(async move {
-                    publish_vote_loop(
-                        parent_finality_votes,
-                        settings.ipc.vote_interval,
-                        settings.ipc.vote_timeout,
-                        key,
-                        own_subnet_id,
-                        client,
-                        |height, block_hash| {
-                            AppVote::ParentFinality(IPCParentFinality { height, block_hash })
-                        },
-                    )
-                    .await
-                });
-            }
-        } else {
-            tracing::info!("parent finality vote gossip disabled");
-        }
-
-        tracing::info!("subscribing to gossip...");
-        let rx = service.subscribe();
-        let parent_finality_votes = parent_finality_votes.clone();
-        tokio::spawn(async move {
-            dispatch_resolver_events(rx, parent_finality_votes, topdown_enabled).await;
-        });
-
-        tracing::info!("starting the IPLD Resolver Service...");
-        tokio::spawn(async move {
-            if let Err(e) = service.run().await {
-                tracing::error!("IPLD Resolver Service failed: {e:#}")
-            }
-        });
+    let topdown_config = if topdown_enabled {
+        Some(
+            settings
+                .ipc
+                .topdown_config()
+                .context("topdown is enabled but topdown config is missing")?,
+        )
     } else {
-        tracing::info!("IPLD Resolver disabled.")
+        None
+    };
+
+    // Decide topdown mode once.
+    // - If F3 is enabled, legacy (vote-based) topdown must NOT run.
+    // - If genesis state indicates F3 is enabled, config must also enable it (fail fast).
+    let f3_enabled_in_config = topdown_config
+        .as_ref()
+        .and_then(|tc| tc.f3.as_ref())
+        .is_some();
+
+    // Query F3 state from committed/genesis state once (used for fail-fast + F3 cache init).
+    let app_namespace = ns.app.clone();
+    let exec_state = crate::app::create_read_only_exec_state::<_, _, AppStore>(
+        &db,
+        &state_store,
+        app_namespace.clone(),
+    )
+    .context("failed to create read-only exec state")?;
+    let f3_state_in_genesis = match exec_state {
+        Some(mut state) => crate::app::query_f3_state(&mut state)
+            .context("failed to query F3 state from genesis")?,
+        None => None,
+    };
+
+    if f3_state_in_genesis.is_some() && !f3_enabled_in_config {
+        bail!("F3 is enabled in genesis but not in config");
     }
 
-    let (parent_finality_provider, ipc_tuple) = if topdown_enabled {
-        info!("topdown finality enabled");
-        let topdown_config = settings.ipc.topdown_config()?;
-        let mut config = fendermint_vm_topdown::Config::new(
-            topdown_config.chain_head_delay,
-            topdown_config.polling_interval,
-            topdown_config.exponential_back_off,
-            topdown_config.exponential_retry_limit,
+    // Start the chosen topdown mode (and its background tasks) and build the TopDownManager once.
+    let (top_down_manager, topdown_post_init) = if !topdown_enabled {
+        let parent_finality_provider = Arc::new(Toggle::disabled());
+        let top_down_manager = TopDownManager::new(
+            parent_finality_provider,
+            parent_finality_votes.clone(),
+            None,
+        );
+        (top_down_manager, TopDownPostInit::None)
+    } else if f3_enabled_in_config {
+        let (f3_handler, proof_config, proof_cache) = start_f3_topdown(
+            &settings,
+            topdown_config
+                .as_ref()
+                .expect("topdown_config must exist when topdown is enabled"),
+            f3_state_in_genesis,
+        )?;
+
+        // Legacy provider is disabled in F3 mode.
+        let parent_finality_provider = Arc::new(Toggle::disabled());
+        let top_down_manager = TopDownManager::new(
+            parent_finality_provider,
+            parent_finality_votes.clone(),
+            Some(f3_handler),
+        );
+
+        (
+            top_down_manager,
+            TopDownPostInit::F3 {
+                proof_config,
+                proof_cache,
+            },
         )
-        .with_proposal_delay(topdown_config.proposal_delay)
-        .with_max_proposal_range(topdown_config.max_proposal_range);
+    } else {
+        let (parent_finality_provider, ipc_tuple) = start_legacy_topdown(
+            &settings,
+            topdown_config
+                .as_ref()
+                .expect("topdown_config must exist when topdown is enabled"),
+            validator_keypair,
+            parent_finality_votes.clone(),
+            db.clone(),
+            state_store.clone(),
+            ns.bit_store,
+            metrics_registry.as_ref(),
+        )
+        .await?;
 
-        if let Some(v) = topdown_config.max_cache_blocks {
-            info!(value = v, "setting max cache blocks");
-            config = config.with_max_cache_blocks(v);
-        }
+        let top_down_manager = TopDownManager::new(
+            parent_finality_provider.clone(),
+            parent_finality_votes.clone(),
+            None,
+        );
 
-        let ipc_provider = {
-            let p = make_ipc_provider_proxy(&settings)?;
-            Arc::new(IPCProviderProxyWithLatency::new(p))
+        let post_init = if let Some((agent_proxy, config)) = ipc_tuple {
+            TopDownPostInit::Legacy {
+                agent_proxy,
+                config,
+                parent_finality_provider,
+                parent_finality_votes: parent_finality_votes.clone(),
+            }
+        } else {
+            TopDownPostInit::None
         };
 
-        let finality_provider =
-            CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
-
-        let p = Arc::new(Toggle::enabled(finality_provider));
-        (p, Some((ipc_provider, config)))
-    } else {
-        info!("topdown finality disabled");
-        (Arc::new(Toggle::disabled()), None)
+        (top_down_manager, post_init)
     };
 
     // Start a snapshot manager in the background.
@@ -250,137 +275,6 @@ pub async fn run(
     };
 
     let end_block_manager = EndBlockManager::new();
-
-    // Validate F3 configuration consistency: config and genesis must match
-    // Query F3 state from genesis to check if F3 is enabled there
-    let app_namespace = ns.app.clone();
-    let exec_state = crate::app::create_read_only_exec_state::<_, _, AppStore>(
-        &db,
-        &state_store,
-        app_namespace.clone(),
-    )
-    .context("failed to create read-only exec state")?;
-
-    let f3_in_genesis = match exec_state {
-        Some(mut state) => {
-            crate::app::query_f3_state(&mut state)
-                .context("failed to query F3 state from genesis")?
-                .is_some()
-        }
-        None => false, // Genesis not initialized yet - will be checked below
-    };
-
-    // Check F3 configuration in settings
-    let f3_in_config = topdown_enabled
-        && settings
-            .ipc
-            .topdown_config()
-            .ok()
-            .and_then(|tc| tc.f3.as_ref())
-            .is_some();
-
-    // Validate: F3 must be enabled in BOTH config and genesis, or NEITHER
-    match (f3_in_config, f3_in_genesis) {
-        (true, false) => {
-            anyhow::bail!(
-                "F3 is enabled in config but F3 Light Client Actor state not found in genesis. \
-                 F3 must be configured in both config and genesis, or neither."
-            );
-        }
-        (false, true) => {
-            anyhow::bail!(
-                "F3 is enabled in genesis but not in config. \
-                 F3 must be configured in both config and genesis, or neither."
-            );
-        }
-        (true, true) => {
-            // Both enabled - proceed with F3 initialization
-        }
-        (false, false) => {
-            // Both disabled - F3 not used
-        }
-    }
-
-    // Create F3 cache and handler if F3 is configured
-    let (f3_handler, f3_service_config) = if f3_in_config && f3_in_genesis {
-        let topdown_config = settings
-            .ipc
-            .topdown_config()
-            .ok()
-            .context("topdown config required when topdown is enabled")?;
-
-        let f3_config = topdown_config
-            .f3
-            .as_ref()
-            .expect("F3 config should exist if f3_in_config is true");
-
-        // Query F3 state - we know it exists from validation above
-        let exec_state = crate::app::create_read_only_exec_state::<_, _, AppStore>(
-            &db,
-            &state_store,
-            app_namespace,
-        )
-        .context("failed to create read-only exec state")?;
-
-        let f3_initial_state = exec_state
-            .and_then(|mut state| {
-                crate::app::query_f3_state(&mut state)
-                    .context("failed to query F3 state")
-                    .transpose()
-            })
-            .transpose()?
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "F3 is enabled but F3 Light Client Actor state not found in genesis"
-                )
-            })?;
-
-        // Use queried F3 state to initialize cache correctly
-        let (initial_instance, initial_epoch) = match f3_initial_state {
-            (inst, Some(epoch)) => (inst, epoch),
-            (inst, None) => (inst, 0),
-        };
-
-        let db_path = Some(settings.data_dir().join("proof-cache"));
-        let cache = if let Some(path) = &db_path {
-            Arc::new(
-                fendermint_vm_topdown_proof_service::ProofCache::new_with_persistence(
-                    initial_epoch,
-                    initial_instance,
-                    f3_config.proof_service.cache_config.clone(),
-                    path,
-                )?,
-            )
-        } else {
-            Arc::new(fendermint_vm_topdown_proof_service::ProofCache::new(
-                initial_epoch,
-                initial_instance,
-                f3_config.proof_service.cache_config.clone(),
-            ))
-        };
-
-        // Create F3 handler with cache
-        use fendermint_vm_interpreter::fvm::F3FinalityHandler;
-        let handler = F3FinalityHandler::new(cache, settings.ipc.subnet_id.to_string());
-
-        // Store config for service creation later
-        let mut proof_config = f3_config.proof_service.clone();
-        proof_config.parent_rpc_url = topdown_config.parent_http_endpoint.to_string();
-
-        (Some(handler), Some((proof_config, db_path)))
-    } else {
-        (None, None)
-    };
-    } else {
-        (None, None)
-    };
-
-    let top_down_manager = TopDownManager::new(
-        parent_finality_provider.clone(),
-        parent_finality_votes.clone(),
-        f3_handler, // F3 handler created upfront
-    );
-
     let interpreter = FvmMessagesInterpreter::new(
         end_block_manager,
         top_down_manager,
@@ -405,61 +299,63 @@ pub async fn run(
         snapshots,
     )?;
 
-    // Launch F3 proof service if configured
-    if let Some((proof_config, _db_path)) = f3_service_config {
-        tracing::info!("F3 proof service enabled");
+    // Run any post-init tasks for the chosen topdown mode in one place.
+    match topdown_post_init {
+        TopDownPostInit::None => {}
+        TopDownPostInit::F3 {
+            proof_config,
+            proof_cache,
+        } => {
+            if !proof_config.enabled {
+                tracing::info!("F3 proof service disabled in configuration");
+            } else {
+                tracing::info!("F3 proof service enabled");
 
-        // Get cache from F3 handler
-        let cache = app
-            .interpreter()
-            .top_down_manager
-            .f3
-            .as_ref()
-            .map(|f3| f3.proof_cache().clone())
-            .expect("F3 handler should exist if f3_service_config is Some");
+                use fendermint_vm_topdown_proof_service::ProofGeneratorService;
+                let service = ProofGeneratorService::new(
+                    proof_config.clone(),
+                    proof_cache.clone(),
+                    &settings.ipc.subnet_id,
+                    0,                    // Service will fetch actual instance ID from cache
+                    PowerEntries(vec![]), // Service will fetch actual power table from parent
+                )
+                .await
+                .context("Failed to create F3 proof service")?;
 
-        // Create service - it will fetch initial state from cache
-        use fendermint_vm_topdown_proof_service::ProofGeneratorService;
-        let service = ProofGeneratorService::new(
-            proof_config.clone(),
-            cache.clone(),
-            &settings.ipc.subnet_id,
-            0, // Service will fetch actual instance ID from cache
-            PowerEntries(vec![]), // Service will fetch actual power table from parent
-        )
-        .await
-        .context("Failed to create F3 proof service")?;
+                tracing::info!(
+                    f3_network = proof_config.f3_network_name(&settings.ipc.subnet_id),
+                    lookahead = proof_config.cache_config.lookahead_instances,
+                    "F3 proof service initialized successfully"
+                );
 
-        tracing::info!(
-            f3_network = proof_config.f3_network_name(&settings.ipc.subnet_id),
-            lookahead = proof_config.cache_config.lookahead_instances,
-            "F3 proof service initialized successfully"
-        );
-
-        // Spawn service in background
-        tokio::spawn(async move {
-            service.run().await;
-        });
-    }
-    }
-
-    if let Some((agent_proxy, config)) = ipc_tuple {
-        let app_parent_finality_query = AppParentFinalityQuery::new(app.clone());
-        tokio::spawn(async move {
-            match launch_polling_syncer(
-                app_parent_finality_query,
-                config,
-                parent_finality_provider,
-                parent_finality_votes,
-                agent_proxy,
-                tendermint_client,
-            )
-            .await
-            {
-                Ok(_) => {}
-                Err(e) => tracing::error!("cannot launch polling syncer: {e}"),
+                tokio::spawn(async move {
+                    service.run().await;
+                });
             }
-        });
+        }
+        TopDownPostInit::Legacy {
+            agent_proxy,
+            config,
+            parent_finality_provider,
+            parent_finality_votes,
+        } => {
+            let app_parent_finality_query = AppParentFinalityQuery::new(app.clone());
+            tokio::spawn(async move {
+                match launch_polling_syncer(
+                    app_parent_finality_query,
+                    config,
+                    parent_finality_provider,
+                    parent_finality_votes,
+                    agent_proxy,
+                    tendermint_client,
+                )
+                .await
+                {
+                    Ok(_) => {}
+                    Err(e) => tracing::error!("cannot launch polling syncer: {e}"),
+                }
+            });
+        }
     }
 
     // Start the metrics on a background thread.
@@ -585,6 +481,160 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
     IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
 }
 
+/// Start legacy (vote-based) topdown finality.
+///
+/// This is the only place where we start legacy topdown background tasks:
+/// - optional resolver service
+/// - optional vote gossip loop
+/// - create the parent finality provider + config needed later by the polling syncer
+async fn start_legacy_topdown(
+    settings: &Settings,
+    topdown_config: &fendermint_app_settings::TopDownSettings,
+    validator_keypair: Option<libp2p::identity::Keypair>,
+    parent_finality_votes: VoteTally,
+    db: RocksDb,
+    state_store: NamespaceBlockstore,
+    bit_store_ns: String,
+    metrics_registry: Option<&prometheus::Registry>,
+) -> anyhow::Result<(
+    Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>,
+    Option<(
+        Arc<IPCProviderProxyWithLatency>,
+        fendermint_vm_topdown::Config,
+    )>,
+)> {
+    // Resolver is optional but only meaningful for legacy mode.
+    if settings.resolver_enabled() {
+        let mut service = make_resolver_service(settings, db, state_store.clone(), bit_store_ns)?;
+
+        // Register all metrics from the IPLD resolver stack
+        if let Some(registry) = metrics_registry {
+            service
+                .register_metrics(registry)
+                .context("failed to register IPLD resolver metrics")?;
+        }
+
+        let client = service.client();
+        let own_subnet_id = settings.ipc.subnet_id.clone();
+
+        client
+            .add_provided_subnet(own_subnet_id.clone())
+            .context("error adding own provided subnet.")?;
+
+        if let Some(key) = validator_keypair {
+            let parent_finality_votes = parent_finality_votes.clone();
+            let vote_interval = settings.ipc.vote_interval;
+            let vote_timeout = settings.ipc.vote_timeout;
+            tracing::info!("starting the parent finality vote gossip loop...");
+            tokio::spawn(async move {
+                publish_vote_loop(
+                    parent_finality_votes,
+                    vote_interval,
+                    vote_timeout,
+                    key,
+                    own_subnet_id,
+                    client,
+                    |height, block_hash| {
+                        AppVote::ParentFinality(IPCParentFinality { height, block_hash })
+                    },
+                )
+                .await
+            });
+        } else {
+            tracing::info!("validator key missing; parent finality vote gossip disabled");
+        }
+
+        tracing::info!("subscribing to gossip...");
+        let rx = service.subscribe();
+        let parent_finality_votes = parent_finality_votes.clone();
+        tokio::spawn(async move {
+            dispatch_resolver_events(rx, parent_finality_votes).await;
+        });
+
+        tracing::info!("starting the IPLD Resolver Service...");
+        tokio::spawn(async move {
+            if let Err(e) = service.run().await {
+                tracing::error!("IPLD Resolver Service failed: {e:#}")
+            }
+        });
+    } else {
+        tracing::info!("IPLD Resolver disabled.");
+    }
+
+    // Build legacy finality provider.
+    info!("legacy topdown finality enabled");
+    let mut config = fendermint_vm_topdown::Config::new(
+        topdown_config.chain_head_delay,
+        topdown_config.polling_interval,
+        topdown_config.exponential_back_off,
+        topdown_config.exponential_retry_limit,
+    )
+    .with_proposal_delay(topdown_config.proposal_delay)
+    .with_max_proposal_range(topdown_config.max_proposal_range);
+
+    if let Some(v) = topdown_config.max_cache_blocks {
+        info!(value = v, "setting max cache blocks");
+        config = config.with_max_cache_blocks(v);
+    }
+
+    let ipc_provider = {
+        let p = make_ipc_provider_proxy(settings)?;
+        Arc::new(IPCProviderProxyWithLatency::new(p))
+    };
+
+    let finality_provider =
+        CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
+    let parent_finality_provider = Arc::new(Toggle::enabled(finality_provider));
+
+    Ok((parent_finality_provider, Some((ipc_provider, config))))
+}
+
+/// Start F3 (proof-based) topdown finality.
+///
+/// Returns the configured handler (for `TopDownManager`) plus the proof-service config
+/// used later to spawn the background proof generator.
+fn start_f3_topdown(
+    settings: &Settings,
+    topdown_config: &fendermint_app_settings::TopDownSettings,
+    f3_state_in_genesis: Option<(u64, Option<fvm_shared::clock::ChainEpoch>)>,
+) -> anyhow::Result<(
+    fendermint_vm_interpreter::fvm::F3FinalityHandler,
+    fendermint_vm_topdown_proof_service::ProofServiceConfig,
+    Arc<fendermint_vm_topdown_proof_service::ProofCache>,
+)> {
+    let f3_config = topdown_config
+        .f3
+        .as_ref()
+        .context("F3 is enabled in config but missing F3 config section")?;
+
+    let (initial_instance, initial_epoch) = match f3_state_in_genesis {
+        Some((inst, Some(epoch))) => (inst, epoch),
+        Some((inst, None)) => (inst, 0),
+        None => bail!("F3 is enabled in config but initial F3 state is missing in genesis"),
+    };
+
+    let db_path = Some(settings.data_dir().join("proof-cache"));
+    let cache = Arc::new(
+        fendermint_vm_topdown_proof_service::ProofCache::new_with_persistence(
+            initial_epoch,
+            initial_instance,
+            f3_config.proof_service.cache_config.clone(),
+            db_path.as_ref().expect("db_path always set here"),
+        )?,
+    );
+
+    let handler = fendermint_vm_interpreter::fvm::F3FinalityHandler::new(
+        cache,
+        settings.ipc.subnet_id.to_string(),
+    );
+    let proof_cache = handler.proof_cache().clone();
+
+    let mut proof_config = f3_config.proof_service.clone();
+    proof_config.parent_rpc_url = topdown_config.parent_http_endpoint.to_string();
+
+    Ok((handler, proof_config, proof_cache))
+}
+
 fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::Config> {
     use ipc_ipld_resolver::{
         Config, ConnectionConfig, ContentConfig, DiscoveryConfig, MembershipConfig, NetworkConfig,
@@ -650,14 +700,13 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
 async fn dispatch_resolver_events(
     mut rx: tokio::sync::broadcast::Receiver<ResolverEvent<AppVote>>,
     parent_finality_votes: VoteTally,
-    topdown_enabled: bool,
 ) {
     loop {
         match rx.recv().await {
             Ok(event) => match event {
                 ResolverEvent::ReceivedPreemptive(_, _) => {}
                 ResolverEvent::ReceivedVote(vote) => {
-                    dispatch_vote(*vote, &parent_finality_votes, topdown_enabled).await;
+                    dispatch_vote(*vote, &parent_finality_votes).await;
                 }
             },
             Err(RecvError::Lagged(n)) => {
@@ -671,17 +720,9 @@ async fn dispatch_resolver_events(
     }
 }
 
-async fn dispatch_vote(
-    vote: VoteRecord<AppVote>,
-    parent_finality_votes: &VoteTally,
-    topdown_enabled: bool,
-) {
+async fn dispatch_vote(vote: VoteRecord<AppVote>, parent_finality_votes: &VoteTally) {
     match vote.content {
         AppVote::ParentFinality(f) => {
-            if !topdown_enabled {
-                tracing::debug!("ignoring vote; topdown disabled");
-                return;
-            }
             let res = atomically_or_err(|| {
                 parent_finality_votes.add_vote(
                     vote.public_key.clone(),
