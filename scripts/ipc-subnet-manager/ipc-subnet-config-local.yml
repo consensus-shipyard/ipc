@@ -13,15 +13,15 @@ deployment:
 # Subnet Configuration
 subnet:
   # Subnet ID - deployed via IPC UI
-  id: "/r31337/t410f5mrbxelefiiczkv4owvtlcoplbsmu3wk6qmbdfy"
+  id: "/r31337/t410ff4xrmeub6ojyg7htbke6jpiy6og4a5ayfkzsqai"
   # Parent chain RPC endpoint (local Anvil)
   parent_rpc: "http://localhost:8545"
   # Parent chain ID
   parent_chain_id: "/r31337"
   # Parent registry contract address (deployed via IPC UI)
-  parent_registry: "0xf953b3a269d80e3eb0f2947630da976b896a8c5b"
+  parent_registry: "0xab16a69a5a8c12c732e0deff4be56a70bb64c926"
   # Parent gateway contract address (deployed on Anvil during subnet init)
-  parent_gateway: "0xa4899d35897033b927acfcf422bc745916139776"
+  parent_gateway: "0x3aade2dcd2df6a8cac689ee797591b2913658659"
 # Validator Nodes
 # In local mode, all validators run on 127.0.0.1 with different ports
 # Port allocation: validator-0 uses base ports, validator-1 uses base+100, validator-2 uses base+200, etc.
