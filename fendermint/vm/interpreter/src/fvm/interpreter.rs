@@ -280,8 +280,6 @@ where
             .top_down_manager
             .chain_message_for_proposal()
             .await
-            .into_iter()
-            .collect::<Vec<_>>()
             .into_iter();
 
         let mut all_msgs = top_down_iter
