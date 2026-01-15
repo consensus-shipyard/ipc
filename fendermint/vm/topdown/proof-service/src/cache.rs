@@ -273,7 +273,7 @@ impl ProofCache {
 
     /// Get the next uncommitted proof entry (epoch + certificate)
     /// Returns None if no proof is available for next epoch
-    pub fn get_next_uncommitted(&self) -> Option<EpochProofWithCertificate> {
+    pub fn get_next_uncommitted_epoch_with_cert(&self) -> Option<EpochProofWithCertificate> {
         let next_epoch = self.get_next_uncommitted_epoch()?;
         self.get_epoch_proof_with_certificate(next_epoch)
     }

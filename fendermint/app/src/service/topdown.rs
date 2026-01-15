@@ -329,10 +329,7 @@ async fn start_f3_topdown(
         )?,
     );
 
-    let handler = fendermint_vm_interpreter::fvm::F3TopDownHandler::new(
-        cache,
-        settings.ipc.subnet_id.to_string(),
-    );
+    let handler = fendermint_vm_interpreter::fvm::F3TopDownHandler::new(cache);
     let proof_cache = handler.proof_cache().clone();
 
     let mut proof_config = f3_config.proof_service.clone();

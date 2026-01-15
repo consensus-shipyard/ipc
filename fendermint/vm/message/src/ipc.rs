@@ -5,7 +5,7 @@ use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
 /// Messages involved in InterPlanetary Consensus.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum IpcMessage {
     /// A top-down checkpoint parent finality proposal (legacy voting-based)
@@ -24,7 +24,7 @@ pub struct ParentFinality {
 }
 
 /// Generalized top-down finality structure
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GeneralisedTopDown {
     /// The chain epoch this finality is for (height)
     pub height: ChainEpoch,
@@ -34,7 +34,7 @@ pub struct GeneralisedTopDown {
 
 /// Certificate types (extensible for future certificate types)
 /// Each variant contains the certificate data. Proofs are fetched from local cache when needed.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Certificate {
     /// Filecoin F3 certificate (proof bundle is fetched from local cache using instance ID)
     FilecoinF3(fendermint_vm_topdown_proof_service::types::SerializableF3Certificate),

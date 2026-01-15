@@ -73,6 +73,13 @@ impl From<&ECChain> for FinalizedTipsets {
     }
 }
 
+impl From<&[FinalizedTipset]> for FinalizedTipsets {
+    /// Convert from slice of already-converted `FinalizedTipset`s.
+    fn from(tipsets: &[FinalizedTipset]) -> Self {
+        Self(tipsets.to_vec())
+    }
+}
+
 impl TryFrom<&[proofs::client::types::ApiTipset]> for FinalizedTipsets {
     type Error = anyhow::Error;
 

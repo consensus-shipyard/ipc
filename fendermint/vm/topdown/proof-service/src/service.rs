@@ -19,7 +19,8 @@ use crate::assembler::ProofAssembler;
 use crate::cache::ProofCache;
 use crate::config::{GatewayId, ProofServiceConfig};
 use crate::f3_client::F3Client;
-use crate::types::{CertificateEntry, EpochProofEntry, FinalizedTipset};
+use crate::types::{CertificateEntry, EpochProofEntry, FinalizedTipset, FinalizedTipsets};
+use crate::verifier::ProofVerifier;
 use anyhow::{Context, Result};
 use filecoin_f3_certs::FinalityCertificate;
 use filecoin_f3_gpbft::PowerEntries;
@@ -33,6 +34,7 @@ pub struct ProofGeneratorService {
     cache: Arc<ProofCache>,
     f3_client: F3Client,
     assembler: ProofAssembler,
+    verifier: ProofVerifier,
 }
 
 impl ProofGeneratorService {
@@ -100,6 +102,7 @@ impl ProofGeneratorService {
             cache,
             f3_client,
             assembler,
+            verifier: ProofVerifier::new(subnet_id.to_string()),
         })
     }
 
@@ -242,6 +245,15 @@ impl ProofGeneratorService {
             "Generating proofs for certificate epochs"
         );
 
+        // The last tipset in the certificate has no child tipset inside this certificate, so it
+        // cannot be proven yet. We only treat the epochs we generated proofs for as "finalized
+        // tipsets" for verification purposes.
+        let finalized_tipsets = {
+            let parents: Vec<FinalizedTipset> =
+                tipset_pairs.iter().map(|(p, _)| p.clone()).collect();
+            FinalizedTipsets::from(parents.as_slice())
+        };
+
         let mut epoch_proofs = Vec::with_capacity(tipset_pairs.len());
 
         // Generate proofs for each (parent, child) pair
@@ -260,6 +272,10 @@ impl ProofGeneratorService {
                 .generate_proof_for_epoch(parent_tipset.clone(), child_tipset.clone())
                 .await
                 .with_context(|| format!("Failed to generate proof for epoch {}", parent_epoch))?;
+
+            self.verifier
+                .verify_proof_bundle_with_tipsets(&proof_bundle, &finalized_tipsets)
+                .with_context(|| format!("Failed to verify proof for epoch {}", parent_epoch))?;
 
             epoch_proofs.push(EpochProofEntry::new(
                 parent_epoch,

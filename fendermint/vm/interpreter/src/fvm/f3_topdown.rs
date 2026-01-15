@@ -9,6 +9,9 @@ use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
 use std::sync::Arc;
 
+use fendermint_vm_message::ipc::IpcMessage;
+use fendermint_vm_topdown_proof_service::types::SerializableF3Certificate;
+
 use crate::fvm::state::ipc::F3LightClientCaller;
 use crate::fvm::state::FvmExecState;
 
@@ -18,20 +21,14 @@ use crate::fvm::state::FvmExecState;
 pub struct F3TopDownHandler {
     /// Proof cache for F3-based parent finality
     proof_cache: Arc<fendermint_vm_topdown_proof_service::ProofCache>,
-    /// Subnet ID for ProofVerifier (needed for event filtering)
-    subnet_id: String,
     /// F3 Light Client caller for querying F3 state
     f3_light_client_caller: F3LightClientCaller,
 }
 
 impl F3TopDownHandler {
-    pub fn new(
-        proof_cache: Arc<fendermint_vm_topdown_proof_service::ProofCache>,
-        subnet_id: String,
-    ) -> Self {
+    pub fn new(proof_cache: Arc<fendermint_vm_topdown_proof_service::ProofCache>) -> Self {
         Self {
             proof_cache,
-            subnet_id,
             f3_light_client_caller: F3LightClientCaller::new(),
         }
     }
@@ -56,150 +53,107 @@ impl F3TopDownHandler {
     /// - Cache is temporarily empty (graceful degradation)
     pub fn chain_message_from_proof_cache(&self) -> Option<ChainMessage> {
         // Get next uncommitted proof (epoch after last_committed)
-        let entry = self.proof_cache.get_next_uncommitted()?;
-
-        // Convert FinalityCertificate to get finalized epochs
-        let finalized_epochs: Vec<fvm_shared::clock::ChainEpoch> = entry
-            .certificate
-            .ec_chain
-            .iter()
-            .map(|ts| ts.epoch)
-            .collect();
+        let epoch_with_cert = self.proof_cache.get_next_uncommitted_epoch_with_cert()?;
 
         tracing::debug!(
-            instance_id = entry.certificate.gpbft_instance,
-            epoch = entry.epoch,
-            epochs = ?finalized_epochs,
-            "found proof in cache for proposal"
+            instance_id = epoch_with_cert.certificate.gpbft_instance,
+            epoch = epoch_with_cert.epoch,
+            "found next uncommitted epoch with certificate in cache"
         );
 
         // Convert FinalityCertificate to SerializableF3Certificate for message
-        let serializable_cert =
-            fendermint_vm_topdown_proof_service::types::SerializableF3Certificate::from(
-                &entry.certificate,
-            );
+        let serializable_cert = SerializableF3Certificate::from(&epoch_with_cert.certificate);
 
-        Some(ChainMessage::Ipc(
-            fendermint_vm_message::ipc::IpcMessage::GeneralisedTopDown(GeneralisedTopDown {
-                height: entry.epoch,
+        Some(ChainMessage::Ipc(IpcMessage::GeneralisedTopDown(
+            GeneralisedTopDown {
+                height: epoch_with_cert.epoch,
                 certificate: fendermint_vm_message::ipc::Certificate::FilecoinF3(serializable_cert),
-            }),
-        ))
+            },
+        )))
     }
 
     /// Attest a generalised top-down message during the attestation phase.
     ///
-    /// This checks the certificate validity:
-    /// 1. Get proof bundle from local cache using certificate instance ID
-    /// 2. Check if certificate is in local cache (if yes, we're done - already validated)
-    /// 3. If not in cache, verify certificate with F3 client and verify proof bundle
+    /// Cache-first attestation.
     ///
-    /// All correct validators will reach the same decision (deterministic).
-    /// Attestation must complete here, not defer to execution phase.
-    pub async fn attest(&self, msg: &GeneralisedTopDown) -> anyhow::Result<()> {
-        // Extract certificate from message
-        let certificate = match &msg.certificate {
+    /// We require that:
+    /// - there is an epoch proof in the local cache for `msg.height`
+    /// - the certificate attached to the message matches the certificate referenced by the cache entry
+    ///
+    /// Proof bundle validity is verified at proof generation time (before insertion into the cache).
+    pub async fn attest<DB>(
+        &self,
+        state: &mut FvmExecState<DB>,
+        msg: &GeneralisedTopDown,
+    ) -> anyhow::Result<()>
+    where
+        DB: Blockstore + Clone + 'static + Send + Sync,
+    {
+        let msg_cert = match &msg.certificate {
             fendermint_vm_message::ipc::Certificate::FilecoinF3(cert) => cert,
         };
 
-        // Get proof bundle from local cache using certificate instance ID
-        let proof_bundle = {
-            // Get the epoch proof entry from cache
-            let entry = self
-                .proof_cache
-                .get_epoch_proof_with_certificate(msg.height)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "proof bundle not found in local cache for height {}",
-                        msg.height
-                    )
-                })?;
-
-            // Verify the certificate instance matches
-            if entry.certificate.gpbft_instance != certificate.gpbft_instance {
-                bail!(
-                    "Certificate instance mismatch: message has {}, cache has {}",
-                    certificate.gpbft_instance,
-                    entry.certificate.gpbft_instance
-                );
-            }
-
-            entry.proof_bundle.clone()
-        };
-
-        // STEP 1: Check if certificate is in local cache
-        let instance_id = certificate.gpbft_instance;
-        if self.proof_cache.contains_certificate(instance_id) {
-            tracing::debug!(
-                instance = instance_id,
-                "Certificate found in local cache - already validated by our F3 client"
-            );
-            return Ok(());
-        }
-
-        // STEP 2: Certificate not in cache - need to verify
-        // Convert SerializableF3Certificate to FinalityCertificate for verification
-        let finality_cert = certificate
-            .clone()
-            .try_into_certificate()
-            .context("failed to convert SerializableF3Certificate to FinalityCertificate")?;
-
-        // Create EpochProofWithCertificate for verification
-        use fendermint_vm_topdown_proof_service::types::FinalizedTipsets;
-        let finalized_tipsets = FinalizedTipsets::from(&finality_cert.ec_chain);
-
-        let epoch_proof = fendermint_vm_topdown_proof_service::types::EpochProofWithCertificate {
-            epoch: msg.height,
-            proof_bundle: proof_bundle.clone(),
-            certificate: finality_cert.clone(),
-            finalized_tipsets,
-        };
-
-        // STEP 3: Verify proof bundle using ProofVerifier
-        use fendermint_vm_topdown_proof_service::verifier::ProofVerifier;
-        let verifier = ProofVerifier::new(self.subnet_id.clone());
-        verifier
-            .verify_epoch_proof(&epoch_proof)
-            .context("proof bundle verification failed")?;
-
-        tracing::debug!(
-            instance = certificate.gpbft_instance,
-            height = msg.height,
-            "Proof bundle verified successfully (certificate not in cache)"
-        );
-
-        // Note: Full F3 certificate chain continuity validation happens during execution
-        // when we have state access to query F3LightClientActor
-
-        Ok(())
-    }
-
-    /// Get proof bundle for a given height from cache
-    pub fn get_proof_bundle(
-        &self,
-        height: fvm_shared::clock::ChainEpoch,
-        expected_instance_id: u64,
-    ) -> anyhow::Result<proofs::proofs::common::bundle::UnifiedProofBundle> {
-        let entry = self
+        let cached = self
             .proof_cache
-            .get_epoch_proof_with_certificate(height)
+            .get_epoch_proof_with_certificate(msg.height)
             .ok_or_else(|| {
                 anyhow::anyhow!(
                     "proof bundle not found in local cache for height {}",
-                    height
+                    msg.height
                 )
             })?;
 
-        // Verify the certificate instance matches
-        if entry.certificate.gpbft_instance != expected_instance_id {
+        if cached.epoch != msg.height {
             bail!(
-                "Certificate instance mismatch: expected {}, cache has {}",
-                expected_instance_id,
-                entry.certificate.gpbft_instance
+                "epoch mismatch: message has {}, cache entry has {}",
+                msg.height,
+                cached.epoch
             );
         }
 
-        Ok(entry.proof_bundle)
+        let cached_cert = SerializableF3Certificate::from(&cached.certificate);
+        if &cached_cert != msg_cert {
+            bail!(
+                "certificate mismatch for epoch {} (message instance {}, cache instance {})",
+                msg.height,
+                msg_cert.gpbft_instance,
+                cached_cert.gpbft_instance
+            );
+        }
+
+        // Check on-chain continuity (this needs state access, hence in attestation).
+        let f3_state = self.get_f3_state(state)?;
+        let instance_id = cached.certificate.gpbft_instance;
+
+        // Certificate instance must not go backwards; it either stays the same (multiple epochs can
+        // be proven under the same certificate) or advances by exactly 1.
+        if instance_id < f3_state.latest_instance_id {
+            bail!(
+                "certificate instance went backwards: {} < {}",
+                instance_id,
+                f3_state.latest_instance_id
+            );
+        }
+        if instance_id > f3_state.latest_instance_id + 1 {
+            bail!(
+                "certificate instance jumped: {} > {}",
+                instance_id,
+                f3_state.latest_instance_id + 1
+            );
+        }
+
+        // Epoch must advance by exactly 1 relative to the latest finalized epoch in state.
+        // At genesis this is `None`; treat it as 0 baseline.
+        let prev_finalized = f3_state.latest_finalized_height.unwrap_or(0);
+        if msg.height != prev_finalized + 1 {
+            bail!(
+                "epoch is not sequential: message height {} != expected {}",
+                msg.height,
+                prev_finalized + 1
+            );
+        }
+
+        Ok(())
     }
 
     /// Extract topdown messages from proof bundle
@@ -294,41 +248,36 @@ impl F3TopDownHandler {
 
     /// Execute F3-specific logic for a generalised top-down message.
     /// Returns the topdown messages and validator changes to be processed by TopDownManager.
-    pub fn execute<DB>(
+    pub fn extract_messages_and_validator_changes<DB>(
         &self,
-        state: &mut FvmExecState<DB>,
+        _state: &mut FvmExecState<DB>,
         msg: &GeneralisedTopDown,
-    ) -> anyhow::Result<(Vec<IpcEnvelope>, Vec<PowerChangeRequest>)>
+    ) -> anyhow::Result<(Vec<IpcEnvelope>, Vec<PowerChangeRequest>, u64)>
     where
         DB: Blockstore + Clone + 'static + Send + Sync,
     {
-        // Extract certificate from message
-        let certificate = match &msg.certificate {
-            fendermint_vm_message::ipc::Certificate::FilecoinF3(cert) => cert,
-        };
+        // Cache is the source of truth: get the proof + certificate for this epoch.
+        let cached = self
+            .proof_cache
+            .get_epoch_proof_with_certificate(msg.height)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "proof bundle not found in local cache for height {}",
+                    msg.height
+                )
+            })?;
+
+        // We don't validate the message certificate here; that happens during attestation.
+        let instance_id = cached.certificate.gpbft_instance;
 
         tracing::debug!(
-            instance = certificate.gpbft_instance,
+            instance = instance_id,
             height = msg.height,
             "executing F3 generalised top-down"
         );
 
-        // Step 1: Verify certificate chain continuity (check against F3LightClientActor state)
-        let f3_state = self.get_f3_state(state)?;
-
-        // Ensure certificate instance is sequential
-        if certificate.gpbft_instance != f3_state.latest_instance_id + 1 {
-            bail!(
-                "Certificate instance ID {} is not sequential (expected {})",
-                certificate.gpbft_instance,
-                f3_state.latest_instance_id + 1
-            );
-        }
-
-        // Step 2: Get proof bundle and extract topdown effects
-        let proof_bundle = self.get_proof_bundle(msg.height, certificate.gpbft_instance)?;
-        let msgs = self.extract_topdown_messages(&proof_bundle)?;
-        let validator_changes = self.extract_validator_changes(&proof_bundle)?;
+        let msgs = self.extract_topdown_messages(&cached.proof_bundle)?;
+        let validator_changes = self.extract_validator_changes(&cached.proof_bundle)?;
 
         tracing::debug!(
             message_count = msgs.len(),
@@ -336,47 +285,49 @@ impl F3TopDownHandler {
             "extracted topdown effects from proof bundle"
         );
 
-        // Step 3: Update F3LightClientActor with new certificate state
-        let power_table = self.get_power_table(certificate.gpbft_instance);
-        let latest_finalized_height = Some(
-            certificate
-                .finalized_epochs()
-                .iter()
-                .max()
-                .copied()
-                .context("certificate has no finalized epochs")?,
-        );
+        Ok((msgs, validator_changes, instance_id))
+    }
 
+    /// Finalize F3 execution after all top-down effects have been applied successfully.
+    ///
+    /// This updates the on-chain F3 light client state and marks the epoch as committed in the proof cache.
+    pub fn finalize_after_execution<DB>(
+        &self,
+        state: &mut FvmExecState<DB>,
+        epoch: fvm_shared::clock::ChainEpoch,
+        instance_id: u64,
+    ) -> anyhow::Result<()>
+    where
+        DB: Blockstore + Clone + 'static + Send + Sync,
+    {
+        // Update F3LightClientActor with new certificate state.
+        let power_table = self.get_power_table(instance_id);
         let new_light_client_state =
             fendermint_vm_actor_interface::f3_light_client::LightClientState {
-                latest_instance_id: certificate.gpbft_instance,
-                latest_finalized_height,
+                latest_instance_id: instance_id,
+                latest_finalized_height: Some(epoch),
                 power_table,
             };
 
         self.update_f3_state(state, new_light_client_state)?;
+        tracing::debug!(instance = instance_id, "updated F3LightClientActor state");
 
-        tracing::debug!(
-            instance = certificate.gpbft_instance,
-            "updated F3LightClientActor state"
-        );
-
-        // Step 4: Mark epoch as committed in cache
-        if let Err(e) = self.mark_committed(msg.height, certificate.gpbft_instance) {
+        // Mark epoch as committed in cache.
+        if let Err(e) = self.mark_committed(epoch, instance_id) {
             tracing::warn!(
                 error = %e,
-                epoch = msg.height,
-                instance = certificate.gpbft_instance,
+                epoch,
+                instance = instance_id,
                 "failed to mark epoch as committed in cache"
             );
         } else {
             tracing::debug!(
-                epoch = msg.height,
-                instance = certificate.gpbft_instance,
+                epoch,
+                instance = instance_id,
                 "marked epoch as committed in cache"
             );
         }
 
-        Ok((msgs, validator_changes))
+        Ok(())
     }
 }

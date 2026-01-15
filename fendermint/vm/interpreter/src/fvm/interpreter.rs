@@ -51,7 +51,7 @@ where
 {
     end_block_manager: EndBlockManager<DB>,
 
-    pub top_down_manager: TopDownManager<DB>,
+    top_down_manager: TopDownManager<DB>,
     upgrade_scheduler: UpgradeScheduler<DB>,
 
     push_block_data_to_chainmeta_actor: bool,
@@ -318,7 +318,7 @@ where
 
     async fn attest_block_messages(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        mut state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
     ) -> Result<AttestMessagesResponse, AttestMessagesError> {
         if msgs.len() > self.max_msgs_per_block {
@@ -330,13 +330,19 @@ where
         }
 
         let mut block_gas_usage = 0;
-        let base_fee = state.block_gas_tracker().base_fee();
+        // Clone to avoid holding an immutable borrow of `state` while we also need mutable access
+        // during top-down attestation.
+        let base_fee = state.block_gas_tracker().base_fee().clone();
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Ok(chain_msg) => match chain_msg {
                     ChainMessage::Ipc(IpcMessage::GeneralisedTopDown(ref msg)) => {
                         // Attest generalised top-down message (checks local cache, verifies if needed)
-                        match self.top_down_manager.attest_generalised(msg).await {
+                        match self
+                            .top_down_manager
+                            .attest_generalised(&mut state, msg)
+                            .await
+                        {
                             Ok(()) => {
                                 tracing::debug!(
                                     height = msg.height,
@@ -360,7 +366,7 @@ where
                         }
                     }
                     ChainMessage::Signed(signed) => {
-                        if signed.message.gas_fee_cap < *base_fee {
+                        if signed.message.gas_fee_cap < base_fee {
                             tracing::warn!(
                                 fee_cap = signed.message.gas_fee_cap.to_string(),
                                 base_fee = base_fee.to_string(),

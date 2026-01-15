@@ -11,11 +11,7 @@ use num_traits::Zero;
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
-    eam::EthAddress,
-    f3_light_client,
-    init::builtin_actor_eth_addr,
-    ipc::GATEWAY_ACTOR_ID,
-    system,
+    eam::EthAddress, f3_light_client, init::builtin_actor_eth_addr, ipc::GATEWAY_ACTOR_ID, system,
 };
 use fendermint_vm_genesis::{Collateral, Power, PowerScale, Validator, ValidatorKey};
 use fendermint_vm_message::conv::from_eth;
@@ -385,8 +381,10 @@ impl F3LightClientCaller {
             gas_premium: TokenAmount::zero(),
         };
 
+        // Read-only execution still requires `&mut FvmExecState` (it uses interior caches), but
+        // any effects are reverted by the executor.
         let (ret, _) = state
-            .execute_implicit(msg)
+            .execute_read_only(msg)
             .context("failed to execute F3 light client get_state")?;
 
         if let Some(err) = &ret.failure_info {
@@ -397,10 +395,9 @@ impl F3LightClientCaller {
             );
         }
 
-        let state_response: f3_light_client::GetStateResponse = fvm_ipld_encoding::from_slice(
-            &ret.msg_receipt.return_data.bytes(),
-        )
-        .context("failed to deserialize F3 light client state")?;
+        let state_response: f3_light_client::GetStateResponse =
+            fvm_ipld_encoding::from_slice(&ret.msg_receipt.return_data.bytes())
+                .context("failed to deserialize F3 light client state")?;
 
         Ok(state_response)
     }

@@ -86,12 +86,16 @@ where
     /// Attest a generalised top-down message during the attestation phase.
     ///
     /// Delegates to F3 handler if F3 is configured, otherwise returns error.
-    pub async fn attest_generalised(
+    pub async fn attest_generalised<BS>(
         &self,
+        state: &mut FvmExecState<BS>,
         msg: &fendermint_vm_message::ipc::GeneralisedTopDown,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        BS: Blockstore + Clone + 'static + Send + Sync,
+    {
         match &self.finality {
-            TopDownFinalityHandler::F3(f3) => f3.attest(msg).await,
+            TopDownFinalityHandler::F3(f3) => f3.attest(state, msg).await,
             TopDownFinalityHandler::Legacy(_) | TopDownFinalityHandler::Disabled => Err(
                 anyhow::anyhow!("F3 not configured - cannot attest generalised top-down message"),
             ),
@@ -119,7 +123,8 @@ where
         };
 
         // Execute F3-specific logic (certificate validation, proof extraction, state updates)
-        let (msgs, validator_changes) = f3.execute(state, &msg)?;
+        let (msgs, validator_changes, instance_id) =
+            f3.extract_messages_and_validator_changes(state, &msg)?;
 
         // Commit parent finality to gateway
         let finality = IPCParentFinality::new(msg.height as i64, vec![]);
@@ -144,6 +149,10 @@ where
             .execute_topdown_msgs(state, msgs)
             .await
             .context("failed to execute top down messages")?;
+
+        // Finalize F3 execution only after all effects were applied successfully.
+        f3.finalize_after_execution(state, msg.height, instance_id)
+            .context("failed to finalize F3 execution")?;
 
         tracing::info!(
             height = msg.height,
