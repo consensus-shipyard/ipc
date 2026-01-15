@@ -47,6 +47,9 @@ jobs:
         with:
           shared-key: build
 
+      - name: Remove target folder to free disk space
+        run: rm -rf target
+
       - name: Run e2e tests
         run: |
           set -e
