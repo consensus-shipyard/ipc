@@ -444,8 +444,9 @@ check_validator_health() {
     fi
 
     # Check ports listening
+    # Note: macOS netstat uses . as separator (e.g., *.8546), Linux uses : (e.g., *:8546)
     local ports_check=$(exec_on_host "$validator_idx" \
-        "netstat -tuln 2>/dev/null | grep -E \":($cometbft_port|$libp2p_port|$eth_api_port)\" | wc -l")
+        "netstat -an 2>/dev/null | grep LISTEN | grep -E \"[\.:]$cometbft_port|[\.:]$libp2p_port|[\.:]$eth_api_port\" | wc -l")
 
     if [ -n "$ports_check" ] && [ "$ports_check" -ge 2 ] 2>/dev/null; then
         log_check "ok" "Ports listening ($ports_check/3)"
@@ -506,16 +507,13 @@ measure_block_time() {
     local sample_duration="${2:-10}"  # Default 10 seconds
 
     local name="${VALIDATORS[$validator_idx]}"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
 
     log_info "Measuring block time for $name (sampling for ${sample_duration}s)..."
 
-    # Get initial block height and timestamp - extract directly without intermediate JSON
-    local initial_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    # Get initial block height and timestamp
+    local initial_height=$(exec_on_host "$validator_idx" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null")
-    local initial_time=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local initial_time=$(exec_on_host "$validator_idx" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_time // \"\"' 2>/dev/null")
 
     if [ -z "$initial_height" ] || [ "$initial_height" = "0" ] || [ "$initial_height" = "null" ] || [ -z "$initial_time" ] || [ "$initial_time" = "null" ]; then
@@ -529,9 +527,9 @@ measure_block_time() {
     sleep "$sample_duration"
 
     # Get final block height and timestamp
-    local final_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local final_height=$(exec_on_host "$validator_idx" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null")
-    local final_time=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local final_time=$(exec_on_host "$validator_idx" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_time // \"\"' 2>/dev/null")
 
     if [ -z "$final_height" ] || [ "$final_height" = "0" ] || [ -z "$final_time" ]; then
@@ -993,10 +991,9 @@ watch_parent_finality() {
     local refresh_interval="${2:-5}"
 
     # Use first validator for monitoring
-    local ip=$(get_config_value "validators[0].ip")
-    local ssh_user=$(get_config_value "validators[0].ssh_user")
-    local ipc_user=$(get_config_value "validators[0].ipc_user")
+    local validator_idx=0
     local name="${VALIDATORS[0]}"
+    local node_home=$(get_node_home 0)
 
     # Get parent RPC endpoint for querying actual parent chain height
     local parent_rpc=$(get_config_value "subnet.parent_rpc")
@@ -1026,8 +1023,8 @@ watch_parent_finality() {
         local elapsed=$((current_time - start_time))
 
         # Get subnet's parent finality height (what parent height the subnet has committed)
-        local subnet_parent_finality=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "grep 'ParentFinalityCommitted' ~/.ipc-node/logs/*.log 2>/dev/null | tail -1" 2>/dev/null | \
+        local subnet_parent_finality=$(exec_on_host 0 \
+            "grep 'ParentFinalityCommitted' $node_home/logs/*.log 2>/dev/null | tail -1" 2>/dev/null | \
             grep -oE 'parent_height: [0-9]+' | grep -oE '[0-9]+' || echo "0")
 
         # Get current parent chain block height
@@ -1049,7 +1046,7 @@ watch_parent_finality() {
         fi
 
         # Get current subnet block height
-        local subnet_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        local subnet_height=$(exec_on_host 0 \
             "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null" || echo "0")
 
         # Calculate progress if target is set
@@ -1105,9 +1102,7 @@ watch_block_production() {
     local refresh_interval="${2:-2}"
 
     # Use first validator for monitoring
-    local ip=$(get_config_value "validators[0].ip")
-    local ssh_user=$(get_config_value "validators[0].ssh_user")
-    local ipc_user=$(get_config_value "validators[0].ipc_user")
+    local validator_idx=0
     local name="${VALIDATORS[0]}"
 
     echo ""
@@ -1133,7 +1128,7 @@ watch_block_production() {
     local cumulative_time=0
 
     # Get initial height
-    prev_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    prev_height=$(exec_on_host 0 \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null" || echo "0")
     prev_time=$(date +%s)
 
@@ -1145,7 +1140,7 @@ watch_block_production() {
         local elapsed=$((current_time - start_time))
 
         # Get current block height
-        local current_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        local current_height=$(exec_on_host 0 \
             "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null" || echo "0")
 
         # Calculate metrics
@@ -1249,12 +1244,9 @@ show_consensus_status() {
 
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-        local ip=$(get_config_value "validators[$idx].ip")
-        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
 
         # Get status from CometBFT
-        local status=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        local status=$(exec_on_host "$idx" \
             "curl -s http://localhost:26657/status 2>/dev/null" || echo '{}')
 
         local height=$(echo "$status" | jq -r '.result.sync_info.latest_block_height // "?"' 2>/dev/null || echo "?")
@@ -1262,7 +1254,7 @@ show_consensus_status() {
         local app_hash=$(echo "$status" | jq -r '.result.sync_info.latest_app_hash // "?"' 2>/dev/null || echo "?")
 
         # Get consensus state
-        local consensus=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        local consensus=$(exec_on_host "$idx" \
             "curl -s http://localhost:26657/consensus_state 2>/dev/null" || echo '{}')
 
         local round=$(echo "$consensus" | jq -r '.result.round_state.height_round_step // "?"' 2>/dev/null | cut -d'/' -f2 || echo "?")
@@ -1288,11 +1280,8 @@ show_consensus_status() {
 
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-        local ip=$(get_config_value "validators[$idx].ip")
-        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
 
-        local status=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        local status=$(exec_on_host "$idx" \
             "curl -s http://localhost:26657/status 2>/dev/null" || echo '{}')
 
         heights[$name]=$(echo "$status" | jq -r '.result.sync_info.latest_block_height // "0"' 2>/dev/null)
@@ -1354,16 +1343,14 @@ show_voting_status() {
     echo ""
 
     # Use first validator as reference
-    local ip=$(get_config_value "validators[0].ip")
-    local ssh_user=$(get_config_value "validators[0].ssh_user")
-    local ipc_user=$(get_config_value "validators[0].ipc_user")
+    local validator_idx=0
     local name="${VALIDATORS[0]}"
 
     log_info "Source: $name"
     echo ""
 
     # Get consensus state
-    local consensus=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local consensus=$(exec_on_host 0 \
         "curl -s http://localhost:26657/consensus_state 2>/dev/null" || echo '{}')
 
     local height_round_step=$(echo "$consensus" | jq -r '.result.round_state.height_round_step // "?"' 2>/dev/null)
@@ -1375,7 +1362,7 @@ show_voting_status() {
     echo ""
 
     # Get validators
-    local validators=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local validators=$(exec_on_host 0 \
         "curl -s http://localhost:26657/validators 2>/dev/null" || echo '{}')
 
     local total_voting_power=$(echo "$validators" | jq -r '[.result.validators[].voting_power | tonumber] | add // 0' 2>/dev/null)
@@ -1431,8 +1418,9 @@ show_voting_status() {
     log_info "Recent consensus activity (last 20 lines):"
     echo ""
 
-    ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "tail -20 ~/.ipc-node/logs/2025-10-20.consensus.log 2>/dev/null | grep -v 'received complete proposal' | tail -10" || true
+    local node_home=$(get_node_home 0)
+    exec_on_host 0 \
+        "tail -20 $node_home/logs/*.consensus.log 2>/dev/null | grep -v 'received complete proposal' | tail -10" || true
 
     echo ""
 }
