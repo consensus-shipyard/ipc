@@ -225,7 +225,10 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
 
             let gas_estimation = middleware.estimate_gas(&deploy_tx, None).await.unwrap();
             deploy_tx.set_gas(gas_estimation);
-            println!("gas estimation {} vs max {}", gas_estimation, max_tx_gas_limit);
+            println!(
+                "gas estimation {} vs max {}",
+                gas_estimation, max_tx_gas_limit
+            );
             assert!(gas_estimation <= max_tx_gas_limit);
 
             input.bencher.start();
