@@ -3,8 +3,6 @@
 
 mod staking;
 
-use std::sync::Arc;
-
 use fendermint_actor_gas_market_eip1559::Constants;
 use fendermint_contract_test::Tester;
 use fendermint_crypto::{PublicKey, SecretKey};
@@ -14,14 +12,14 @@ use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
+use fendermint_vm_interpreter::fvm::topdown::TopDownFinalityHandler;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::conv::from_fvm;
 use fendermint_vm_message::signed::SignedMessage;
-use fendermint_vm_topdown::voting::VoteTally;
-use fendermint_vm_topdown::Toggle;
+// Topdown is disabled for these tests.
 use fvm_shared::chainid::ChainID;
 
 use crate::staking::DEFAULT_CHAIN_ID;
@@ -64,15 +62,7 @@ async fn tester_with_upgrader(
     let validator = rand_secret_key().public_key();
 
     let end_block_manager = EndBlockManager::default();
-    let finality_provider = Arc::new(Toggle::disabled());
-    let vote_tally = VoteTally::empty();
-    let top_down_manager = TopDownManager::new(
-        finality_provider,
-        vote_tally,
-        None,
-        "test-subnet".to_string(),
-        false,
-    );
+    let top_down_manager = TopDownManager::new(TopDownFinalityHandler::Disabled);
 
     let interpreter: FvmMessagesInterpreter<MemoryBlockstore> = FvmMessagesInterpreter::new(
         end_block_manager,

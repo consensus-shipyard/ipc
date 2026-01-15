@@ -4,13 +4,15 @@
 pub mod constants;
 mod executions;
 mod externs;
-pub mod f3;
+pub mod f3_topdown;
 pub mod interpreter;
+pub mod legacy_topdown;
 pub mod observe;
 pub mod state;
 pub mod store;
 pub mod topdown;
-pub use f3::F3FinalityHandler;
+pub use f3_topdown::F3TopDownHandler;
+pub use legacy_topdown::LegacyTopDownHandler;
 pub mod upgrades;
 pub use interpreter::FvmMessagesInterpreter;
 

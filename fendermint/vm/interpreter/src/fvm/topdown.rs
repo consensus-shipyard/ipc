@@ -1,21 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use async_stm::atomically;
-use fendermint_tracing::emit;
-use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_message::ipc::ParentFinality;
-use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
-use fendermint_vm_topdown::voting::ValidatorKey;
-use fendermint_vm_topdown::voting::VoteTally;
-use fendermint_vm_topdown::{
-    BlockHeight, CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider,
-    ParentViewProvider, Toggle,
-};
-use fvm_shared::clock::ChainEpoch;
-use std::sync::Arc;
+use fendermint_vm_topdown::{BlockHeight, IPCParentFinality};
 
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::FvmExecState;
@@ -23,127 +11,76 @@ use anyhow::{bail, Context};
 use fvm_ipld_blockstore::Blockstore;
 
 use crate::fvm::end_block_hook::PowerUpdates;
-use crate::fvm::f3::F3FinalityHandler;
+use crate::fvm::f3_topdown::F3TopDownHandler;
+use crate::fvm::legacy_topdown::LegacyTopDownHandler;
 use crate::fvm::state::ipc::tokens_to_mint;
 use crate::types::AppliedMessage;
 use ipc_api::cross::IpcEnvelope;
 
-type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
+#[derive(Clone)]
+pub enum TopDownFinalityHandler {
+    Disabled,
+    Legacy(LegacyTopDownHandler),
+    F3(F3TopDownHandler),
+}
 
 #[derive(Clone)]
 pub struct TopDownManager<DB>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    provider: TopDownFinalityProvider,
-    votes: VoteTally,
+    finality: TopDownFinalityHandler,
     // Gateway caller for IPC gateway interactions
     gateway_caller: GatewayCaller<DB>,
-    // F3 finality handler (None means use legacy voting-based finality)
-    // Set once during startup before any concurrent access
-    pub f3: Option<F3FinalityHandler>,
 }
 
 impl<DB> TopDownManager<DB>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    pub fn new(
-        provider: TopDownFinalityProvider,
-        votes: VoteTally,
-        f3: Option<F3FinalityHandler>,
-    ) -> Self {
+    pub fn new(finality: TopDownFinalityHandler) -> Self {
         Self {
-            provider,
-            votes,
+            finality,
             gateway_caller: GatewayCaller::default(),
-            f3,
         }
     }
 
-    pub async fn attest_legacy(&self, finality: ParentFinality) -> bool {
-        let prop = IPCParentFinality {
-            height: finality.height as u64,
-            block_hash: finality.block_hash,
-        };
-        atomically(|| self.provider.check_proposal(&prop)).await
+    pub fn disabled() -> Self {
+        Self::new(TopDownFinalityHandler::Disabled)
     }
 
-    /// Prepares a top-down execution message based on the current parent's finality proposal and quorum.
-    ///
-    /// This function first pauses incoming votes to prevent interference during processing. It then atomically retrieves
-    /// both the next parent's proposal and the quorum of votes. If either the parent's proposal or the quorum is missing,
-    /// the function returns `None`. When both are available, it selects the finality with the lower block height and wraps
-    /// it into a `ChainMessage` for top-down execution.
-    async fn chain_message_from_finality_or_quorum(&self) -> Option<ChainMessage> {
-        // Prepare top down proposals.
-        // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
-        atomically(|| self.votes.pause_votes_until_find_quorum()).await;
+    pub fn legacy(handler: LegacyTopDownHandler) -> Self {
+        Self::new(TopDownFinalityHandler::Legacy(handler))
+    }
 
-        // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
-        // The final proposal can be at most as high as the quorum, but can be less if we have already,
-        // hit some limits such as how many blocks we can propose in a single step.
-        let (parent, quorum) = atomically(|| {
-            let parent = self.provider.next_proposal()?;
+    pub fn f3(handler: F3TopDownHandler) -> Self {
+        Self::new(TopDownFinalityHandler::F3(handler))
+    }
 
-            let quorum = self
-                .votes
-                .find_quorum()?
-                .map(|(height, block_hash)| IPCParentFinality { height, block_hash });
-
-            Ok((parent, quorum))
-        })
-        .await;
-
-        // If there is no parent proposal, exit early.
-        let parent = parent?;
-
-        // Require a quorum; if it's missing, log and exit.
-        let quorum = if let Some(quorum) = quorum {
-            quorum
-        } else {
-            emit!(
-                DEBUG,
-                ParentFinalityMissingQuorum {
-                    block_height: parent.height,
-                    block_hash: &hex::encode(&parent.block_hash),
-                }
-            );
-            return None;
-        };
-
-        // Choose the lower height between the parent's proposal and the quorum.
-        let finality = if parent.height <= quorum.height {
-            parent
-        } else {
-            quorum
-        };
-
-        Some(ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
-            height: finality.height as ChainEpoch,
-            block_hash: finality.block_hash,
-        })))
+    pub async fn attest_legacy(&self, finality: ParentFinality) -> bool {
+        match &self.finality {
+            TopDownFinalityHandler::Legacy(h) => h.attest(finality).await,
+            TopDownFinalityHandler::F3(_) | TopDownFinalityHandler::Disabled => false,
+        }
     }
 
     /// Get the chain message for parent finality proposal.
     ///
     /// This method encapsulates the decision of which finality mechanism to use:
-    /// - If F3 is configured and has a proof available, use F3 proof-based finality
-    /// - Otherwise, use legacy voting-based finality
+    /// - If configured for legacy: use legacy voting-based finality
+    /// - If configured for F3: use F3 proof-based finality (no fallback)
     ///
     /// The caller doesn't need to know which mechanism is being used.
     pub async fn chain_message_for_proposal(&self) -> Option<ChainMessage> {
-        // Use F3 finality (if configured)
-        if let Some(f3) = &self.f3 {
-            if let Some(proof_msg) = f3.chain_message_from_proof_cache() {
+        match &self.finality {
+            TopDownFinalityHandler::Disabled => None,
+            TopDownFinalityHandler::Legacy(h) => h.chain_message_for_proposal().await,
+            TopDownFinalityHandler::F3(f3) => {
+                let proof_msg = f3.chain_message_from_proof_cache()?;
                 tracing::info!("using F3 proof-based parent finality in proposal");
-                return Some(proof_msg);
+                Some(proof_msg)
             }
         }
-
-        // Fall back to legacy voting-based finality
-        tracing::debug!("using legacy voting-based finality");
-        self.chain_message_from_finality_or_quorum().await
     }
 
     /// Attest a generalised top-down message during the attestation phase.
@@ -153,23 +90,18 @@ where
         &self,
         msg: &fendermint_vm_message::ipc::GeneralisedTopDown,
     ) -> anyhow::Result<()> {
-        if let Some(f3) = &self.f3 {
-            f3.attest(msg).await
-        } else {
-            Err(anyhow::anyhow!(
-                "F3 not configured - cannot attest generalised top-down message"
-            ))
+        match &self.finality {
+            TopDownFinalityHandler::F3(f3) => f3.attest(msg).await,
+            TopDownFinalityHandler::Legacy(_) | TopDownFinalityHandler::Disabled => Err(
+                anyhow::anyhow!("F3 not configured - cannot attest generalised top-down message"),
+            ),
         }
     }
 
     pub async fn update_voting_power_table(&self, power_updates: &PowerUpdates) {
-        let power_updates_mapped: Vec<_> = power_updates
-            .0
-            .iter()
-            .map(|v| (ValidatorKey::from(v.public_key.0), v.power.0))
-            .collect();
-
-        atomically(|| self.votes.update_power_table(power_updates_mapped.clone())).await
+        if let TopDownFinalityHandler::Legacy(h) = &self.finality {
+            h.update_voting_power_table(power_updates).await
+        }
     }
 
     /// Execute generalised top-down message.
@@ -179,10 +111,12 @@ where
         state: &mut FvmExecState<DB>,
         msg: fendermint_vm_message::ipc::GeneralisedTopDown,
     ) -> anyhow::Result<AppliedMessage> {
-        // Get F3 handler - all F3-specific logic is delegated to it
-        let f3 = self.f3.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("F3 not configured - cannot execute without F3 handler")
-        })?;
+        let f3 = match &self.finality {
+            TopDownFinalityHandler::F3(f3) => f3,
+            TopDownFinalityHandler::Legacy(_) | TopDownFinalityHandler::Disabled => {
+                bail!("F3 not configured - cannot execute without F3 handler")
+            }
+        };
 
         // Execute F3-specific logic (certificate validation, proof extraction, state updates)
         let (msgs, validator_changes) = f3.execute(state, &msg)?;
@@ -190,7 +124,7 @@ where
         // Commit parent finality to gateway
         let finality = IPCParentFinality::new(msg.height as i64, vec![]);
         let (prev_height, _prev_finality) = self
-            .commit_finality(state, finality.clone())
+            .commit_finality(state, finality.clone(), 0)
             .await
             .context("failed to commit finality")?;
 
@@ -225,7 +159,14 @@ where
         state: &mut FvmExecState<DB>,
         finality: ParentFinality,
     ) -> anyhow::Result<AppliedMessage> {
-        if !self.provider.is_enabled() {
+        let legacy = match &self.finality {
+            TopDownFinalityHandler::Legacy(h) => h,
+            TopDownFinalityHandler::F3(_) => bail!("cannot execute legacy top-down: F3 enabled"),
+            TopDownFinalityHandler::Disabled => {
+                bail!("cannot execute IPC top-down message: parent provider disabled")
+            }
+        };
+        if !legacy.is_enabled() {
             bail!("cannot execute IPC top-down message: parent provider disabled");
         }
 
@@ -237,7 +178,7 @@ where
         );
 
         let (prev_height, prev_finality) = self
-            .commit_finality(state, finality.clone())
+            .commit_finality(state, finality.clone(), legacy.genesis_epoch()?)
             .await
             .context("failed to commit finality")?;
 
@@ -263,8 +204,7 @@ where
         let (execution_fr, execution_to) = (prev_height + 1, finality.height);
 
         // error happens if we cannot get the validator set from ipc agent after retries
-        let validator_changes = self
-            .provider
+        let validator_changes = legacy
             .validator_changes_from(execution_fr, execution_to)
             .await
             .context("failed to fetch validator changes")?;
@@ -281,8 +221,7 @@ where
             .context("failed to store validator changes")?;
 
         // error happens if we cannot get the cross messages from ipc agent after retries
-        let msgs = self
-            .provider
+        let msgs = legacy
             .top_down_msgs_from(execution_fr, execution_to)
             .await
             .context("failed to fetch top down messages")?;
@@ -307,19 +246,10 @@ where
             .map(|id| hex::encode(id.serialize_compressed()));
         let proposer_ref = proposer.as_deref();
 
-        atomically(|| {
-            self.provider.set_new_finality(finality.clone())?;
-
-            self.votes.set_finalized(
-                finality.height,
-                finality.block_hash.clone(),
-                proposer_ref,
-                Some(local_block_height),
-            )?;
-
-            Ok(())
-        })
-        .await;
+        legacy
+            .on_finality_executed(finality.clone(), proposer_ref, local_block_height)
+            .await
+            .context("failed to record new finality")?;
 
         tracing::debug!(
             finality = finality.to_string(),
@@ -335,6 +265,7 @@ where
         &self,
         state: &mut FvmExecState<DB>,
         finality: IPCParentFinality,
+        genesis_epoch: BlockHeight,
     ) -> anyhow::Result<(BlockHeight, Option<IPCParentFinality>)> {
         let (prev_height, prev_finality) = if let Some(prev_finality) = self
             .gateway_caller
@@ -342,7 +273,7 @@ where
         {
             (prev_finality.height, Some(prev_finality))
         } else {
-            (self.provider.genesis_epoch()?, None)
+            (genesis_epoch, None)
         };
 
         tracing::debug!(
