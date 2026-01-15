@@ -606,7 +606,7 @@ show_subnet_info() {
 
     # Get config values
     local subnet_id=$(get_config_value "subnet.id")
-    local parent_subnet=$(get_config_value "subnet.parent_subnet")
+    local parent_chain_id=$(get_config_value "subnet.parent_chain_id")
     local parent_registry=$(get_config_value "subnet.parent_registry")
     local parent_gateway=$(get_config_value "subnet.parent_gateway")
     local num_validators=${#VALIDATORS[@]}
@@ -614,7 +614,7 @@ show_subnet_info() {
     echo
     log_info "Network Configuration:"
     log_info "  Subnet ID: $subnet_id"
-    log_info "  Parent Subnet: $parent_subnet"
+    log_info "  Parent Chain: $parent_chain_id"
     log_info "  Parent Registry: $parent_registry"
     log_info "  Parent Gateway: $parent_gateway"
     echo
@@ -628,20 +628,52 @@ show_subnet_info() {
     done
     echo
 
-    # Get chain ID from first validator
-    log_info "Fetching chain ID from ${VALIDATORS[0]}..."
-    local chain_id=$(get_chain_id 0)
+    # Get chain IDs
+    log_info "Chain IDs:"
 
-    if [ -n "$chain_id" ] && [ "$chain_id" != "null" ] && [ "$chain_id" != "" ]; then
+    # Parent chain ID (from config)
+    if [ -n "$parent_chain_id" ] && [ "$parent_chain_id" != "null" ]; then
+        # Extract numeric chain ID from /r<number> format
+        local parent_chain_num=$(echo "$parent_chain_id" | sed 's/\/r//')
+        log_info "  Parent Chain ID: $parent_chain_num (from config: $parent_chain_id)"
+
+        # Query parent chain's actual eth_chainId
+        local parent_rpc=$(get_config_value "subnet.parent_rpc")
+        if [ -n "$parent_rpc" ]; then
+            local parent_eth_chain_id=$(curl -s -X POST -H "Content-Type: application/json" \
+                --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+                "$parent_rpc" 2>/dev/null | jq -r '.result // ""' 2>/dev/null)
+
+            if [ -n "$parent_eth_chain_id" ] && [ "$parent_eth_chain_id" != "null" ]; then
+                if [[ "$parent_eth_chain_id" == 0x* ]]; then
+                    local parent_eth_chain_id_dec=$((parent_eth_chain_id))
+                    log_info "  Parent eth_chainId (via RPC): $parent_eth_chain_id (decimal: $parent_eth_chain_id_dec)"
+                fi
+            fi
+        fi
+    fi
+
+    # Subnet's eth_chainId (from querying the subnet's RPC)
+    local eth_api_port=$(get_config_value "network.eth_api_port")
+    log_info "  Querying subnet's eth_chainId from ${VALIDATORS[0]} (port $eth_api_port)..."
+    local subnet_chain_id=$(get_chain_id 0)
+
+    if [ -n "$subnet_chain_id" ] && [ "$subnet_chain_id" != "null" ] && [ "$subnet_chain_id" != "" ]; then
         # Convert hex to decimal if it starts with 0x
-        if [[ "$chain_id" == 0x* ]]; then
-            local chain_id_dec=$((chain_id))
-            log_info "  Chain ID: $chain_id (decimal: $chain_id_dec)"
+        if [[ "$subnet_chain_id" == 0x* ]]; then
+            local subnet_chain_id_dec=$((subnet_chain_id))
+            log_info "  Subnet eth_chainId (via RPC): $subnet_chain_id (decimal: $subnet_chain_id_dec)"
+
+            # Warn if they're the same
+            if [ "$subnet_chain_id_dec" = "$parent_chain_num" ]; then
+                log_warn "  ⚠ Subnet and parent have the same eth_chainId ($subnet_chain_id_dec)"
+                log_warn "    This is common in local dev but may cause issues in production"
+            fi
         else
-            log_info "  Chain ID: $chain_id"
+            log_info "  Subnet eth_chainId (via RPC): $subnet_chain_id"
         fi
     else
-        log_warn "  Could not fetch chain ID"
+        log_warn "  Could not fetch subnet eth_chainId"
     fi
     echo
 
