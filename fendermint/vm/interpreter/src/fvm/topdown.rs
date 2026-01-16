@@ -77,7 +77,7 @@ where
             TopDownFinalityHandler::Legacy(h) => h.chain_message_for_proposal().await,
             TopDownFinalityHandler::F3(f3) => {
                 let proof_msg = f3.chain_message_from_proof_cache()?;
-                tracing::info!("using F3 proof-based parent finality in proposal");
+                tracing::debug!("using F3 proof-based parent finality in proposal");
                 Some(proof_msg)
             }
         }

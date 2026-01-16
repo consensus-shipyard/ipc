@@ -337,7 +337,7 @@ where
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Ok(chain_msg) => match chain_msg {
                     ChainMessage::Ipc(IpcMessage::GeneralisedTopDown(ref msg)) => {
-                        // Attest generalised top-down message (checks local cache, verifies if needed)
+                        // Attest generalised top-down message (checks local cache + on-chain continuity).
                         match self
                             .top_down_manager
                             .attest_generalised(&mut state, msg)

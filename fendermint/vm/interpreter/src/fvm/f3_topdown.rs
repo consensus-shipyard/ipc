@@ -323,3 +323,257 @@ impl From<&PowerEntries> for ActorPowerTable {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::F3TopDownHandler;
+    use crate::fvm::state::FvmGenesisState;
+    use crate::fvm::store::memory::MemoryBlockstore;
+    use anyhow::Context;
+    use cid::multihash::Multihash;
+    use fendermint_vm_actor_interface::{f3_light_client, gas_market, init, system};
+    use fendermint_vm_core::Timestamp;
+    use fendermint_vm_genesis::PowerScale;
+    use fendermint_vm_message::chain::ChainMessage;
+    use fendermint_vm_message::ipc::{Certificate, IpcMessage};
+    use fendermint_vm_topdown_proof_service::config::CacheConfig;
+    use fendermint_vm_topdown_proof_service::types::{
+        CertificateEntry, EpochProofEntry, SerializableCertificateEntry, SerializableECChainEntry,
+        SerializableF3Certificate, SerializablePowerEntries, SerializablePowerEntry,
+        SerializableSupplementalData,
+    };
+    use fendermint_vm_topdown_proof_service::ProofCache;
+    use fvm::engine::MultiEngine;
+    use fvm_shared::clock::ChainEpoch;
+    use fvm_shared::econ::TokenAmount;
+    use fvm_shared::version::NetworkVersion;
+    use num_traits::Zero;
+    use proofs::proofs::common::bundle::UnifiedProofBundle;
+    use std::collections::BTreeSet;
+    use std::sync::Arc;
+
+    fn mk_test_certificate_entry(instance_id: u64, epochs: Vec<ChainEpoch>) -> CertificateEntry {
+        let mh = Multihash::<64>::wrap(0x12, &[0u8; 32]).expect("valid multihash");
+        let power_table_cid = cid::Cid::new_v1(0x55, mh).to_string();
+
+        let ec_chain = epochs
+            .into_iter()
+            .map(|epoch| SerializableECChainEntry {
+                epoch,
+                key: vec!["0".to_string()],
+                power_table: power_table_cid.clone(),
+                commitments: vec![0u8; 32],
+            })
+            .collect();
+
+        let serializable = SerializableCertificateEntry {
+            certificate: SerializableF3Certificate {
+                gpbft_instance: instance_id,
+                ec_chain,
+                supplemental_data: SerializableSupplementalData {
+                    power_table: power_table_cid.clone(),
+                    commitments: vec![0u8; 32],
+                },
+                signers: vec![0],
+                signature: vec![],
+                power_table_delta: vec![],
+            },
+            power_table: SerializablePowerEntries(vec![
+                SerializablePowerEntry {
+                    id: 1,
+                    power: "1000".to_string(),
+                    pub_key: vec![1u8; 48],
+                },
+                SerializablePowerEntry {
+                    id: 2,
+                    power: "2000".to_string(),
+                    pub_key: vec![2u8; 48],
+                },
+            ]),
+            source_rpc: "test".to_string(),
+            fetched_at: std::time::SystemTime::now(),
+        };
+
+        CertificateEntry::try_from(serializable).expect("valid certificate entry")
+    }
+
+    #[tokio::test]
+    async fn f3_topdown_handler_end_to_end_cache_to_finalize() -> anyhow::Result<()> {
+        // Minimal FVM genesis state with F3LightClientActor so attestation can query actor state.
+        let store = MemoryBlockstore::new();
+        let multi_engine = Arc::new(MultiEngine::new(1));
+        let mut genesis_state = FvmGenesisState::new(
+            store,
+            multi_engine,
+            actors_builtin_car::CAR,
+            actors_custom_car::CAR,
+        )
+        .await
+        .context("failed to create FVM genesis state")?;
+
+        // System actor (required so the FVM can load the builtin actor manifest).
+        genesis_state
+            .create_builtin_actor(
+                system::SYSTEM_ACTOR_CODE_ID,
+                system::SYSTEM_ACTOR_ID,
+                &system::State {
+                    builtin_actors: genesis_state.manifest_data_cid,
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create system actor")?;
+
+        // Init actor (safe default for message execution environment).
+        let (init_state, _addr_to_id) = init::State::new(
+            genesis_state.store(),
+            "test".to_string(),
+            &[],
+            &BTreeSet::new(),
+            0,
+        )
+        .context("failed to create init state")?;
+        genesis_state
+            .create_builtin_actor(
+                init::INIT_ACTOR_CODE_ID,
+                init::INIT_ACTOR_ID,
+                &init_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create init actor")?;
+
+        // Gas market custom actor: required by BlockGasTracker initialization.
+        let gas_market_state = fendermint_actor_gas_market_eip1559::State {
+            base_fee: TokenAmount::from_atto(100),
+            constants: fendermint_actor_gas_market_eip1559::Constants::default(),
+        };
+        genesis_state
+            .create_custom_actor(
+                fendermint_actor_gas_market_eip1559::ACTOR_NAME,
+                gas_market::GAS_MARKET_ACTOR_ID,
+                &gas_market_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create gas market actor")?;
+
+        let instance_id = 7u64;
+        let base_epoch: ChainEpoch = 50;
+        let genesis_power_table = vec![f3_light_client::PowerEntry {
+            id: 10,
+            public_key: vec![9u8; 48],
+            power: 9,
+        }];
+
+        let f3_state = fendermint_actor_f3_light_client::state::State::new(
+            instance_id,
+            Some(base_epoch),
+            genesis_power_table,
+        )
+        .context("failed to create F3 light client actor state")?;
+        genesis_state
+            .create_custom_actor(
+                fendermint_actor_f3_light_client::F3_LIGHT_CLIENT_ACTOR_NAME,
+                f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID,
+                &f3_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create F3 light client actor")?;
+
+        // Initialize execution params (required for executing implicit/read-only messages).
+        genesis_state
+            .init_exec_state(
+                Timestamp(1),
+                NetworkVersion::V21,
+                TokenAmount::from_atto(100),
+                TokenAmount::zero(),
+                1,
+                0 as PowerScale,
+            )
+            .context("failed to init exec state")?;
+        let mut exec_state = genesis_state
+            .into_exec_state()
+            .map_err(|_| anyhow::anyhow!("genesis exec state missing"))?;
+
+        // Prepare a cache with exactly one next epoch proof.
+        let cache = ProofCache::new(
+            base_epoch,
+            instance_id,
+            CacheConfig {
+                lookahead_instances: 10,
+                retention_epochs: 10,
+            },
+        );
+        cache
+            .insert_certificate(mk_test_certificate_entry(
+                instance_id,
+                vec![base_epoch, base_epoch + 1],
+            ))
+            .context("failed to insert certificate")?;
+        cache
+            .insert_epoch_proofs(vec![EpochProofEntry::new(
+                base_epoch + 1,
+                UnifiedProofBundle {
+                    storage_proofs: vec![],
+                    event_proofs: vec![],
+                    blocks: vec![],
+                },
+                instance_id,
+            )])
+            .context("failed to insert epoch proof")?;
+
+        let handler = F3TopDownHandler::new(Arc::new(cache.clone()));
+
+        // Propose from cache.
+        let chain_msg = handler
+            .chain_message_from_proof_cache()
+            .expect("next uncommitted epoch proof exists");
+        let msg = match chain_msg {
+            ChainMessage::Ipc(IpcMessage::GeneralisedTopDown(m)) => m,
+            other => anyhow::bail!("unexpected chain message: {other:?}"),
+        };
+        assert_eq!(msg.height, base_epoch + 1);
+
+        // Attest: cache match + on-chain continuity.
+        handler
+            .attest(&mut exec_state, &msg)
+            .await
+            .context("attestation failed")?;
+
+        // Extract effects (should be empty in this fabricated proof bundle).
+        let (topdown_msgs, validator_changes, used_instance) =
+            handler.extract_messages_and_validator_changes(&mut exec_state, &msg)?;
+        assert!(topdown_msgs.is_empty());
+        assert!(validator_changes.is_empty());
+        assert_eq!(used_instance, instance_id);
+
+        // Finalize: updates actor state + marks cache committed.
+        handler
+            .finalize_after_execution(&mut exec_state, msg.height, used_instance)
+            .context("finalize failed")?;
+
+        // Actor state updated.
+        let caller = crate::fvm::state::ipc::F3LightClientCaller::new();
+        let actor_state = caller.get_state(&mut exec_state)?;
+        assert_eq!(actor_state.latest_instance_id, instance_id);
+        assert_eq!(actor_state.latest_finalized_height, Some(base_epoch + 1));
+        assert_eq!(actor_state.power_table.len(), 2);
+        assert_eq!(actor_state.power_table[0].id, 1);
+        assert_eq!(actor_state.power_table[0].power, 1000);
+
+        // Cache committed cursor updated.
+        assert_eq!(
+            handler.proof_cache().last_committed(),
+            (base_epoch + 1, instance_id)
+        );
+
+        // Sanity: message certificate is FilecoinF3 (we don't decode internals here).
+        match msg.certificate {
+            Certificate::FilecoinF3(_) => {}
+        }
+
+        Ok(())
+    }
+}

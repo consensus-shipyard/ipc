@@ -381,11 +381,19 @@ async fn fetch_f3_params_from_parent(
     )
     .await
     .context("failed to fetch F3 certificate for instance")?;
-    let base_epoch = cert
-        .ec_chain
-        .base()
-        .map(|b| b.epoch)
-        .ok_or_else(|| anyhow::anyhow!("F3 certificate has no ECChain base"))?;
+    if cert.gpbft_instance != instance_id {
+        anyhow::bail!(
+            "F3 certificate instance mismatch: requested {}, got {}",
+            instance_id,
+            cert.gpbft_instance
+        );
+    }
+    let base_epoch = cert.ec_chain.base().map(|b| b.epoch).ok_or_else(|| {
+        anyhow::anyhow!(
+            "F3 certificate instance {} has no ECChain base (cannot derive genesis base_epoch)",
+            instance_id
+        )
+    })?;
 
     // Get base power table for the specified instance
     let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
