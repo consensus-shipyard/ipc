@@ -119,10 +119,12 @@ mod tests {
     fn create_test_power_entries() -> Vec<PowerEntry> {
         vec![
             PowerEntry {
+                id: 1,
                 public_key: vec![1, 2, 3],
                 power: 100,
             },
             PowerEntry {
+                id: 2,
                 public_key: vec![4, 5, 6],
                 power: 200,
             },

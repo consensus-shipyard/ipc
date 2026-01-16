@@ -285,6 +285,12 @@ pub mod ipc {
     pub struct F3Params {
         /// F3 instance ID from parent chain
         pub instance_id: u64,
+        /// Base epoch of the ECChain for `instance_id`.
+        ///
+        /// This is the overlap point: the last epoch finalized by the previous certificate.
+        /// We treat it as already finalized/committed at genesis, so the first epoch to
+        /// prove/execute is `base_epoch + 1`.
+        pub base_epoch: fvm_shared::clock::ChainEpoch,
         /// Power table for F3 consensus from parent chain
         pub power_table: Vec<fendermint_actor_f3_light_client::types::PowerEntry>,
     }

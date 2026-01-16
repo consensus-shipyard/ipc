@@ -546,10 +546,11 @@ impl<'a> GenesisBuilder<'a> {
 
         // F3 Light Client actor - manages F3 light client state for proof-based parent finality
         if let Some(f3_params) = &genesis.f3 {
-            // No finalized height at genesis - will be set when first certificate is processed
+            // We treat the ECChain base epoch for the configured instance as already finalized
+            // by the previous certificate. The node will start proving/executing from base_epoch + 1.
             let f3_state = fendermint_actor_f3_light_client::state::State::new(
                 f3_params.instance_id,
-                None,
+                Some(f3_params.base_epoch),
                 f3_params.power_table.clone(),
             )?;
 

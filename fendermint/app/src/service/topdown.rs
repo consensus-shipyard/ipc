@@ -14,7 +14,6 @@ use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
-use filecoin_f3_gpbft::PowerEntries;
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -143,7 +142,7 @@ fn query_f3_state_in_genesis(
     db: &RocksDb,
     state_store: &NamespaceBlockstore,
     app_namespace: <AppStore as KVStore>::Namespace,
-) -> anyhow::Result<Option<(u64, Option<fvm_shared::clock::ChainEpoch>)>> {
+) -> anyhow::Result<Option<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>> {
     // Query F3 state from committed/genesis state once (used for fail-fast + F3 cache init).
     let exec_state =
         crate::app::create_read_only_exec_state::<_, _, AppStore>(db, state_store, app_namespace)
@@ -306,18 +305,19 @@ async fn start_legacy_topdown(
 async fn start_f3_topdown(
     settings: &Settings,
     topdown_config: &TopDownSettings,
-    f3_state_in_genesis: Option<(u64, Option<fvm_shared::clock::ChainEpoch>)>,
+    f3_state_in_genesis: Option<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>,
 ) -> anyhow::Result<TopDownInit> {
     let f3_config = topdown_config
         .f3
         .as_ref()
         .context("F3 is enabled in config but missing F3 config section")?;
 
-    let (initial_instance, initial_epoch) = match f3_state_in_genesis {
-        Some((inst, Some(epoch))) => (inst, epoch),
-        Some((inst, None)) => (inst, 0),
-        None => bail!("F3 is enabled in config but initial F3 state is missing in genesis"),
-    };
+    let f3_state = f3_state_in_genesis
+        .context("F3 is enabled in config but initial F3 state is missing in genesis")?;
+    let initial_instance = f3_state.latest_instance_id;
+    let initial_epoch = f3_state.latest_finalized_height.context(
+        "F3LightClientActor has no latest_finalized_height; genesis must set base epoch",
+    )?;
 
     let db_path = Some(settings.data_dir().join("proof-cache"));
     let cache = Arc::new(
@@ -346,8 +346,8 @@ async fn start_f3_topdown(
             proof_config.clone(),
             proof_cache.clone(),
             &subnet_id,
-            0,                    // Service will fetch actual instance ID from cache
-            PowerEntries(vec![]), // Service will fetch actual power table from parent
+            initial_instance,
+            fendermint_vm_topdown_proof_service::power_entries_from_actor(&f3_state.power_table),
         )
         .await
         .context("Failed to create F3 proof service")?;

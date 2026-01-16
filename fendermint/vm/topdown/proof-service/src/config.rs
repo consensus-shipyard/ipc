@@ -9,6 +9,25 @@ use std::time::Duration;
 const FILECOIN_MAINNET_CHAIN_ID: u64 = 314;
 const FILECOIN_CALIBRATION_CHAIN_ID: u64 = 314159;
 
+/// Derive the F3 network name from the subnet root chain ID.
+///
+/// This is used for interacting with the Filecoin F3 RPC.
+pub fn f3_network_name(subnet_id: &SubnetID) -> String {
+    let root_id = subnet_id.root_id();
+
+    match root_id {
+        FILECOIN_MAINNET_CHAIN_ID => "mainnet".to_string(),
+        FILECOIN_CALIBRATION_CHAIN_ID => "calibrationnet".to_string(),
+        _ => {
+            tracing::warn!(
+                root_id,
+                "Unknown root chain ID for F3, defaulting to calibrationnet"
+            );
+            "calibrationnet".to_string()
+        }
+    }
+}
+
 /// Represents a value that can be either a numeric Actor ID or an Ethereum address string.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -65,19 +84,7 @@ impl ProofServiceConfig {
     }
 
     pub fn f3_network_name(&self, subnet_id: &SubnetID) -> String {
-        let root_id = subnet_id.root_id();
-
-        match root_id {
-            FILECOIN_MAINNET_CHAIN_ID => "mainnet".to_string(),
-            FILECOIN_CALIBRATION_CHAIN_ID => "calibrationnet".to_string(),
-            _ => {
-                tracing::warn!(
-                    root_id,
-                    "Unknown root chain ID for F3, defaulting to calibrationnet"
-                );
-                "calibrationnet".to_string()
-            }
-        }
+        f3_network_name(subnet_id)
     }
 }
 

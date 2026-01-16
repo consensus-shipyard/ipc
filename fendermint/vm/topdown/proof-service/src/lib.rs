@@ -18,6 +18,7 @@
 //! the same certificate.
 
 pub mod assembler;
+pub mod bootstrap;
 pub mod cache;
 pub mod config;
 pub mod f3_client;
@@ -28,8 +29,10 @@ pub mod types;
 pub mod verifier;
 
 // Re-export main types for convenience
+pub use bootstrap::{fetch_certificate, power_entries_from_actor};
 pub use cache::ProofCache;
 pub use config::{CacheConfig, ProofServiceConfig};
+pub use filecoin_f3_gpbft::PowerEntries;
 pub use service::ProofGeneratorService;
 pub use types::{
     CertificateEntry, EpochProofEntry, EpochProofWithCertificate, SerializableF3Certificate,

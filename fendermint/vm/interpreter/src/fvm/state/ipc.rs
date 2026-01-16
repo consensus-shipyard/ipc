@@ -402,3 +402,167 @@ impl F3LightClientCaller {
         Ok(state_response)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::F3LightClientCaller;
+    use crate::fvm::state::genesis::FvmGenesisState;
+    use crate::fvm::store::memory::MemoryBlockstore;
+    use anyhow::Context;
+    use fendermint_vm_actor_interface::{f3_light_client, gas_market, init, system};
+    use fendermint_vm_core::Timestamp;
+    use fendermint_vm_genesis::PowerScale;
+    use fvm::engine::MultiEngine;
+    use fvm_shared::clock::ChainEpoch;
+    use fvm_shared::econ::TokenAmount;
+    use fvm_shared::version::NetworkVersion;
+    use num_traits::Zero;
+    use std::collections::BTreeSet;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn f3_light_client_caller_roundtrip_update_and_get_state() -> anyhow::Result<()> {
+        // Build a minimal genesis state with the built-in bundle, plus the custom F3 actor.
+        let store = MemoryBlockstore::new();
+        let multi_engine = Arc::new(MultiEngine::new(1));
+        let mut genesis_state = FvmGenesisState::new(
+            store,
+            multi_engine,
+            actors_builtin_car::CAR,
+            actors_custom_car::CAR,
+        )
+        .await
+        .context("failed to create FVM genesis state")?;
+
+        // System actor (required so the FVM can load the builtin actor manifest).
+        genesis_state
+            .create_builtin_actor(
+                system::SYSTEM_ACTOR_CODE_ID,
+                system::SYSTEM_ACTOR_ID,
+                &system::State {
+                    builtin_actors: genesis_state.manifest_data_cid,
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create system actor")?;
+
+        // Init actor (safe default for message execution environment).
+        let (init_state, _addr_to_id) = init::State::new(
+            genesis_state.store(),
+            "test".to_string(),
+            &[],
+            &BTreeSet::new(),
+            0,
+        )
+        .context("failed to create init state")?;
+        genesis_state
+            .create_builtin_actor(
+                init::INIT_ACTOR_CODE_ID,
+                init::INIT_ACTOR_ID,
+                &init_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create init actor")?;
+
+        // Gas market custom actor: required by BlockGasTracker initialization.
+        let gas_market_state = fendermint_actor_gas_market_eip1559::State {
+            base_fee: TokenAmount::from_atto(100),
+            constants: fendermint_actor_gas_market_eip1559::Constants::default(),
+        };
+        genesis_state
+            .create_custom_actor(
+                fendermint_actor_gas_market_eip1559::ACTOR_NAME,
+                gas_market::GAS_MARKET_ACTOR_ID,
+                &gas_market_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create gas market actor")?;
+
+        // Create the F3 light client custom actor.
+        let instance_id = 10u64;
+        let base_epoch: ChainEpoch = 1234;
+        let power_table = vec![
+            fendermint_actor_f3_light_client::types::PowerEntry {
+                id: 1,
+                public_key: vec![1, 2, 3],
+                power: 100,
+            },
+            fendermint_actor_f3_light_client::types::PowerEntry {
+                id: 2,
+                public_key: vec![4, 5, 6],
+                power: 200,
+            },
+        ];
+        let f3_state = fendermint_actor_f3_light_client::state::State::new(
+            instance_id,
+            Some(base_epoch),
+            power_table.clone(),
+        )
+        .context("failed to create F3 light client actor state")?;
+        genesis_state
+            .create_custom_actor(
+                fendermint_actor_f3_light_client::F3_LIGHT_CLIENT_ACTOR_NAME,
+                f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID,
+                &f3_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create F3 light client actor")?;
+
+        // Initialize execution params (required for executing implicit/read-only messages).
+        genesis_state
+            .init_exec_state(
+                Timestamp(1),
+                NetworkVersion::V21,
+                TokenAmount::from_atto(100),
+                TokenAmount::zero(),
+                1,
+                0 as PowerScale,
+            )
+            .context("failed to init exec state")?;
+
+        let mut exec_state = genesis_state
+            .into_exec_state()
+            .map_err(|_| anyhow::anyhow!("genesis exec state missing"))?;
+
+        let caller = F3LightClientCaller::new();
+
+        // Round-trip: read initial actor state.
+        let state0 = caller.get_state(&mut exec_state)?;
+        assert_eq!(state0.latest_instance_id, instance_id);
+        assert_eq!(state0.latest_finalized_height, Some(base_epoch));
+        assert_eq!(state0.power_table.len(), power_table.len());
+        assert_eq!(state0.power_table[0].id, 1);
+
+        // Update state and read again.
+        let new_state = f3_light_client::LightClientState {
+            latest_instance_id: instance_id + 1,
+            latest_finalized_height: Some(base_epoch + 1),
+            power_table: vec![f3_light_client::PowerEntry {
+                id: 99,
+                public_key: vec![9u8; 48],
+                power: 999,
+            }],
+        };
+        caller
+            .update_state(&mut exec_state, new_state.clone())
+            .context("failed to update F3LightClientActor state")?;
+
+        let state1 = caller.get_state(&mut exec_state)?;
+        assert_eq!(state1.latest_instance_id, new_state.latest_instance_id);
+        assert_eq!(
+            state1.latest_finalized_height,
+            new_state.latest_finalized_height
+        );
+        assert_eq!(state1.power_table, new_state.power_table);
+
+        // Also sanity-check that read-only exec doesn't mutate the actor (it reverts effects).
+        let state2 = caller.get_state(&mut exec_state)?;
+        assert_eq!(state2, state1);
+
+        Ok(())
+    }
+}

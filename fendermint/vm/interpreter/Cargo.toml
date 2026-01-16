@@ -93,6 +93,7 @@ proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", br
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 tempfile = { workspace = true }
+actors-builtin-car = { path = "../../actors-builtin-car" }
 
 fendermint_vm_interpreter = { path = ".", features = ["arb"] }
 fendermint_vm_message = { path = "../message", features = ["arb"] }

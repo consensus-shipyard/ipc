@@ -352,6 +352,7 @@ pub async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> any
 
 /// Fetches F3 parameters from the parent Filecoin chain
 async fn fetch_f3_params_from_parent(
+    subnet_id: &SubnetID,
     parent_endpoint: &url::Url,
     parent_auth_token: Option<&String>,
     instance_id: u64,
@@ -367,8 +368,24 @@ async fn fetch_f3_params_from_parent(
         parent_auth_token.map(|s| s.as_str()),
     );
 
-    // We use a dummy subnet ID here since F3 data is at the chain level, not subnet-specific
+    // We use a dummy subnet ID for the Lotus client since these RPC calls are chain-level,
+    // but the F3 network name derivation (for certificate fetch) uses the real subnet root.
     let lotus_client = LotusJsonRPCClient::new(jsonrpc_client, SubnetID::default());
+
+    // Fetch the F3 certificate for the specific instance so we can deterministically
+    // derive the ECChain base epoch (the overlap point finalized by the previous certificate).
+    let cert = fendermint_vm_topdown_proof_service::fetch_certificate(
+        &parent_endpoint.to_string(),
+        subnet_id,
+        instance_id,
+    )
+    .await
+    .context("failed to fetch F3 certificate for instance")?;
+    let base_epoch = cert
+        .ec_chain
+        .base()
+        .map(|b| b.epoch)
+        .ok_or_else(|| anyhow::anyhow!("F3 certificate has no ECChain base"))?;
 
     // Get base power table for the specified instance
     let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
@@ -383,6 +400,7 @@ async fn fetch_f3_params_from_parent(
             // Parse the power string to u64
             let power = entry.power.parse::<u64>()?;
             Ok(types::PowerEntry {
+                id: entry.id,
                 public_key: public_key_bytes,
                 power,
             })
@@ -396,6 +414,7 @@ async fn fetch_f3_params_from_parent(
     );
     Ok(Some(ipc::F3Params {
         instance_id,
+        base_epoch,
         power_table,
     }))
 }
@@ -442,6 +461,7 @@ pub async fn new_genesis_from_parent(
 
         tracing::info!("Fetching F3 data from parent Filecoin chain");
         fetch_f3_params_from_parent(
+            &args.subnet_id,
             parent_rpc,
             args.parent_filecoin_auth_token.as_ref(),
             f3_instance_id,

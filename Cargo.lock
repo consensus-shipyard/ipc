@@ -4758,6 +4758,7 @@ dependencies = [
 name = "fendermint_vm_interpreter"
 version = "0.1.0"
 dependencies = [
+ "actors-builtin-car",
  "actors-custom-api",
  "actors-custom-car",
  "anyhow",

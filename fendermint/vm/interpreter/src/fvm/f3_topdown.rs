@@ -11,7 +11,9 @@ use std::sync::Arc;
 
 use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_topdown_proof_service::types::SerializableF3Certificate;
+use fendermint_vm_topdown_proof_service::PowerEntries;
 
+use crate::fvm::event_extraction::{extract_topdown_messages, extract_validator_changes};
 use crate::fvm::state::ipc::F3LightClientCaller;
 use crate::fvm::state::FvmExecState;
 
@@ -19,29 +21,23 @@ use crate::fvm::state::FvmExecState;
 /// This module encapsulates all F3-specific concerns, keeping TopDownManager clean
 #[derive(Clone)]
 pub struct F3TopDownHandler {
-    /// Proof cache for F3-based parent finality
+    /// Proof cache for F3-based parent finality (off-chain, local).
     proof_cache: Arc<fendermint_vm_topdown_proof_service::ProofCache>,
-    /// F3 Light Client caller for querying F3 state
-    f3_light_client_caller: F3LightClientCaller,
+    /// F3 Light Client **actor** caller (on-chain state in the FVM).
+    f3_light_client_actor_caller: F3LightClientCaller,
 }
 
 impl F3TopDownHandler {
     pub fn new(proof_cache: Arc<fendermint_vm_topdown_proof_service::ProofCache>) -> Self {
         Self {
             proof_cache,
-            f3_light_client_caller: F3LightClientCaller::new(),
+            f3_light_client_actor_caller: F3LightClientCaller::new(),
         }
     }
 
     /// Get reference to the proof cache
     pub fn proof_cache(&self) -> &Arc<fendermint_vm_topdown_proof_service::ProofCache> {
         &self.proof_cache
-    }
-
-    /// Check if we have a certificate in our local cache
-    /// Used during attestation to avoid redundant F3 validation
-    pub fn has_certificate_in_cache(&self, instance_id: u64) -> bool {
-        self.proof_cache.contains_certificate(instance_id)
     }
 
     /// Query proof cache for next uncommitted proof and create a chain message with proof bundle.
@@ -103,14 +99,6 @@ impl F3TopDownHandler {
                 )
             })?;
 
-        if cached.epoch != msg.height {
-            bail!(
-                "epoch mismatch: message has {}, cache entry has {}",
-                msg.height,
-                cached.epoch
-            );
-        }
-
         let cached_cert = SerializableF3Certificate::from(&cached.certificate);
         if &cached_cert != msg_cert {
             bail!(
@@ -121,8 +109,8 @@ impl F3TopDownHandler {
             );
         }
 
-        // Check on-chain continuity (this needs state access, hence in attestation).
-        let f3_state = self.get_f3_state(state)?;
+        // Check on-chain continuity (this needs actor state access, hence in attestation).
+        let f3_state = self.get_f3_light_client_actor_state(state)?;
         let instance_id = cached.certificate.gpbft_instance;
 
         // Certificate instance must not go backwards; it either stays the same (multiple epochs can
@@ -143,107 +131,21 @@ impl F3TopDownHandler {
         }
 
         // Epoch must advance by exactly 1 relative to the latest finalized epoch in state.
-        // At genesis this is `None`; treat it as 0 baseline.
-        let prev_finalized = f3_state.latest_finalized_height.unwrap_or(0);
-        if msg.height != prev_finalized + 1 {
-            bail!(
-                "epoch is not sequential: message height {} != expected {}",
-                msg.height,
-                prev_finalized + 1
-            );
+        //
+        // At genesis this is `None` (no finality yet). In that case we skip the check here; the
+        // cache lookup (and later execution) will still enforce that we only process epochs we
+        // have proofs for.
+        if let Some(prev_finalized) = f3_state.latest_finalized_height {
+            if msg.height != prev_finalized + 1 {
+                bail!(
+                    "epoch is not sequential: message height {} != expected {}",
+                    msg.height,
+                    prev_finalized + 1
+                );
+            }
         }
 
         Ok(())
-    }
-
-    /// Extract topdown messages from proof bundle
-    pub fn extract_topdown_messages(
-        &self,
-        proof_bundle: &proofs::proofs::common::bundle::UnifiedProofBundle,
-    ) -> anyhow::Result<Vec<ipc_api::cross::IpcEnvelope>> {
-        crate::fvm::event_extraction::extract_topdown_messages(proof_bundle)
-    }
-
-    /// Extract validator changes from proof bundle
-    pub fn extract_validator_changes(
-        &self,
-        proof_bundle: &proofs::proofs::common::bundle::UnifiedProofBundle,
-    ) -> anyhow::Result<Vec<ipc_api::staking::PowerChangeRequest>> {
-        crate::fvm::event_extraction::extract_validator_changes(proof_bundle)
-    }
-
-    /// Get power table for a certificate instance from cache
-    pub fn get_power_table(
-        &self,
-        instance_id: u64,
-    ) -> Vec<fendermint_vm_actor_interface::f3_light_client::PowerEntry> {
-        if let Some(cert_entry) = self.proof_cache.get_certificate(instance_id) {
-            cert_entry
-                .power_table
-                .iter()
-                .map(|pe| {
-                    // Convert BigInt power to u64 (saturating if too large)
-                    let (_sign, digits) = pe.power.to_u64_digits();
-                    let power_u64 = if digits.is_empty() {
-                        0
-                    } else if digits.len() == 1 {
-                        digits[0]
-                    } else {
-                        u64::MAX // Too large, saturate
-                    };
-                    fendermint_vm_actor_interface::f3_light_client::PowerEntry {
-                        public_key: pe.pub_key.0.clone(),
-                        power: power_u64,
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Mark epoch as committed in cache
-    pub fn mark_committed(
-        &self,
-        epoch: fvm_shared::clock::ChainEpoch,
-        instance_id: u64,
-    ) -> anyhow::Result<()> {
-        self.proof_cache
-            .mark_committed(epoch, instance_id)
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "failed to mark epoch {} as committed in cache: {}",
-                    epoch,
-                    e
-                )
-            })
-    }
-
-    /// Get F3 light client state
-    pub fn get_f3_state<DB>(
-        &self,
-        state: &mut FvmExecState<DB>,
-    ) -> anyhow::Result<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>
-    where
-        DB: Blockstore + Clone + 'static + Send + Sync,
-    {
-        self.f3_light_client_caller
-            .get_state(state)
-            .context("failed to get F3 light client state")
-    }
-
-    /// Update F3 light client state
-    pub fn update_f3_state<DB>(
-        &self,
-        state: &mut FvmExecState<DB>,
-        new_state: fendermint_vm_actor_interface::f3_light_client::LightClientState,
-    ) -> anyhow::Result<()>
-    where
-        DB: Blockstore + Clone + 'static + Send + Sync,
-    {
-        self.f3_light_client_caller
-            .update_state(state, new_state)
-            .context("failed to update F3LightClientActor state")
     }
 
     /// Execute F3-specific logic for a generalised top-down message.
@@ -276,8 +178,8 @@ impl F3TopDownHandler {
             "executing F3 generalised top-down"
         );
 
-        let msgs = self.extract_topdown_messages(&cached.proof_bundle)?;
-        let validator_changes = self.extract_validator_changes(&cached.proof_bundle)?;
+        let msgs = extract_topdown_messages(&cached.proof_bundle)?;
+        let validator_changes = extract_validator_changes(&cached.proof_bundle)?;
 
         tracing::debug!(
             message_count = msgs.len(),
@@ -300,8 +202,8 @@ impl F3TopDownHandler {
     where
         DB: Blockstore + Clone + 'static + Send + Sync,
     {
-        // Update F3LightClientActor with new certificate state.
-        let power_table = self.get_power_table(instance_id);
+        // Update F3LightClientActor with new certificate state (on-chain).
+        let power_table = ActorPowerTable::from(&self.get_power_table(instance_id)?).0;
         let new_light_client_state =
             fendermint_vm_actor_interface::f3_light_client::LightClientState {
                 latest_instance_id: instance_id,
@@ -309,7 +211,7 @@ impl F3TopDownHandler {
                 power_table,
             };
 
-        self.update_f3_state(state, new_light_client_state)?;
+        self.update_f3_light_client_actor_state(state, new_light_client_state)?;
         tracing::debug!(instance = instance_id, "updated F3LightClientActor state");
 
         // Mark epoch as committed in cache.
@@ -329,5 +231,95 @@ impl F3TopDownHandler {
         }
 
         Ok(())
+    }
+
+    /// Get power table for a certificate instance from the **cache** (off-chain).
+    fn get_power_table(&self, instance_id: u64) -> anyhow::Result<PowerEntries> {
+        let cert_entry = self
+            .proof_cache
+            .get_certificate(instance_id)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "certificate not found in cache for instance {}",
+                    instance_id
+                )
+            })?;
+
+        Ok(cert_entry.power_table)
+    }
+
+    /// Mark epoch as committed in the **cache** (off-chain).
+    fn mark_committed(
+        &self,
+        epoch: fvm_shared::clock::ChainEpoch,
+        instance_id: u64,
+    ) -> anyhow::Result<()> {
+        self.proof_cache
+            .mark_committed(epoch, instance_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "failed to mark epoch {} as committed in cache: {}",
+                    epoch,
+                    e
+                )
+            })
+    }
+
+    /// Get F3 Light Client **actor** state (on-chain).
+    fn get_f3_light_client_actor_state<DB>(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>
+    where
+        DB: Blockstore + Clone + 'static + Send + Sync,
+    {
+        self.f3_light_client_actor_caller
+            .get_state(state)
+            .context("failed to get F3LightClientActor state")
+    }
+
+    /// Update F3 Light Client **actor** state (on-chain).
+    fn update_f3_light_client_actor_state<DB>(
+        &self,
+        state: &mut FvmExecState<DB>,
+        new_state: fendermint_vm_actor_interface::f3_light_client::LightClientState,
+    ) -> anyhow::Result<()>
+    where
+        DB: Blockstore + Clone + 'static + Send + Sync,
+    {
+        self.f3_light_client_actor_caller
+            .update_state(state, new_state)
+            .context("failed to update F3LightClientActor state")
+    }
+}
+
+/// Local helper newtype so we can provide a clean `From` impl at the conversion boundary.
+struct ActorPowerTable(Vec<fendermint_vm_actor_interface::f3_light_client::PowerEntry>);
+
+impl From<&PowerEntries> for ActorPowerTable {
+    fn from(entries: &PowerEntries) -> Self {
+        Self(
+            entries
+                .iter()
+                .map(|pe| {
+                    // Convert BigInt -> u64 (saturating if too large).
+                    // Power should be non-negative; we ignore the sign here and keep the magnitude.
+                    let (_sign, digits) = pe.power.to_u64_digits();
+                    let power = if digits.is_empty() {
+                        0
+                    } else if digits.len() == 1 {
+                        digits[0]
+                    } else {
+                        u64::MAX
+                    };
+
+                    fendermint_vm_actor_interface::f3_light_client::PowerEntry {
+                        id: pe.id,
+                        public_key: pe.pub_key.0.clone(),
+                        power,
+                    }
+                })
+                .collect(),
+        )
     }
 }

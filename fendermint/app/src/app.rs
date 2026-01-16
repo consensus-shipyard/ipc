@@ -271,19 +271,16 @@ where
 }
 
 /// Query the F3 Light Client Actor state from a read-only execution state.
-/// Returns (instance_id, latest_finalized_height) if F3 is initialized, None otherwise.
+/// Returns the actor state if F3 is initialized, None otherwise.
 pub fn query_f3_state<BS>(
     exec_state: &mut FvmExecState<ReadOnlyBlockstore<BS>>,
-) -> Result<Option<(u64, Option<ChainEpoch>)>>
+) -> Result<Option<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>>
 where
     BS: Blockstore + Clone + 'static + Send + Sync,
 {
     let f3_caller = F3LightClientCaller::new();
     match f3_caller.get_state(exec_state) {
-        Ok(state) => Ok(Some((
-            state.latest_instance_id,
-            state.latest_finalized_height,
-        ))),
+        Ok(state) => Ok(Some(state)),
         Err(e) => {
             // F3 actor might not be deployed (non-Filecoin parent)
             tracing::debug!("F3 Light Client Actor not found or not accessible: {}", e);

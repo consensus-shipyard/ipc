@@ -31,6 +31,8 @@ pub struct LightClientState {
 /// Power table entry for F3 consensus
 #[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone, PartialEq, Eq)]
 pub struct PowerEntry {
+    /// Validator ID (from F3 power table)
+    pub id: u64,
     /// Public key of the validator
     pub public_key: Vec<u8>,
     /// Voting power of the validator
