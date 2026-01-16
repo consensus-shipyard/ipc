@@ -238,6 +238,17 @@ deploy_subnet() {
     local min_validators=$(get_config_value "init.min_validators" 2>/dev/null || echo "$validator_count")
     local activate_subnet=$(get_config_value "init.activate_subnet" 2>/dev/null || echo "true")
 
+    # Get subnet chain ID from config, or generate a unique one
+    local subnet_chain_id=$(get_config_value "subnet.chain_id" 2>/dev/null)
+    if [ -z "$subnet_chain_id" ] || [ "$subnet_chain_id" = "null" ]; then
+        # Generate unique chain ID based on timestamp (milliseconds since epoch mod 2^32)
+        local parent_num=$(echo "$parent_chain_id" | sed 's/\/r//')
+        subnet_chain_id=$((parent_num + 1000 + ($(date +%s) % 10000)))
+        log_warn "No subnet.chain_id configured, generated: $subnet_chain_id" >&2
+    else
+        log_info "Using configured subnet chain ID: $subnet_chain_id" >&2
+    fi
+
     # Create subnet-init.yaml
     local subnet_init_config="/tmp/subnet-init-$$.yaml"
 
@@ -255,7 +266,7 @@ deploy:
 create:
   parent: $parent_chain_id
   from: $from_address
-  chain-id: $(echo "$parent_chain_id" | sed 's/\/r//')
+  chain-id: $subnet_chain_id
   min-validator-stake: 1.0
   min-validators: $min_validators
   bottomup-check-period: 50
