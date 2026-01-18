@@ -55,12 +55,6 @@ struct GatewayActorStorage {
     mapping(bytes32 => Subnet) subnets;
     /// @notice The parent finalities. Key is the block number, value is the finality struct.
     mapping(uint256 => ParentFinality) finalitiesMap;
-    /// @notice Postbox keeps track of all the cross-net messages triggered by
-    /// an actor that need to be propagated further through the hierarchy.
-    /// cross-net message id => CrossMsg
-    mapping(bytes32 => IpcEnvelope) postbox;
-    /// @notice Keys of the envelopes in the postbox. Useful to iterate through them
-    EnumerableSet.Bytes32Set postboxKeys;
     /// @notice A mapping of block numbers to bottom-up cross-messages
     // slither-disable-next-line uninitialized-state
     mapping(uint256 => BottomUpMsgBatch) bottomUpMsgBatches;

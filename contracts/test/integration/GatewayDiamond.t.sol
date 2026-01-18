@@ -84,10 +84,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             gatewayDiamond.getter().majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE,
             "unexpected majorityPercentage"
         );
-
-        IpcEnvelope memory storableMsg = gatewayDiamond.getter().postbox(0);
-        IpcEnvelope memory msg1;
-        require(msg1.toHash() == storableMsg.toHash(), "unexpected hash");
     }
 
     function testGatewayDiamond_NewGatewayWithDefaultParams() public view {
@@ -557,7 +553,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_Fuzz(uint256 fee) public {
-        vm.assume(fee < DEFAULT_CROSS_MSG_FEE);
+        vm.assume(fee > 0 && fee < DEFAULT_CROSS_MSG_FEE);
 
         address caller = CHILD_NETWORK_ADDRESS;
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);

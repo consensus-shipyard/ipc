@@ -125,9 +125,6 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
         }
 
         IGateway(LibSubnetActorStorage.appStorage().ipcGatewayAddr).execBottomUpMsgBatch(msgs);
-
-        // Propagate cross messages from checkpoint to other subnets
-        IGateway(LibSubnetActorStorage.appStorage().ipcGatewayAddr).propagateAll();
     }
 
     function ensureValidHeight(uint64 blockHeight, uint64 lastHeight) internal view {

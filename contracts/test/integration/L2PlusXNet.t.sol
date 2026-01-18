@@ -438,6 +438,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
 
     // testing Native L1 => ERC20 L2 => ERC20 L3, this supply source is not allowed
     function test_N1E2E3_rejects() public {
+        vm.skip(true); // TODO: re-enable once non-direct messaging is allowed
         SubnetID memory l1SubnetID = initL1();
 
         address erc20_1 = address(new ERC20PresetFixedSupply("TestToken1", "TT", 21_000_000 ether, address(this)));
@@ -491,6 +492,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
 
     // testing Native L1 => ERC20 L2 => Native L3
     function test_N1E2N3_works() public {
+        vm.skip(true); // TODO: re-enable once non-direct messaging is allowed
+
         SubnetID memory l1SubnetID = initL1();
 
         address erc20 = address(new ERC20PresetFixedSupply("TestToken", "TT", 21_000_000 ether, address(this)));
@@ -530,6 +533,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
 
     // testing Native L3 => ERC20 L2 => Native L1 => ERC20 L2' => Native L3'
     function test_N3E2N1E2N3_works() public {
+        vm.skip(true); // TODO: re-enable once non-direct messaging is allowed
+
         SubnetID memory l1SubnetID = initL1();
 
         address erc20 = address(new ERC20PresetFixedSupply("TestToken", "TT", 21_000_000 ether, address(this)));

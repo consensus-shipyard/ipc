@@ -120,16 +120,6 @@ contract GatewayGetterFacet {
         return s.appliedTopDownNonce;
     }
 
-    /// @notice Returns the storable message and its wrapped status from the postbox by a given identifier.
-    /// @param id The unique identifier of the message in the postbox.
-    function postbox(bytes32 id) external view returns (IpcEnvelope memory storableMsg) {
-        return (s.postbox[id]);
-    }
-
-    function postboxMsgs() external view returns (bytes32[] memory) {
-        return (s.postboxKeys.values());
-    }
-
     /// @notice Returns the majority percentage required for certain consensus or decision-making processes.
     function majorityPercentage() external view returns (uint64) {
         return s.majorityPercentage;
