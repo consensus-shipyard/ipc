@@ -3,6 +3,7 @@
 use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
+#[cfg(feature = "ipc-storage")]
 use fendermint_actor_bucket::Object;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn};
 use fvm_ipld_encoding::{BytesDe, RawBytes};
@@ -61,12 +62,14 @@ pub fn decode_fevm_return_data(data: RawBytes) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Decode the result of a bucket GetObject call.
+#[cfg(feature = "ipc-storage")]
 pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
     let data = decode_data(&deliver_tx.data)?;
     fvm_ipld_encoding::from_slice::<Option<Object>>(&data)
         .map_err(|e| anyhow!("error parsing as Option<Object>: {e}"))
 }
 
+#[cfg(feature = "ipc-storage")]
 pub fn decode_blob_get(
     deliver_tx: &DeliverTx,
 ) -> anyhow::Result<Option<fendermint_actor_blobs_shared::blobs::Blob>> {

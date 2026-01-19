@@ -285,6 +285,8 @@ cid = { version = "0.11", default-features = false, features = [
   "std",
 ] }
 multihash-codetable = "0.1"
+digest = { git = "https://github.com/RustCrypto/traits", tag = "digest-v0.11.0-rc.2" }
+netwatch = { path = "patches/netwatch" }
 
 frc42_dispatch = { path = "./ext/frc42_dispatch" }
 

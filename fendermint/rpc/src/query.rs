@@ -20,7 +20,10 @@ use fendermint_vm_message::query::{
 };
 
 use crate::message::{GasParams, MessageFactory};
-use crate::response::{decode_blob_get, decode_os_get, encode_data};
+use crate::response::encode_data;
+#[cfg(feature = "ipc-storage")]
+use crate::response::{decode_blob_get, decode_os_get};
+#[cfg(feature = "ipc-storage")]
 use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_vm_actor_interface::system;
 use fvm_shared::econ::TokenAmount;
@@ -133,6 +136,7 @@ pub trait QueryClient: Sync {
     }
 
     /// Get an object in a bucket without including a transaction on the blockchain.
+    #[cfg(feature = "ipc-storage")]
     async fn os_get_call(
         &mut self,
         address: Address,
@@ -156,6 +160,7 @@ pub trait QueryClient: Sync {
     }
 
     /// Get a blob from the blobs actor without including a transaction on the blockchain.
+    #[cfg(feature = "ipc-storage")]
     async fn blob_get_call(
         &mut self,
         blob_hash: fendermint_actor_blobs_shared::bytes::B256,

@@ -176,8 +176,10 @@ where
         mut msg: FvmMessage,
     ) -> anyhow::Result<(Self, (ApplyRet, HashMap<u64, Address>))> {
         self.with_exec_state(|s| {
+            println!("DEBUG: call() - start");
             // If the sequence is zero, treat it as a signal to use whatever is in the state.
             if msg.sequence.is_zero() {
+                println!("DEBUG: call() - looking up sequence");
                 let state_tree = s.state_tree_mut();
                 if let Some(id) = state_tree.lookup_id(&msg.from)? {
                     state_tree.get_actor(id)?.inspect(|st| {
@@ -194,32 +196,56 @@ where
             }
 
             let to = msg.to;
+            println!("DEBUG: call() - before execute, to={:?}", to);
 
             let (mut ret, address_map) = if is_system_addr(&msg.from) {
                 // Explicit execution requires `from` to be an account kind.
+                println!("DEBUG: call() - execute_implicit");
                 s.execute_implicit(msg)?
             } else {
+                println!("DEBUG: call() - execute_explicit");
                 s.execute_explicit(msg)?
             };
 
+            println!(
+                "DEBUG: call() - after execute, exit_code={:?}",
+                ret.msg_receipt.exit_code
+            );
+
             // if it is a call to create evm address, align with geth behaviour that returns the code deployed
             if to == EAM_ACTOR_ADDR && ret.msg_receipt.exit_code.is_success() {
+                println!("DEBUG: call() - EAM create, deserializing CreateExternalReturn");
                 let created = fvm_ipld_encoding::from_slice::<CreateExternalReturn>(
                     &ret.msg_receipt.return_data,
                 )?;
 
+                println!(
+                    "DEBUG: call() - getting evm_actor for id={}",
+                    created.actor_id
+                );
                 // safe to unwrap as they are created above
                 let evm_actor = s.state_tree().get_actor(created.actor_id)?.unwrap();
+                println!("DEBUG: call() - evm_actor.code={}", evm_actor.code);
+                println!("DEBUG: call() - evm_actor.state={}", evm_actor.state);
+                println!("DEBUG: call() - getting evm_actor_state_raw");
                 let evm_actor_state_raw = s.state_tree().store().get(&evm_actor.state)?.unwrap();
+                println!(
+                    "DEBUG: call() - state_raw hex={}",
+                    hex::encode(&evm_actor_state_raw)
+                );
+                println!("DEBUG: call() - deserializing fil_actor_evm::State");
                 let evm_actor_state = from_slice::<fil_actor_evm::State>(&evm_actor_state_raw)?;
+                println!("DEBUG: call() - getting bytecode");
                 let actor_code = s
                     .state_tree()
                     .store()
                     .get(&evm_actor_state.bytecode)?
                     .unwrap();
                 ret.msg_receipt.return_data = RawBytes::from(actor_code);
+                println!("DEBUG: call() - done with EAM create");
             }
 
+            println!("DEBUG: call() - returning");
             Ok((ret, address_map))
         })
         .await

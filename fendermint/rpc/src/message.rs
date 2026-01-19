@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
+#[cfg(feature = "ipc-storage")]
 use fendermint_actor_bucket::{GetParams, Method::GetObject};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{eam, evm};
@@ -119,6 +120,7 @@ impl MessageFactory {
     }
 
     /// Get an object from a bucket.
+    #[cfg(feature = "ipc-storage")]
     pub fn os_get(
         &mut self,
         address: Address,
@@ -130,6 +132,7 @@ impl MessageFactory {
         Ok(self.transaction(address, GetObject as u64, params, value, gas_params))
     }
 
+    #[cfg(feature = "ipc-storage")]
     pub fn blob_get(
         &mut self,
         blob_hash: fendermint_actor_blobs_shared::bytes::B256,
