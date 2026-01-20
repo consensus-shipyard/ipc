@@ -306,7 +306,8 @@ impl<'a> GenesisBuilder<'a> {
         // Init actor
         // Add Blobs actor ID to eth_builtin_ids so its delegated address is registered
         #[allow(unused_mut)]
-        let mut eth_builtin_ids: BTreeSet<_> = ipc_entrypoints.values().map(|c| c.actor_id).collect();
+        let mut eth_builtin_ids: BTreeSet<_> =
+            ipc_entrypoints.values().map(|c| c.actor_id).collect();
 
         #[cfg(feature = "ipc-storage")]
         {
