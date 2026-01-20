@@ -50,19 +50,13 @@ export SECRET_KEY_FILE=./test-network/keys/alice.sk
 ./target/release/gateway --bls-key-file $BLS_KEY_FILE --secret-key-file $SECRET_KEY_FILE --iroh-path ./iroh_gateway --objects-listen-addr 0.0.0.0:8080
 
 ```
-## 6. Download the Blob
 
-Download via HTTP API:
+## 3. Launch ipc-dropbox
+Launch `ipc-dropbox` in `ipc-storage/ipc-dropbox` with `npm run dev`.
 
-```bash
-# Download the blob
-curl $NODE_OPERATION_OBJECT_API/v1/blobs/${BLOB_HASH#0x}/content
-# You should see the original file
-```
+Alternatively, run the below bash script to go through the steps one by one.
 
----
-
-## 1. Create a Bucket
+## 3. Create a Bucket
 
 First, create a bucket via the ADM (Actor Deployment Manager):
 
@@ -90,10 +84,7 @@ echo "Bucket created at: $BUCKET_ADDR"
 export BUCKET_ADDR
 ```
 
-## 2. Upload and Register an Object
-
-### Step 2a: Upload file to Iroh (same as basic flow)
-
+## 4. Upload and Register an Object
 ```bash
 # Create a test file
 echo "Hello from bucket storage!" > myfile.txt
@@ -147,7 +138,7 @@ echo "Metadata Hash: $METADATA_HASH"
 echo "Source Node: $SOURCE_NODE"
 ```
 
-### Step 2b: Register object in bucket with a path
+### Register object in bucket with a path
 
 ```bash
 # Add object with a path-based key
@@ -162,7 +153,7 @@ cast send $BUCKET_ADDR "addObject(bytes32,string,bytes32,bytes32,uint64)" \
   --rpc-url $ETH_RPC
 ```
 
-## 3. Query Objects
+## 5. Query Objects
 
 ### Get a single object by path
 
@@ -231,7 +222,7 @@ cast call $BUCKET_ADDR "queryObjects(string,string,string,uint64)" \
 
 ---
 
-## 4. Update Object Metadata
+## 6. Update Object Metadata
 
 ```bash
 # Update metadata for an existing object
@@ -245,7 +236,7 @@ cast send $BUCKET_ADDR "updateObjectMetadata(string,(string,string)[])" \
 
 ---
 
-## 5. Delete an Object
+## 7. Delete an Object
 
 ```bash
 # Delete object by path
@@ -256,7 +247,7 @@ cast send $BUCKET_ADDR "deleteObject(string)" "documents/myfile.txt" \
 
 ---
 
-## 6. Download Content
+## 8. Download Content
 
 Downloads still go through the Iroh/Objects API using the blob hash:
 
