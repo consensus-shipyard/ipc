@@ -19,14 +19,16 @@ use fendermint_vm_message::query::{
     ActorState, BuiltinActors, FvmQuery, FvmQueryHeight, GasEstimate, StateParams,
 };
 
-use crate::message::{GasParams, MessageFactory};
 use crate::response::encode_data;
+
 #[cfg(feature = "ipc-storage")]
-use crate::response::{decode_blob_get, decode_os_get};
-#[cfg(feature = "ipc-storage")]
-use fendermint_actor_bucket::{GetParams, Object};
-use fendermint_vm_actor_interface::system;
-use fvm_shared::econ::TokenAmount;
+use {
+    crate::message::{GasParams, MessageFactory},
+    crate::response::{decode_blob_get, decode_os_get},
+    fendermint_actor_bucket::{GetParams, Object},
+    fendermint_vm_actor_interface::system,
+    fvm_shared::econ::TokenAmount,
+};
 
 #[derive(Serialize, Debug, Clone)]
 /// The parsed value from a query, along with the height at which the query was performed.

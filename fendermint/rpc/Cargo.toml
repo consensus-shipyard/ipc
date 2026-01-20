@@ -31,7 +31,7 @@ fendermint_vm_actor_interface = { path = "../vm/actor_interface", default-featur
 fendermint_vm_message = { path = "../vm/message" }
 
 [features]
-default = ["ipc-storage"]
+default = []
 ipc-storage = [
     "fendermint_actor_blobs_shared",
     "fendermint_actor_bucket",

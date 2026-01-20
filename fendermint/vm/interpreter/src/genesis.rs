@@ -5,7 +5,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::io::{Cursor, Read, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
@@ -306,8 +305,9 @@ impl<'a> GenesisBuilder<'a> {
 
         // Init actor
         // Add Blobs actor ID to eth_builtin_ids so its delegated address is registered
-        let mut eth_builtin_ids: BTreeSet<_> =
-            ipc_entrypoints.values().map(|c| c.actor_id).collect();
+        #[allow(unused_mut)]
+        let mut eth_builtin_ids: BTreeSet<_> = ipc_entrypoints.values().map(|c| c.actor_id).collect();
+
         #[cfg(feature = "ipc-storage")]
         {
             eth_builtin_ids.insert(blobs::BLOBS_ACTOR_ID);
@@ -388,6 +388,7 @@ impl<'a> GenesisBuilder<'a> {
         // ADM Address Manager (ADM) actor
         #[cfg(feature = "ipc-storage")]
         {
+            use std::str::FromStr;
             let mut machine_codes = std::collections::HashMap::new();
             for machine_name in &["bucket", "timehub"] {
                 if let Some(cid) = state.custom_actor_manifest.code_by_name(machine_name) {

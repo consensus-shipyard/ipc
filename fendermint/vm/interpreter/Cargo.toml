@@ -100,7 +100,7 @@ multihash = { workspace = true }
 hex = { workspace = true }
 
 [features]
-default = ["ipc-storage"]
+default = []
 bundle = []
 ipc-storage = [
     "fendermint_actor_init",

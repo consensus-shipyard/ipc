@@ -45,7 +45,7 @@ iroh-blobs.workspace = true
 iroh_manager = { path = "../../ipc-storage/iroh_manager" }
 
 # Fendermint dependencies for RPC client
-fendermint_rpc = { path = "../../fendermint/rpc" }
+fendermint_rpc = { path = "../../fendermint/rpc", features = ["ipc-storage"] }
 fendermint_vm_message = { path = "../../fendermint/vm/message" }
 fendermint_vm_actor_interface = { path = "../../fendermint/vm/actor_interface" }
 fendermint_actor_blobs_shared = { path = "../../fendermint/actors/blobs/shared" }
