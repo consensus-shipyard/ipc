@@ -13,10 +13,16 @@ export ADM_ACTOR=0x7caec36fc8a3a867ca5b80c6acb5e5871d05aa28
 
 # Your credentials
 export USER_SK=<YOUR_PRIVATE_KEY_HEX>
-export USER_ADDR=<YOUR_ETH_ADDRESS>
 ```
 
-## 6. Start Gateway
+## 1. Build IPC
+By default, ipc-storage is not enabled, build with `ipc-storage` feature to enable it.
+```bash
+cargo build --release -p fendermint_app --features ipc-storage
+```
+Setup your ipc chain as per normal.
+
+## 2. Start Gateway and Node Operator
 ```bash
 cargo build --release -p ipc-decentralized-storage --bin gateway --bin node
 

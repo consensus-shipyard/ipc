@@ -354,7 +354,7 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
 
     // Gas params
     let gas_params = GasParams {
-        gas_limit: 10_000_000_000,
+        gas_limit: 10_000_000,
         gas_fee_cap: TokenAmount::from_atto(100),
         gas_premium: TokenAmount::from_atto(100),
     };
@@ -382,8 +382,11 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
 
     if res.response.deliver_tx.code.is_err() {
         anyhow::bail!(
-            "RegisterNodeOperator deliver_tx failed: {}",
-            res.response.deliver_tx.log
+            "RegisterNodeOperator deliver_tx failed: code={:?}, log={}, info={}, gas_used={}",
+            res.response.deliver_tx.code,
+            res.response.deliver_tx.log,
+            res.response.deliver_tx.info,
+            res.response.deliver_tx.gas_used
         );
     }
 

@@ -217,19 +217,12 @@ impl ActorCode for BlobsActor {
     }
 }
 
-/// Makes a syscall that will delete a blob from the underlying Iroh-based data store.
+/// Placeholder for deleting a blob from the underlying Iroh-based data store.
+/// TODO: Implement custom kernel syscall for ipc_storage::delete_blob
 fn delete_from_disc(hash: B256) -> Result<(), ActorError> {
-    #[cfg(feature = "fil-actor")]
-    {
-        ipc_storage_actor_sdk::storage::delete_blob(hash.0).map_err(|en| {
-            ActorError::unspecified(format!("failed to delete blob from disc: {:?}", en))
-        })?;
-        log::debug!("deleted blob {} from disc", hash);
-        Ok(())
-    }
-    #[cfg(not(feature = "fil-actor"))]
-    {
-        log::debug!("mock deletion from disc (hash={})", hash);
-        Ok(())
-    }
+    log::debug!(
+        "delete_from_disc called (hash={}), no-op until kernel syscall is implemented",
+        hash
+    );
+    Ok(())
 }
