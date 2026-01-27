@@ -425,8 +425,8 @@ mod tests {
         let paths = NodePaths::new(home);
 
         // Create necessary directories
-        std::fs::create_dir_all(&paths.fendermint.join("config")).unwrap();
-        std::fs::create_dir_all(&paths.comet_bft.join("config")).unwrap();
+        std::fs::create_dir_all(paths.fendermint.join("config")).unwrap();
+        std::fs::create_dir_all(paths.comet_bft.join("config")).unwrap();
 
         // Create minimal config files
         std::fs::write(
@@ -443,12 +443,14 @@ mod tests {
     async fn test_resolver_port_config_uses_zero_address_for_listening() {
         let (_temp, paths) = create_test_paths();
 
-        let mut p2p_config = P2pConfig::default();
-        p2p_config.external_ip = Some("34.73.187.192".to_string());
-        p2p_config.ports = Some(P2pPortsConfig {
-            cometbft: Some(26656),
-            resolver: Some(26655),
-        });
+        let p2p_config = P2pConfig {
+            external_ip: Some("34.73.187.192".to_string()),
+            ports: Some(P2pPortsConfig {
+                cometbft: Some(26656),
+                resolver: Some(26655),
+            }),
+            ..Default::default()
+        };
 
         apply_port_configurations(&paths, &p2p_config)
             .await
@@ -477,12 +479,14 @@ mod tests {
     async fn test_resolver_port_config_with_default_localhost() {
         let (_temp, paths) = create_test_paths();
 
-        let mut p2p_config = P2pConfig::default();
         // Don't set external_ip, should default to 127.0.0.1
-        p2p_config.ports = Some(P2pPortsConfig {
-            cometbft: Some(26656),
-            resolver: Some(26655),
-        });
+        let p2p_config = P2pConfig {
+            ports: Some(P2pPortsConfig {
+                cometbft: Some(26656),
+                resolver: Some(26655),
+            }),
+            ..Default::default()
+        };
 
         apply_port_configurations(&paths, &p2p_config)
             .await
@@ -510,12 +514,14 @@ mod tests {
     async fn test_resolver_port_config_with_custom_port() {
         let (_temp, paths) = create_test_paths();
 
-        let mut p2p_config = P2pConfig::default();
-        p2p_config.external_ip = Some("10.0.0.5".to_string());
-        p2p_config.ports = Some(P2pPortsConfig {
-            cometbft: Some(26656),
-            resolver: Some(9999), // Custom port
-        });
+        let p2p_config = P2pConfig {
+            external_ip: Some("10.0.0.5".to_string()),
+            ports: Some(P2pPortsConfig {
+                cometbft: Some(26656),
+                resolver: Some(9999), // Custom port
+            }),
+            ..Default::default()
+        };
 
         apply_port_configurations(&paths, &p2p_config)
             .await
@@ -541,12 +547,14 @@ mod tests {
     async fn test_resolver_disabled_when_port_not_set() {
         let (_temp, paths) = create_test_paths();
 
-        let mut p2p_config = P2pConfig::default();
-        p2p_config.external_ip = Some("34.73.187.192".to_string());
-        p2p_config.ports = Some(P2pPortsConfig {
-            cometbft: Some(26656),
-            resolver: None, // Resolver disabled
-        });
+        let p2p_config = P2pConfig {
+            external_ip: Some("34.73.187.192".to_string()),
+            ports: Some(P2pPortsConfig {
+                cometbft: Some(26656),
+                resolver: None, // Resolver disabled
+            }),
+            ..Default::default()
+        };
 
         apply_port_configurations(&paths, &p2p_config)
             .await
@@ -567,11 +575,13 @@ mod tests {
     async fn test_cometbft_port_config_uses_zero_address() {
         let (_temp, paths) = create_test_paths();
 
-        let mut p2p_config = P2pConfig::default();
-        p2p_config.ports = Some(P2pPortsConfig {
-            cometbft: Some(26656),
-            resolver: None,
-        });
+        let p2p_config = P2pConfig {
+            ports: Some(P2pPortsConfig {
+                cometbft: Some(26656),
+                resolver: None,
+            }),
+            ..Default::default()
+        };
 
         apply_port_configurations(&paths, &p2p_config)
             .await
@@ -592,13 +602,15 @@ mod tests {
     async fn test_resolver_port_config_with_custom_listen_ip() {
         let (_temp, paths) = create_test_paths();
 
-        let mut p2p_config = P2pConfig::default();
-        p2p_config.external_ip = Some("34.73.187.192".to_string());
-        p2p_config.listen_ip = Some("10.128.0.5".to_string()); // Custom private IP
-        p2p_config.ports = Some(P2pPortsConfig {
-            cometbft: Some(26656),
-            resolver: Some(26655),
-        });
+        let p2p_config = P2pConfig {
+            external_ip: Some("34.73.187.192".to_string()),
+            listen_ip: Some("10.128.0.5".to_string()), // Custom private IP
+            ports: Some(P2pPortsConfig {
+                cometbft: Some(26656),
+                resolver: Some(26655),
+            }),
+            ..Default::default()
+        };
 
         apply_port_configurations(&paths, &p2p_config)
             .await
