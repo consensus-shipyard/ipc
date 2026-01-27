@@ -10,8 +10,11 @@ use serde::{Deserialize, Serialize};
 pub enum IpcMessage {
     /// A top-down checkpoint parent finality proposal (legacy voting-based)
     TopDownExec(ParentFinality),
-    /// Generalized top-down finality with extensible certificate types
-    GeneralisedTopDown(GeneralisedTopDown),
+    /// Parent finality proposal carrying a certificate.
+    ///
+    /// This is intentionally "WithCert" to allow future extensions where certificates and
+    /// integrity proof bundles are delivered as separate messages.
+    ParentFinalityWithCert(ParentFinalityWithCert),
 }
 
 /// A proposal of the parent view that validators will be voting on.
@@ -23,9 +26,9 @@ pub struct ParentFinality {
     pub block_hash: Vec<u8>,
 }
 
-/// Generalized top-down finality structure
+/// Parent finality proposal with a certificate (v2).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct GeneralisedTopDown {
+pub struct ParentFinalityWithCert {
     /// The chain epoch this finality is for (height)
     pub height: ChainEpoch,
     /// The certificate that certifies finality (type-specific, proof is fetched from local cache)

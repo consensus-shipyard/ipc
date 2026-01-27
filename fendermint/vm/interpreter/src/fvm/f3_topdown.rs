@@ -3,11 +3,15 @@
 
 use anyhow::{bail, Context};
 use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::ipc::GeneralisedTopDown;
+use fendermint_vm_message::ipc::ParentFinalityWithCert;
 use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::BytesSer;
+use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
+use multihash_codetable::{Code, MultihashDigest};
 use std::sync::Arc;
+use thiserror::Error;
 
 use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_topdown_proof_service::types::SerializableF3Certificate;
@@ -16,6 +20,38 @@ use fendermint_vm_topdown_proof_service::PowerEntries;
 use crate::fvm::event_extraction::{extract_topdown_messages, extract_validator_changes};
 use crate::fvm::state::ipc::F3LightClientCaller;
 use crate::fvm::state::FvmExecState;
+
+#[derive(Debug, Error)]
+pub enum F3TopDownError {
+    #[error("proof bundle not found in local cache for height {height}")]
+    CacheMiss { height: ChainEpoch },
+}
+
+#[derive(Debug)]
+pub struct ExtractedTopDownEffects {
+    pub topdown_msgs: Vec<IpcEnvelope>,
+    pub validator_changes: Vec<PowerChangeRequest>,
+    pub instance_id: u64,
+    pub parent_eth_block_hash: [u8; 32],
+}
+
+fn eth_hash_from_tipset_key_bytes(
+    tipset: &fendermint_vm_topdown_proof_service::types::FinalizedTipset,
+) -> anyhow::Result<[u8; 32]> {
+    // Lotus eth block hash for a tipset is the multihash digest of `TipSetKey.Cid()`, where
+    // `TipSetKey` is the concatenation of block header CID bytes (order-sensitive), and
+    // `TipSetKey.Cid()` is computed over the DAG-CBOR bytestring-wrapped key bytes.
+    //
+    // See: https://docs.filecoin.io/basics/the-blockchain/blocks-and-tipsets#tipsets-in-the-ethereum-json-rpc
+    // Force CBOR *bytestring* encoding (not array-of-ints) for the key bytes.
+    let wrapped = fvm_ipld_encoding::to_vec(&BytesSer(&tipset.block_cids))
+        .context("failed to CBOR-encode tipset key bytes as bytestring")?;
+    let digest = Code::Blake2b256.digest(&wrapped);
+
+    let mut out = [0u8; 32];
+    out.copy_from_slice(digest.digest());
+    Ok(out)
+}
 
 /// F3 finality handler - handles all F3 proof-based finality logic
 /// This module encapsulates all F3-specific concerns, keeping TopDownManager clean
@@ -60,8 +96,8 @@ impl F3TopDownHandler {
         // Convert FinalityCertificate to SerializableF3Certificate for message
         let serializable_cert = SerializableF3Certificate::from(&epoch_with_cert.certificate);
 
-        Some(ChainMessage::Ipc(IpcMessage::GeneralisedTopDown(
-            GeneralisedTopDown {
+        Some(ChainMessage::Ipc(IpcMessage::ParentFinalityWithCert(
+            ParentFinalityWithCert {
                 height: epoch_with_cert.epoch,
                 certificate: fendermint_vm_message::ipc::Certificate::FilecoinF3(serializable_cert),
             },
@@ -80,7 +116,7 @@ impl F3TopDownHandler {
     pub async fn attest<DB>(
         &self,
         state: &mut FvmExecState<DB>,
-        msg: &GeneralisedTopDown,
+        msg: &ParentFinalityWithCert,
     ) -> anyhow::Result<()>
     where
         DB: Blockstore + Clone + 'static + Send + Sync,
@@ -92,12 +128,7 @@ impl F3TopDownHandler {
         let cached = self
             .proof_cache
             .get_epoch_proof_with_certificate(msg.height)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "proof bundle not found in local cache for height {}",
-                    msg.height
-                )
-            })?;
+            .ok_or_else(|| anyhow::Error::new(F3TopDownError::CacheMiss { height: msg.height }))?;
 
         let cached_cert = SerializableF3Certificate::from(&cached.certificate);
         if &cached_cert != msg_cert {
@@ -130,19 +161,26 @@ impl F3TopDownHandler {
             );
         }
 
-        // Epoch must advance by exactly 1 relative to the latest finalized epoch in state.
+        // Epoch ordering:
         //
-        // At genesis this is `None` (no finality yet). In that case we skip the check here; the
-        // cache lookup (and later execution) will still enforce that we only process epochs we
-        // have proofs for.
-        if let Some(prev_finalized) = f3_state.latest_finalized_height {
-            if msg.height != prev_finalized + 1 {
-                bail!(
-                    "epoch is not sequential: message height {} != expected {}",
-                    msg.height,
-                    prev_finalized + 1
-                );
-            }
+        // Filecoin can have null rounds (epochs with no tipsets), so tipset heights may skip.
+        // We must not require strict +1 sequencing. Instead, require that the proposal targets
+        // the next *available* cached epoch after the last committed one.
+        let expected_epoch = self
+            .proof_cache
+            .get_next_uncommitted_epoch()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "no cached proof available after last committed epoch {}",
+                    f3_state.latest_finalized_height
+                )
+            })?;
+        if msg.height != expected_epoch {
+            bail!(
+                "unexpected epoch: message height {} != expected {}",
+                msg.height,
+                expected_epoch
+            );
         }
 
         Ok(())
@@ -150,27 +188,37 @@ impl F3TopDownHandler {
 
     /// Execute F3-specific logic for a generalised top-down message.
     /// Returns the topdown messages and validator changes to be processed by TopDownManager.
-    pub fn extract_messages_and_validator_changes<DB>(
+    pub fn extract_top_down_effects(
         &self,
-        _state: &mut FvmExecState<DB>,
-        msg: &GeneralisedTopDown,
-    ) -> anyhow::Result<(Vec<IpcEnvelope>, Vec<PowerChangeRequest>, u64)>
-    where
-        DB: Blockstore + Clone + 'static + Send + Sync,
-    {
+        msg: &ParentFinalityWithCert,
+    ) -> anyhow::Result<ExtractedTopDownEffects> {
         // Cache is the source of truth: get the proof + certificate for this epoch.
         let cached = self
             .proof_cache
             .get_epoch_proof_with_certificate(msg.height)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "proof bundle not found in local cache for height {}",
-                    msg.height
-                )
-            })?;
+            .ok_or_else(|| anyhow::Error::new(F3TopDownError::CacheMiss { height: msg.height }))?;
 
         // We don't validate the message certificate here; that happens during attestation.
         let instance_id = cached.certificate.gpbft_instance;
+
+        // Deterministically derive the FEVM/Ethereum-view block hash from the cached tipset key.
+        //
+        // In Lotus, the eth "block hash" for a tipset is `EthHashFromCid(TipSetKey.Cid())`,
+        // where `TipSetKey.Cid()` is the CID of the DAG-CBOR bytestring-wrapped key bytes.
+        //
+        // We already have the former tipset key bytes in the cache as `FinalizedTipset.block_cids`.
+        let tipset = cached
+            .finalized_tipsets
+            .iter()
+            .find(|t| t.epoch == msg.height)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "tipset key bytes not found in certificate for epoch {}",
+                    msg.height
+                )
+            })?;
+        let parent_eth_block_hash = eth_hash_from_tipset_key_bytes(tipset)
+            .context("failed to derive parent eth block hash from cached tipset key")?;
 
         tracing::debug!(
             instance = instance_id,
@@ -187,7 +235,12 @@ impl F3TopDownHandler {
             "extracted topdown effects from proof bundle"
         );
 
-        Ok((msgs, validator_changes, instance_id))
+        Ok(ExtractedTopDownEffects {
+            topdown_msgs: msgs,
+            validator_changes,
+            instance_id,
+            parent_eth_block_hash,
+        })
     }
 
     /// Finalize F3 execution after all top-down effects have been applied successfully.
@@ -204,14 +257,7 @@ impl F3TopDownHandler {
     {
         // Update F3LightClientActor with new certificate state (on-chain).
         let power_table = ActorPowerTable::from(&self.get_power_table(instance_id)?).0;
-        let new_light_client_state =
-            fendermint_vm_actor_interface::f3_light_client::LightClientState {
-                latest_instance_id: instance_id,
-                latest_finalized_height: Some(epoch),
-                power_table,
-            };
-
-        self.update_f3_light_client_actor_state(state, new_light_client_state)?;
+        self.update_f3_light_client_actor_state(state, instance_id, epoch, power_table)?;
         tracing::debug!(instance = instance_id, "updated F3LightClientActor state");
 
         // Mark epoch as committed in cache.
@@ -282,13 +328,20 @@ impl F3TopDownHandler {
     fn update_f3_light_client_actor_state<DB>(
         &self,
         state: &mut FvmExecState<DB>,
-        new_state: fendermint_vm_actor_interface::f3_light_client::LightClientState,
+        latest_instance_id: u64,
+        latest_finalized_height: fvm_shared::clock::ChainEpoch,
+        power_table: Vec<fendermint_vm_actor_interface::f3_light_client::PowerEntry>,
     ) -> anyhow::Result<()>
     where
         DB: Blockstore + Clone + 'static + Send + Sync,
     {
         self.f3_light_client_actor_caller
-            .update_state(state, new_state)
+            .update_state(
+                state,
+                latest_instance_id,
+                latest_finalized_height,
+                power_table,
+            )
             .context("failed to update F3LightClientActor state")
     }
 }
@@ -351,6 +404,43 @@ mod tests {
     use proofs::proofs::common::bundle::UnifiedProofBundle;
     use std::collections::BTreeSet;
     use std::sync::Arc;
+
+    #[test]
+    fn test_eth_hash_from_tipset_key_bytes_matches_mainnet_vector() -> anyhow::Result<()> {
+        // Mainnet test vector for epoch 5707380.
+        // Generated from:
+        // - Filecoin.ChainGetTipSetByHeight(5707380).Cids (in RPC order)
+        // - Filecoin.EthGetBlockByNumber(5707380).hash
+        //
+        // IMPORTANT: CID order is significant; do NOT sort these.
+        let cids = [
+            "bafy2bzacedqyixpeoqskjviifl6s2jmsabnexnw5ho77wakh3s3bevsdyqyle",
+            "bafy2bzaceacu7rvgnnmeq2ibhtzil6ygw6govnaqdia3yr3otetfk7whiohkq",
+            "bafy2bzaceccqjvlsxeesvb4mksxa62n47o7ahuvkpfue32qkwpjcbuw3lhdja",
+            "bafy2bzaced46vktulg7par7y3b5uwemwsamqucdn3mpbtezcxfv36gcfwumpy",
+            "bafy2bzaceb26bjmzcqkvnrwlfr7o3kxrdliqf6d5metxta5genc2fg7qz7x2y",
+        ];
+        let expected_hex = "b1b336d1164ed4a696920245d94d3a0c32d25b7d6d4758b51d7218e4f932b785";
+        let expected = hex::decode(expected_hex)?;
+        let expected: [u8; 32] = expected
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("expected hash must be 32 bytes"))?;
+
+        let mut block_cids = Vec::new();
+        for s in cids {
+            let cid: cid::Cid = s.parse()?;
+            block_cids.extend_from_slice(cid.to_bytes().as_slice());
+        }
+
+        let tipset = fendermint_vm_topdown_proof_service::types::FinalizedTipset {
+            epoch: 5707380,
+            block_cids,
+        };
+
+        let got = super::eth_hash_from_tipset_key_bytes(&tipset)?;
+        assert_eq!(got, expected);
+        Ok(())
+    }
 
     fn mk_test_certificate_entry(instance_id: u64, epochs: Vec<ChainEpoch>) -> CertificateEntry {
         let mh = Multihash::<64>::wrap(0x12, &[0u8; 32]).expect("valid multihash");
@@ -467,8 +557,9 @@ mod tests {
         }];
 
         let f3_state = fendermint_actor_f3_light_client::state::State::new(
+            genesis_state.store(),
             instance_id,
-            Some(base_epoch),
+            base_epoch,
             genesis_power_table,
         )
         .context("failed to create F3 light client actor state")?;
@@ -531,7 +622,7 @@ mod tests {
             .chain_message_from_proof_cache()
             .expect("next uncommitted epoch proof exists");
         let msg = match chain_msg {
-            ChainMessage::Ipc(IpcMessage::GeneralisedTopDown(m)) => m,
+            ChainMessage::Ipc(IpcMessage::ParentFinalityWithCert(m)) => m,
             other => anyhow::bail!("unexpected chain message: {other:?}"),
         };
         assert_eq!(msg.height, base_epoch + 1);
@@ -543,22 +634,21 @@ mod tests {
             .context("attestation failed")?;
 
         // Extract effects (should be empty in this fabricated proof bundle).
-        let (topdown_msgs, validator_changes, used_instance) =
-            handler.extract_messages_and_validator_changes(&mut exec_state, &msg)?;
-        assert!(topdown_msgs.is_empty());
-        assert!(validator_changes.is_empty());
-        assert_eq!(used_instance, instance_id);
+        let extracted = handler.extract_top_down_effects(&msg)?;
+        assert!(extracted.topdown_msgs.is_empty());
+        assert!(extracted.validator_changes.is_empty());
+        assert_eq!(extracted.instance_id, instance_id);
 
         // Finalize: updates actor state + marks cache committed.
         handler
-            .finalize_after_execution(&mut exec_state, msg.height, used_instance)
+            .finalize_after_execution(&mut exec_state, msg.height, extracted.instance_id)
             .context("finalize failed")?;
 
         // Actor state updated.
         let caller = crate::fvm::state::ipc::F3LightClientCaller::new();
         let actor_state = caller.get_state(&mut exec_state)?;
         assert_eq!(actor_state.latest_instance_id, instance_id);
-        assert_eq!(actor_state.latest_finalized_height, Some(base_epoch + 1));
+        assert_eq!(actor_state.latest_finalized_height, base_epoch + 1);
         assert_eq!(actor_state.power_table.len(), 2);
         assert_eq!(actor_state.power_table[0].id, 1);
         assert_eq!(actor_state.power_table[0].power, 1000);

@@ -315,9 +315,7 @@ async fn start_f3_topdown(
     let f3_state = f3_state_in_genesis
         .context("F3 is enabled in config but initial F3 state is missing in genesis")?;
     let initial_instance = f3_state.latest_instance_id;
-    let initial_epoch = f3_state.latest_finalized_height.context(
-        "F3LightClientActor has no latest_finalized_height; genesis must set base epoch",
-    )?;
+    let initial_epoch = f3_state.latest_finalized_height;
 
     let db_path = Some(settings.data_dir().join("proof-cache"));
     let cache = Arc::new(
@@ -364,7 +362,15 @@ async fn start_f3_topdown(
     }
 
     Ok(TopDownInit {
-        manager: TopDownManager::f3(handler),
+        manager: TopDownManager::f3_with_retry_config(
+            handler,
+            fendermint_vm_interpreter::fvm::topdown::F3ExecutionCacheRetryConfig {
+                backoff_initial: f3_config.execution_cache_retry.backoff_initial,
+                backoff_max: f3_config.execution_cache_retry.backoff_max,
+                max_wait: f3_config.execution_cache_retry.max_wait,
+                error_after: f3_config.execution_cache_retry.error_after,
+            },
+        ),
         legacy_post_init: None,
     })
 }

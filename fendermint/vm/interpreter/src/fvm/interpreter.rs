@@ -335,48 +335,60 @@ where
         let base_fee = state.block_gas_tracker().base_fee().clone();
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
-                Ok(chain_msg) => match chain_msg {
-                    ChainMessage::Ipc(IpcMessage::GeneralisedTopDown(ref msg)) => {
-                        // Attest generalised top-down message (checks local cache + on-chain continuity).
-                        match self
-                            .top_down_manager
-                            .attest_generalised(&mut state, msg)
-                            .await
-                        {
-                            Ok(()) => {
-                                tracing::debug!(
-                                    height = msg.height,
-                                    "generalised top-down message attested successfully"
-                                );
+                Ok(chain_msg) => {
+                    match chain_msg {
+                        ChainMessage::Ipc(IpcMessage::ParentFinalityWithCert(ref msg)) => {
+                            // Attest parent-finality-with-cert message (checks local cache + on-chain continuity).
+                            match self
+                                .top_down_manager
+                                .attest_parent_finality_with_cert(&mut state, msg)
+                                .await
+                            {
+                                Ok(()) => {
+                                    tracing::debug!(
+                                        height = msg.height,
+                                        "parent finality with cert attested successfully"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        height = msg.height,
+                                        reason = if e.chain().any(|cause| {
+                                            matches!(
+                                                cause.downcast_ref::<crate::fvm::f3_topdown::F3TopDownError>(),
+                                                Some(crate::fvm::f3_topdown::F3TopDownError::CacheMiss { .. })
+                                            )
+                                        }) {
+                                            "cache_miss"
+                                        } else {
+                                            "invalid"
+                                        },
+                                        "parent finality with cert attestation failed - rejecting block"
+                                    );
+                                    return Ok(AttestMessagesResponse::Reject);
+                                }
                             }
-                            Err(e) => {
-                                tracing::warn!(
-                                    error = %e,
-                                    height = msg.height,
-                                    "proof bundle verification failed - rejecting block"
-                                );
+                        }
+                        ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
+                            // v1 voting-based finality (kept for backward compatibility)
+                            if !self.top_down_manager.attest_legacy(finality).await {
                                 return Ok(AttestMessagesResponse::Reject);
                             }
                         }
-                    }
-                    ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
-                        // v1 voting-based finality (kept for backward compatibility)
-                        if !self.top_down_manager.attest_legacy(finality).await {
-                            return Ok(AttestMessagesResponse::Reject);
+                        ChainMessage::Signed(signed) => {
+                            if signed.message.gas_fee_cap < base_fee {
+                                tracing::warn!(
+                                    fee_cap = signed.message.gas_fee_cap.to_string(),
+                                    base_fee = base_fee.to_string(),
+                                    "msg fee cap less than base fee"
+                                );
+                                return Ok(AttestMessagesResponse::Reject);
+                            }
+                            block_gas_usage += signed.message.gas_limit;
                         }
                     }
-                    ChainMessage::Signed(signed) => {
-                        if signed.message.gas_fee_cap < base_fee {
-                            tracing::warn!(
-                                fee_cap = signed.message.gas_fee_cap.to_string(),
-                                base_fee = base_fee.to_string(),
-                                "msg fee cap less than base fee"
-                            );
-                            return Ok(AttestMessagesResponse::Reject);
-                        }
-                        block_gas_usage += signed.message.gas_limit;
-                    }
-                },
+                }
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to decode message in proposal as ChainMessage");
                     return Ok(AttestMessagesResponse::Reject);
@@ -486,10 +498,10 @@ where
                 })
             }
             ChainMessage::Ipc(ipc_msg) => match ipc_msg {
-                IpcMessage::GeneralisedTopDown(msg) => {
+                IpcMessage::ParentFinalityWithCert(msg) => {
                     let applied_message = self
                         .top_down_manager
-                        .execute_generalised(state, msg)
+                        .execute_parent_finality_with_cert(state, msg)
                         .await?;
                     Ok(ApplyMessageResponse {
                         applied_message,

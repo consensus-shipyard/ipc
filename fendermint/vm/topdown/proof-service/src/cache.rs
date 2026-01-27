@@ -115,8 +115,9 @@ impl ProofCache {
     /// Insert a certificate into the store
     pub fn insert_certificate(&self, entry: CertificateEntry) -> Result<()> {
         let instance_id = entry.instance_id();
-        self.certificates.write().insert(instance_id, entry.clone());
+        // Persist first so an error doesn't leave in-memory state ahead of disk.
         self.with_persistence(|p| p.save_certificate(&entry))?;
+        self.certificates.write().insert(instance_id, entry.clone());
         tracing::debug!(instance_id, "Inserted certificate into cache");
         Ok(())
     }
@@ -147,13 +148,7 @@ impl ProofCache {
 
         let epochs: Vec<ChainEpoch> = entries.iter().map(|e| e.epoch).collect();
 
-        {
-            let mut proofs = self.epoch_proofs.write();
-            for entry in entries.iter() {
-                proofs.insert(entry.epoch, entry.clone());
-            }
-        }
-
+        // Persist first so an error doesn't leave in-memory state ahead of disk.
         self.with_persistence(|p| {
             for entry in &entries {
                 p.save_epoch_proof(entry)?;
@@ -161,8 +156,48 @@ impl ProofCache {
             Ok(())
         })?;
 
+        {
+            let mut proofs = self.epoch_proofs.write();
+            for entry in entries.iter() {
+                proofs.insert(entry.epoch, entry.clone());
+            }
+        }
+
         self.emit_cache_metrics(&epochs);
         tracing::debug!(?epochs, "Inserted epoch proofs into cache");
+        Ok(())
+    }
+
+    /// Insert a certificate and all of its epoch proofs into the cache, atomically on disk.
+    ///
+    /// This is the preferred API for proof generation: it avoids partial persistence (e.g. cert
+    /// written but only some epoch proofs) if RocksDB writes fail or the process crashes mid-write.
+    pub fn insert_certificate_with_epoch_proofs(
+        &self,
+        cert: CertificateEntry,
+        epoch_proofs: Vec<EpochProofEntry>,
+    ) -> Result<()> {
+        let instance_id = cert.instance_id();
+        let epochs: Vec<ChainEpoch> = epoch_proofs.iter().map(|e| e.epoch).collect();
+
+        // Persist atomically first (if enabled).
+        self.with_persistence(|p| p.save_certificate_with_epoch_proofs(&cert, &epoch_proofs))?;
+
+        // Then update in-memory structures (infallible).
+        self.certificates.write().insert(instance_id, cert.clone());
+        if !epoch_proofs.is_empty() {
+            let mut proofs = self.epoch_proofs.write();
+            for entry in &epoch_proofs {
+                proofs.insert(entry.epoch, entry.clone());
+            }
+            self.emit_cache_metrics(&epochs);
+        }
+
+        tracing::debug!(
+            instance_id,
+            epoch_count = epochs.len(),
+            "Inserted certificate and epoch proofs into cache"
+        );
         Ok(())
     }
 
@@ -260,15 +295,18 @@ impl ProofCache {
         self.last_committed_instance.load(Ordering::Acquire)
     }
 
-    /// Get the next uncommitted epoch (last_committed_epoch + 1)
-    /// Returns None if no proof is available for that epoch
+    /// Get the next uncommitted epoch.
+    ///
+    /// Filecoin can have null rounds (epochs with no tipsets), so cached proofs may not exist for
+    /// `last_committed_epoch + 1`. We therefore return the smallest cached epoch strictly greater
+    /// than `last_committed_epoch`.
     pub fn get_next_uncommitted_epoch(&self) -> Option<ChainEpoch> {
-        let next_epoch = self.last_committed_epoch() + 1;
-        if self.contains_epoch_proof(next_epoch) {
-            Some(next_epoch)
-        } else {
-            None
-        }
+        let after = self.last_committed_epoch() + 1;
+        self.epoch_proofs
+            .read()
+            .range(after..)
+            .next()
+            .map(|(epoch, _)| *epoch)
     }
 
     /// Get the next uncommitted proof entry (epoch + certificate)

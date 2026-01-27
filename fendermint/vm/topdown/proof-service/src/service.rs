@@ -15,7 +15,7 @@
 //! Each proof requires both parent (epoch E) and child (typically epoch E+1) because
 //! Filecoin stores `parentReceipts` in the child block, not the parent.
 
-use crate::assembler::ProofAssembler;
+use crate::assembler::{resolve_eth_address_to_actor_id, ProofAssembler};
 use crate::cache::ProofCache;
 use crate::config::{GatewayId, ProofServiceConfig};
 use crate::f3_client::F3Client;
@@ -145,12 +145,30 @@ impl ProofGeneratorService {
             return Ok(());
         }
 
+        // Provide *all-or-nothing* semantics per certificate.
+        //
+        // `fetch_next_certificate()` advances the internal F3 light-client state to the newly
+        // validated instance. If we fail later while generating/verifying/caching proofs, we MUST
+        // roll back that state; otherwise the next tick would fetch the next instance and we'd
+        // permanently skip this certificate, leaving a cache hole that can stall catch-up.
+        let checkpoint = self.f3_client.checkpoint_state();
+
         let Some((certificate, power_table)) = self.fetch_next_certificate().await? else {
             return Ok(()); // No certificate available, caught up with F3
         };
 
-        self.generate_proofs_for_certificate(&certificate, &power_table)
-            .await?;
+        if let Err(e) = self
+            .generate_proofs_for_certificate(&certificate, &power_table)
+            .await
+        {
+            tracing::error!(
+                error = %e,
+                instance = certificate.gpbft_instance,
+                "failed to generate/verify proofs for certificate; rolling back and retrying later"
+            );
+            self.f3_client.restore_state(checkpoint);
+            return Err(e);
+        }
 
         Ok(())
     }
@@ -245,14 +263,13 @@ impl ProofGeneratorService {
             "Generating proofs for certificate epochs"
         );
 
-        // The last tipset in the certificate has no child tipset inside this certificate, so it
-        // cannot be proven yet. We only treat the epochs we generated proofs for as "finalized
-        // tipsets" for verification purposes.
-        let finalized_tipsets = {
-            let parents: Vec<FinalizedTipset> =
-                tipset_pairs.iter().map(|(p, _)| p.clone()).collect();
-            FinalizedTipsets::from(parents.as_slice())
-        };
+        // Verification needs to accept witness blocks from *both* the parent and the child tipset
+        // of each (parent, child) pair (receipts/state for the parent live in the child).
+        // Therefore, pass the whole certified chain from the certificate.
+        //
+        // Note: we still only *generate* proofs for the parent epochs via `windows(2)`, so the
+        // last tipset in the chain (which has no child in this certificate) is not proven yet.
+        let finalized_tipsets = FinalizedTipsets::from(&cert.ec_chain);
 
         let mut epoch_proofs = Vec::with_capacity(tipset_pairs.len());
 
@@ -287,8 +304,8 @@ impl ProofGeneratorService {
         // Cache the certificate and proofs
         let rpc_endpoint = self.f3_client.rpc_endpoint().to_string();
         let cert_entry = CertificateEntry::new(cert.clone(), power_table.clone(), rpc_endpoint);
-        self.cache.insert_certificate(cert_entry)?;
-        self.cache.insert_epoch_proofs(epoch_proofs)?;
+        self.cache
+            .insert_certificate_with_epoch_proofs(cert_entry, epoch_proofs)?;
 
         tracing::info!(
             epoch_count = epochs_to_prove.len(),
@@ -314,17 +331,9 @@ async fn extract_gateway_actor_id_from_config(config: &ProofServiceConfig) -> Re
     match &config.gateway_id {
         GatewayId::ActorId(id) => Ok(*id),
         GatewayId::EthAddress(eth_addr) => {
-            resolve_eth_address_to_actor_id(eth_addr, &config.parent_rpc_url).await
+            resolve_eth_address_to_actor_id(&config.parent_rpc_url, eth_addr).await
         }
     }
-}
-
-async fn resolve_eth_address_to_actor_id(eth_addr: &str, parent_rpc_url: &str) -> Result<u64> {
-    let client = proofs::client::LotusClient::new(url::Url::parse(parent_rpc_url)?, None);
-    let actor_id = proofs::proofs::resolve_eth_address_to_actor_id(&client, eth_addr)
-        .await
-        .with_context(|| format!("Failed to resolve gateway Ethereum address: {}", eth_addr))?;
-    Ok(actor_id)
 }
 
 #[cfg(test)]

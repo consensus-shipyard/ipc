@@ -154,6 +154,20 @@ impl F3Client {
         Ok((certificate, power_table))
     }
 
+    /// Snapshot the current validated state.
+    ///
+    /// Used by the proof-service to provide *all-or-nothing* semantics:
+    /// if proof generation fails after fetching/validating a certificate, we can roll back
+    /// and retry the same certificate on the next tick.
+    pub fn checkpoint_state(&self) -> LightClientState {
+        self.state.clone()
+    }
+
+    /// Restore a previously checkpointed validated state.
+    pub fn restore_state(&mut self, state: LightClientState) {
+        self.state = state;
+    }
+
     async fn fetch_certificate(&self, instance: u64) -> Result<FinalityCertificate> {
         let fetch_start = Instant::now();
 

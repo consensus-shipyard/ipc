@@ -549,8 +549,9 @@ impl<'a> GenesisBuilder<'a> {
             // We treat the ECChain base epoch for the configured instance as already finalized
             // by the previous certificate. The node will start proving/executing from base_epoch + 1.
             let f3_state = fendermint_actor_f3_light_client::state::State::new(
+                state.store(),
                 f3_params.instance_id,
-                Some(f3_params.base_epoch),
+                f3_params.base_epoch as fvm_shared::clock::ChainEpoch,
                 f3_params.power_table.clone(),
             )?;
 

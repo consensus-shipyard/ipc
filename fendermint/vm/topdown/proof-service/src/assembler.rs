@@ -111,7 +111,7 @@ impl ProofAssembler {
     /// LotusClient is not Send, so we create it on-demand in each async function
     /// rather than storing it as a field.
     fn create_client(&self) -> LotusClient {
-        LotusClient::new(self.rpc_url.clone(), None)
+        LotusClient::new(self.rpc_url.clone(), None::<&str>)
     }
 
     /// Fetch a tipset by epoch from Lotus RPC
@@ -243,6 +243,23 @@ impl ProofAssembler {
         .await
         .context("Failed to join proof generation task")?
     }
+}
+
+/// Resolve an Ethereum address to a Filecoin actor ID on the parent chain.
+///
+/// Used at proof-service startup when `gateway_id` is configured as an Ethereum address.
+pub async fn resolve_eth_address_to_actor_id(parent_rpc_url: &str, eth_addr: &str) -> Result<u64> {
+    let url = Url::parse(parent_rpc_url).context("Failed to parse parent RPC URL")?;
+    let client = LotusClient::new(url, None::<&str>);
+    let actor_id = proofs::proofs::resolve_eth_address_to_actor_id(&client, eth_addr)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to resolve gateway Ethereum address to actor id: {}",
+                eth_addr
+            )
+        })?;
+    Ok(actor_id)
 }
 
 #[cfg(test)]

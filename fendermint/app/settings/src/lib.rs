@@ -236,10 +236,47 @@ pub struct TopDownSettings {
 
 /// F3 proof-based finality configuration
 /// When present, F3 proof-based finality is enabled
+#[serde_as]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct F3 {
     /// F3 proof service configuration (mandatory when F3 is configured)
     pub proof_service: ProofServiceConfig,
+
+    /// Retry policy for executing `ParentFinalityWithCert` when the local proof cache is missing.
+    ///
+    /// This affects catch-up: if a node did not have the cache entry during attestation (so it
+    /// didn't vote), it may still need to execute a committed block later once the proof-service
+    /// fills the cache.
+    #[serde(default)]
+    pub execution_cache_retry: F3ExecutionCacheRetrySettings,
+}
+
+#[serde_as]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct F3ExecutionCacheRetrySettings {
+    /// Initial backoff between retries.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub backoff_initial: Duration,
+    /// Maximum backoff between retries.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub backoff_max: Duration,
+    /// Maximum time to wait for the cache entry before failing block execution.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub max_wait: Duration,
+    /// Emit an `error!` log after this much waiting (and then periodically thereafter).
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub error_after: Duration,
+}
+
+impl Default for F3ExecutionCacheRetrySettings {
+    fn default() -> Self {
+        Self {
+            backoff_initial: Duration::from_millis(200),
+            backoff_max: Duration::from_secs(5),
+            max_wait: Duration::from_secs(10 * 60),
+            error_after: Duration::from_secs(2 * 60),
+        }
+    }
 }
 
 /// Settings for bottom-up checkpointing (posting subnet state to parent chain).

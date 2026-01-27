@@ -23,7 +23,7 @@ use crate::types::{
 use anyhow::{Context, Result};
 use fvm_shared::clock::ChainEpoch;
 use proofs::proofs::common::bundle::UnifiedProofBundle;
-use rocksdb::{BoundColumnFamily, Options, DB};
+use rocksdb::{BoundColumnFamily, Options, WriteBatch, DB};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -111,6 +111,41 @@ impl ProofCachePersistence {
         debug!(
             instance_id = entry.instance_id(),
             "Saved certificate to disk"
+        );
+        Ok(())
+    }
+
+    /// Atomically save a certificate together with all its epoch proofs.
+    ///
+    /// This is used to guarantee "all-or-nothing" persistence: if any write fails, none of the
+    /// entries are committed to disk, avoiding partial cache state after restart.
+    pub fn save_certificate_with_epoch_proofs(
+        &self,
+        cert: &CertificateEntry,
+        epoch_proofs: &[EpochProofEntry],
+    ) -> Result<()> {
+        let cf_certs = self.get_cf(CF_CERTIFICATES)?;
+        let cf_proofs = self.get_cf(CF_EPOCH_PROOFS)?;
+
+        let cert_key = cert.instance_id().to_be_bytes();
+        let cert_value = serde_json::to_vec(&SerializableCertificateEntry::from(cert))
+            .context("Failed to serialize certificate entry")?;
+
+        let mut batch = WriteBatch::default();
+        batch.put_cf(&cf_certs, cert_key, cert_value);
+
+        for entry in epoch_proofs {
+            let key = entry.epoch.to_be_bytes();
+            let value =
+                serde_json::to_vec(entry).context("Failed to serialize epoch proof entry")?;
+            batch.put_cf(&cf_proofs, key, value);
+        }
+
+        self.db.write(batch)?;
+        debug!(
+            instance_id = cert.instance_id(),
+            epoch_count = epoch_proofs.len(),
+            "Saved certificate and epoch proofs to disk (atomic batch)"
         );
         Ok(())
     }

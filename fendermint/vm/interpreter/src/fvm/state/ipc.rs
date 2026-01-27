@@ -4,6 +4,7 @@
 use anyhow::{bail, Context};
 
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::ActorID;
 use num_traits::Zero;
@@ -322,12 +323,16 @@ impl F3LightClientCaller {
     pub fn update_state(
         &self,
         state: &mut FvmExecState<impl Blockstore + Clone>,
-        light_client_state: f3_light_client::LightClientState,
+        latest_instance_id: u64,
+        latest_finalized_height: ChainEpoch,
+        power_table: Vec<f3_light_client::PowerEntry>,
     ) -> anyhow::Result<()> {
         let method_num = f3_light_client::Method::UpdateState as u64;
 
         let params = f3_light_client::UpdateStateParams {
-            state: light_client_state,
+            latest_instance_id,
+            latest_finalized_height,
+            power_table,
         };
 
         let params_bytes =
@@ -497,8 +502,9 @@ mod tests {
             },
         ];
         let f3_state = fendermint_actor_f3_light_client::state::State::new(
+            genesis_state.store(),
             instance_id,
-            Some(base_epoch),
+            base_epoch,
             power_table.clone(),
         )
         .context("failed to create F3 light client actor state")?;
@@ -533,31 +539,31 @@ mod tests {
         // Round-trip: read initial actor state.
         let state0 = caller.get_state(&mut exec_state)?;
         assert_eq!(state0.latest_instance_id, instance_id);
-        assert_eq!(state0.latest_finalized_height, Some(base_epoch));
+        assert_eq!(state0.latest_finalized_height, base_epoch);
         assert_eq!(state0.power_table.len(), power_table.len());
         assert_eq!(state0.power_table[0].id, 1);
 
         // Update state and read again.
-        let new_state = f3_light_client::LightClientState {
-            latest_instance_id: instance_id + 1,
-            latest_finalized_height: Some(base_epoch + 1),
-            power_table: vec![f3_light_client::PowerEntry {
-                id: 99,
-                public_key: vec![9u8; 48],
-                power: 999,
-            }],
-        };
+        let new_instance = instance_id + 1;
+        let new_epoch = base_epoch + 1;
+        let new_power_table = vec![f3_light_client::PowerEntry {
+            id: 99,
+            public_key: vec![9u8; 48],
+            power: 999,
+        }];
         caller
-            .update_state(&mut exec_state, new_state.clone())
+            .update_state(
+                &mut exec_state,
+                new_instance,
+                new_epoch,
+                new_power_table.clone(),
+            )
             .context("failed to update F3LightClientActor state")?;
 
         let state1 = caller.get_state(&mut exec_state)?;
-        assert_eq!(state1.latest_instance_id, new_state.latest_instance_id);
-        assert_eq!(
-            state1.latest_finalized_height,
-            new_state.latest_finalized_height
-        );
-        assert_eq!(state1.power_table, new_state.power_table);
+        assert_eq!(state1.latest_instance_id, new_instance);
+        assert_eq!(state1.latest_finalized_height, new_epoch);
+        assert_eq!(state1.power_table, new_power_table);
 
         // Also sanity-check that read-only exec doesn't mutate the actor (it reverts effects).
         let state2 = caller.get_state(&mut exec_state)?;

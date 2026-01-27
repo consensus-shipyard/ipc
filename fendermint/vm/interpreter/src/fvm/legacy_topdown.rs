@@ -1,7 +1,7 @@
 // Copyright 2022-2026 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use async_stm::atomically;
+use async_stm::{atomically, atomically_or_err};
 use fendermint_tracing::emit;
 use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_message::chain::ChainMessage;
@@ -87,7 +87,7 @@ impl LegacyTopDownHandler {
         proposer: Option<&str>,
         local_block_height: u64,
     ) -> anyhow::Result<()> {
-        atomically(|| {
+        atomically_or_err(|| {
             self.provider.set_new_finality(finality.clone())?;
             self.votes.set_finalized(
                 finality.height,
@@ -97,8 +97,7 @@ impl LegacyTopDownHandler {
             )?;
             Ok(())
         })
-        .await;
-        Ok(())
+        .await
     }
 
     async fn chain_message_from_finality_or_quorum(&self) -> Option<ChainMessage> {

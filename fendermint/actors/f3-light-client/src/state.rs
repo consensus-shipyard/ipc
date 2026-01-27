@@ -8,7 +8,8 @@
 
 use crate::types::{LightClientState, PowerEntry};
 use fil_actors_runtime::runtime::Runtime;
-use fil_actors_runtime::ActorError;
+use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
+use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
@@ -23,18 +24,30 @@ pub struct State {
     pub light_client_state: LightClientState,
 }
 
+pub(crate) type PowerTable<BS> = Map2<BS, u64, PowerEntry>;
+
 impl State {
     /// Create a new F3 light client state
-    pub fn new(
+    pub fn new<BS: Blockstore>(
+        store: &BS,
         latest_instance_id: u64,
-        latest_finalized_height: Option<ChainEpoch>,
+        latest_finalized_height: ChainEpoch,
         power_table: Vec<PowerEntry>,
     ) -> Result<State, ActorError> {
+        let power_table_root = {
+            let mut m = PowerTable::empty(store, DEFAULT_HAMT_CONFIG, "f3_power_table");
+            for pe in power_table {
+                let id = pe.id;
+                m.set(&id, pe)?;
+            }
+            m.flush()?
+        };
+
         let state = State {
             light_client_state: LightClientState {
                 latest_instance_id,
                 latest_finalized_height,
-                power_table,
+                power_table_root,
             },
         };
         Ok(state)
@@ -43,10 +56,23 @@ impl State {
     /// Update light client state
     pub fn update_state(
         &mut self,
-        _rt: &impl Runtime,
-        new_state: LightClientState,
+        rt: &impl Runtime,
+        latest_instance_id: u64,
+        latest_finalized_height: ChainEpoch,
+        power_table: Vec<PowerEntry>,
     ) -> Result<(), ActorError> {
-        self.light_client_state = new_state;
+        let power_table_root = {
+            let mut m = PowerTable::empty(rt.store(), DEFAULT_HAMT_CONFIG, "f3_power_table");
+            for pe in power_table {
+                let id = pe.id;
+                m.set(&id, pe)?;
+            }
+            m.flush()?
+        };
+
+        self.light_client_state.latest_instance_id = latest_instance_id;
+        self.light_client_state.latest_finalized_height = latest_finalized_height;
+        self.light_client_state.power_table_root = power_table_root;
         Ok(())
     }
 }
