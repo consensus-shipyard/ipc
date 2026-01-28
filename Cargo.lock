@@ -4724,6 +4724,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_vm_evm_event_utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ethers",
+ "hex",
+ "ipc_actors_abis",
+ "proofs",
+]
+
+[[package]]
 name = "fendermint_vm_genesis"
 version = "0.1.0"
 dependencies = [
@@ -4793,6 +4804,7 @@ dependencies = [
  "fendermint_vm_core",
  "fendermint_vm_encoding",
  "fendermint_vm_event",
+ "fendermint_vm_evm_event_utils",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
@@ -4980,6 +4992,7 @@ dependencies = [
  "cid 0.11.1",
  "clap 4.5.54",
  "fendermint_actor_f3_light_client",
+ "fendermint_vm_evm_event_utils",
  "fendermint_vm_genesis",
  "filecoin-f3-certs",
  "filecoin-f3-gpbft",
@@ -4993,6 +5006,7 @@ dependencies = [
  "humantime-serde",
  "ipc-api",
  "ipc-observability",
+ "ipc_actors_abis",
  "keccak-hash",
  "multihash 0.18.1",
  "multihash-codetable",

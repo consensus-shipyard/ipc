@@ -5,11 +5,10 @@
 //! This module provides functionality to extract and decode events from proof bundles,
 //! including topdown messages and validator change events.
 
-use anyhow::{anyhow, Context, Result};
-use ethers::abi::RawLog;
-use ethers::contract::EthLogDecode;
-use ethers::types as et;
-use ipc_actors_abis::{lib_gateway, lib_power_change_log};
+use anyhow::{Context, Result};
+use fendermint_vm_evm_event_utils::{
+    decode_new_power_change_request, decode_new_topdown_message, raw_log_from_event_proof,
+};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
 use proofs::proofs::common::bundle::UnifiedProofBundle;
@@ -26,12 +25,12 @@ pub fn extract_topdown_messages(proof_bundle: &UnifiedProofBundle) -> Result<Vec
     let mut messages = Vec::new();
 
     for event_proof in &proof_bundle.event_proofs {
-        let event_log = extract_event_from_proof(event_proof)?;
+        let raw = raw_log_from_event_proof(event_proof)?;
 
-        // Try to decode as NewTopDownMessage event
-        if let Ok(event) = decode_topdown_message_event(&event_log) {
+        // Try to decode as NewTopDownMessage event.
+        if let Ok(event) = decode_new_topdown_message(&raw) {
             trace!(
-                emitter = event_log.emitter,
+                emitter = event_proof.event_data.emitter,
                 subnet = ?event.subnet,
                 "Found NewTopDownMessage event"
             );
@@ -64,12 +63,12 @@ pub fn extract_validator_changes(
     let mut changes = Vec::new();
 
     for event_proof in &proof_bundle.event_proofs {
-        let event_log = extract_event_from_proof(event_proof)?;
+        let raw = raw_log_from_event_proof(event_proof)?;
 
-        // Try to decode as NewPowerChangeRequest event
-        if let Ok(event) = decode_power_change_event(&event_log) {
+        // Try to decode as NewPowerChangeRequest event.
+        if let Ok(event) = decode_new_power_change_request(&raw) {
             trace!(
-                emitter = event_log.emitter,
+                emitter = event_proof.event_data.emitter,
                 validator = ?event.validator,
                 op = event.op,
                 "Found NewPowerChangeRequest event"
@@ -90,87 +89,7 @@ pub fn extract_validator_changes(
     Ok(changes)
 }
 
-/// Extract events from a single event proof
-///
-/// The EventProof contains EventData which includes:
-/// - emitter: actor ID that emitted the event
-/// - topics: hex-encoded topics (event signature, indexed params)
-/// - data: hex-encoded event data (often ABI encoded for cross-chain)
-fn extract_event_from_proof(
-    event_proof: &proofs::proofs::events::bundle::EventProof,
-) -> Result<EventLog> {
-    // Convert hex-encoded topics to H256
-    let topics: Result<Vec<et::H256>> = event_proof
-        .event_data
-        .topics
-        .iter()
-        .map(|topic| {
-            // Remove 0x prefix if present and parse hex
-            let topic_str = topic.trim_start_matches("0x");
-            let bytes =
-                hex::decode(topic_str).context(format!("Failed to decode topic hex: {}", topic))?;
-
-            if bytes.len() != 32 {
-                return Err(anyhow!("Topic must be 32 bytes, got {} bytes", bytes.len()));
-            }
-
-            Ok(et::H256::from_slice(&bytes))
-        })
-        .collect();
-
-    let topics = topics?;
-
-    // Convert hex-encoded data
-    let data_str = event_proof.event_data.data.trim_start_matches("0x");
-    let data = hex::decode(data_str).context(format!(
-        "Failed to decode event data hex: {}",
-        event_proof.event_data.data
-    ))?;
-
-    Ok(EventLog {
-        emitter: event_proof.event_data.emitter,
-        topics,
-        data,
-    })
-}
-
-/// Helper struct to represent an event log
-#[derive(Debug, Clone)]
-struct EventLog {
-    emitter: u64,
-    topics: Vec<et::H256>,
-    data: Vec<u8>,
-}
-
-/// Decode a NewTopDownMessage event using the contract bindings
-fn decode_topdown_message_event(
-    event_log: &EventLog,
-) -> Result<lib_gateway::NewTopDownMessageFilter> {
-    // Create RawLog from our EventLog
-    let raw_log = RawLog {
-        topics: event_log.topics.clone(),
-        data: event_log.data.clone(),
-    };
-
-    // Use the contract binding's decoding
-    lib_gateway::NewTopDownMessageFilter::decode_log(&raw_log)
-        .map_err(|e| anyhow!("Failed to decode NewTopDownMessage event: {}", e))
-}
-
-/// Decode a NewPowerChangeRequest event using the contract bindings  
-fn decode_power_change_event(
-    event_log: &EventLog,
-) -> Result<lib_power_change_log::NewPowerChangeRequestFilter> {
-    // Create RawLog from our EventLog
-    let raw_log = RawLog {
-        topics: event_log.topics.clone(),
-        data: event_log.data.clone(),
-    };
-
-    // Use the contract binding's decoding
-    lib_power_change_log::NewPowerChangeRequestFilter::decode_log(&raw_log)
-        .map_err(|e| anyhow!("Failed to decode NewPowerChangeRequest event: {}", e))
-}
+// (Decoding helpers moved to `fendermint_vm_evm_event_utils` so proof-service and interpreter share logic.)
 
 #[cfg(test)]
 mod tests {

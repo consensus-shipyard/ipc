@@ -25,6 +25,7 @@ pub mod f3_client;
 pub mod observe;
 pub mod persistence;
 pub mod service;
+pub mod storage_layout;
 pub mod types;
 pub mod verifier;
 

@@ -1,0 +1,14 @@
+[package]
+name = "fendermint_vm_evm_event_utils"
+description = "Shared helpers for decoding EVM logs (topics/data) from proof bundles"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+ethers = { workspace = true }
+hex = { workspace = true }
+ipc_actors_abis = { path = "../../../contract-bindings" }
+proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }

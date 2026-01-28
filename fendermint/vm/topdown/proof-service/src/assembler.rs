@@ -7,53 +7,57 @@
 //! proof generation - it has no knowledge of cache entries or storage.
 
 use crate::observe::{OperationStatus, ProofBundleGenerated};
+use crate::storage_layout::{
+    NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, SUBNETS_MAPPING_SLOT, SUBNET_TOPDOWN_NONCE_OFFSET,
+};
 use crate::types::FinalizedTipset;
 use anyhow::{Context, Result};
+use ethers::contract::EthEvent;
+use ethers::types::H256;
 use fvm_ipld_encoding;
+use ipc_actors_abis::{lib_gateway, lib_power_change_log};
 use ipc_observability::emit;
+use proofs::proofs::storage::utils::compute_mapping_slot;
 use proofs::{
     client::LotusClient,
     proofs::{
-        calculate_storage_slot, common::bundle::UnifiedProofBundle, generate_proof_bundle,
-        EventProofSpec, StorageProofSpec,
+        common::bundle::UnifiedProofBundle, generate_proof_bundle, EventProofSpec, StorageProofSpec,
     },
 };
 use std::time::Instant;
 use url::Url;
 
-// Event signatures for proof generation
-// These use Solidity's canonical format (type names, not ABI encoding)
-// For contract bindings, see: contract_bindings::lib_gateway::NewTopDownMessageFilter
-// and contract_bindings::lib_power_change_log::NewPowerChangeRequestFilter
+// Event signatures for proof generation.
+//
+// The proofs library expects the Solidity *canonical ABI signature* string.
+// Instead of hard-coding it, derive it from the contract bindings.
+fn new_topdown_message_signature() -> String {
+    lib_gateway::NewTopDownMessageFilter::abi_signature().into_owned()
+}
 
-/// Event signature for NewTopDownMessage from LibGateway.sol
-/// Event: NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id)
-/// Bindings: contract_bindings::lib_gateway::NewTopDownMessageFilter
-pub const NEW_TOPDOWN_MESSAGE_SIGNATURE: &str = "NewTopDownMessage(address,IpcEnvelope,bytes32)";
+fn new_power_change_request_signature() -> String {
+    lib_power_change_log::NewPowerChangeRequestFilter::abi_signature().into_owned()
+}
 
-/// Event signature for NewPowerChangeRequest from LibPowerChangeLog.sol
-/// Event: NewPowerChangeRequest(PowerOperation op, address validator, bytes payload, uint64 configurationNumber)
-/// Bindings: contract_bindings::lib_power_change_log::NewPowerChangeRequestFilter
-/// This captures validator power changes that need to be reflected in the subnet
-pub const NEW_POWER_CHANGE_REQUEST_SIGNATURE: &str =
-    "NewPowerChangeRequest(PowerOperation,address,bytes,uint64)";
+// Storage slots are defined in `storage_layout.rs` (derived from Foundry `storageLayout`).
 
-/// Storage slot offset for topDownNonce in the Subnet struct.
-/// In the Gateway actor's subnets mapping: mapping(SubnetID => Subnet)
-/// The Subnet struct field layout (see contracts/contracts/structs/Subnet.sol):
-///   - id (SubnetID): slot 0-1 (SubnetID has 2 fields)
-///   - stake (uint256): slot 2
-///   - topDownNonce (uint64): slot 3
-///   - appliedBottomUpNonce (uint64): slot 3 (packed with topDownNonce)
-///   - genesisEpoch (uint256): slot 4
-///
-/// We need the nonce to verify top-down message ordering.
-const TOPDOWN_NONCE_STORAGE_OFFSET: u64 = 3;
+#[cfg(test)]
+mod signature_tests {
+    use super::*;
+    use ethers::contract::EthEvent;
+    use proofs::proofs::common::evm::hash_event_signature;
 
-/// Storage slot for nextConfigurationNumber in GatewayActorStorage
-/// This is used to track configuration changes for power updates
-/// Based on the storage layout, nextConfigurationNumber is at slot 20
-const NEXT_CONFIG_NUMBER_STORAGE_SLOT: u64 = 20;
+    #[test]
+    fn abi_signature_strings_match_contract_bindings_topic0() {
+        let expected_topdown: H256 = lib_gateway::NewTopDownMessageFilter::signature();
+        let got_topdown: H256 = H256(hash_event_signature(&new_topdown_message_signature()));
+        assert_eq!(got_topdown, expected_topdown);
+
+        let expected_power: H256 = lib_power_change_log::NewPowerChangeRequestFilter::signature();
+        let got_power: H256 = H256(hash_event_signature(&new_power_change_request_signature()));
+        assert_eq!(got_power, expected_power);
+    }
+}
 
 /// Assembles proof bundles from F3 certificates and parent chain data
 ///
@@ -79,14 +83,27 @@ impl ProofAssembler {
     }
 
     fn build_storage_specs(&self) -> Vec<StorageProofSpec> {
+        // Mapping key is bytes32; proofs utils only provide `compute_mapping_slot(key, slot)`.
+        // We use the proof library's ASCII bytes32 helper to match the existing on-chain encoding
+        // used by the proofs stack (topic/storage filters operate on bytes32 strings).
+        let key = proofs::proofs::common::evm::ascii_to_bytes32(&self.subnet_id);
+        let base = compute_mapping_slot(key, SUBNETS_MAPPING_SLOT);
+        // Struct member is at relative slot 3.
+        let mut slot_bytes = base;
+        let base_u256 = ethers::types::U256::from_big_endian(&base);
+        let slot_u256 = base_u256 + ethers::types::U256::from(SUBNET_TOPDOWN_NONCE_OFFSET);
+        slot_u256.to_big_endian(&mut slot_bytes);
+
         vec![
             StorageProofSpec {
                 actor_id: self.gateway_actor_id,
-                slot: calculate_storage_slot(&self.subnet_id, TOPDOWN_NONCE_STORAGE_OFFSET),
+                // `subnets[<key>].topDownNonce`
+                slot: H256::from(slot_bytes),
             },
             StorageProofSpec {
                 actor_id: self.gateway_actor_id,
-                slot: calculate_storage_slot("", NEXT_CONFIG_NUMBER_STORAGE_SLOT),
+                // Fixed storage slot (not a mapping): `validatorsTracker.changes.nextConfigurationNumber`.
+                slot: H256::from_low_u64_be(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT),
             },
         ]
     }
@@ -94,12 +111,12 @@ impl ProofAssembler {
     fn build_event_specs(&self) -> Vec<EventProofSpec> {
         vec![
             EventProofSpec {
-                event_signature: NEW_TOPDOWN_MESSAGE_SIGNATURE.to_string(),
+                event_signature: new_topdown_message_signature(),
                 topic_1: self.subnet_id.clone(),
                 actor_id_filter: Some(self.gateway_actor_id),
             },
             EventProofSpec {
-                event_signature: NEW_POWER_CHANGE_REQUEST_SIGNATURE.to_string(),
+                event_signature: new_power_change_request_signature(),
                 topic_1: String::new(),
                 actor_id_filter: Some(self.gateway_actor_id),
             },

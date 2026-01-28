@@ -273,7 +273,7 @@ impl ProofGeneratorService {
 
         let mut epoch_proofs = Vec::with_capacity(tipset_pairs.len());
 
-        // Generate proofs for each (parent, child) pair
+        // Generate proofs for each (parent, child) pair.
         // The child tipset contains `parentReceipts` which commits to the parent's execution.
         for (parent_tipset, child_tipset) in tipset_pairs {
             let parent_epoch = parent_tipset.epoch;
@@ -293,6 +293,17 @@ impl ProofGeneratorService {
             self.verifier
                 .verify_proof_bundle_with_tipsets(&proof_bundle, &finalized_tipsets)
                 .with_context(|| format!("Failed to verify proof for epoch {}", parent_epoch))?;
+
+            // Additional semantic checks:
+            // - top-down message nonce continuity (from decoded events)
+            // - power change configurationNumber continuity, and consistency with proved storage slot
+            crate::verifier::verify_event_number_continuity(parent_epoch, &proof_bundle)
+                .with_context(|| {
+                    format!(
+                        "Nonce/config continuity check failed for epoch {}",
+                        parent_epoch
+                    )
+                })?;
 
             epoch_proofs.push(EpochProofEntry::new(
                 parent_epoch,
