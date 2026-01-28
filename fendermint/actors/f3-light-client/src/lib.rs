@@ -1,7 +1,7 @@
 // Copyright 2021-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::state::State;
+use crate::state::{PowerEntryValue, State};
 use crate::types::{ConstructorParams, GetStateResponse, PowerEntry, UpdateStateParams};
 use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
@@ -58,6 +58,38 @@ impl F3LightClient for F3LightClientActor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, rt| {
+            // Basic monotonicity checks to prevent accidental rewinds or no-op updates.
+            //
+            // Note: multiple epochs can be proven under the same certificate instance, so
+            // `latest_instance_id` may stay the same across updates, but it must never go
+            // backwards and must not jump by more than 1.
+            //
+            // Also, we allow re-applying the same update (idempotency) by permitting equality.
+            if params.latest_finalized_height < st.light_client_state.latest_finalized_height {
+                return Err(actor_error!(
+                    illegal_argument,
+                    "latest_finalized_height went backwards: {} < {}",
+                    params.latest_finalized_height,
+                    st.light_client_state.latest_finalized_height
+                ));
+            }
+            if params.latest_instance_id < st.light_client_state.latest_instance_id {
+                return Err(actor_error!(
+                    illegal_argument,
+                    "latest_instance_id went backwards: {} < {}",
+                    params.latest_instance_id,
+                    st.light_client_state.latest_instance_id
+                ));
+            }
+            if params.latest_instance_id > st.light_client_state.latest_instance_id + 1 {
+                return Err(actor_error!(
+                    illegal_argument,
+                    "latest_instance_id jumped: {} > {}",
+                    params.latest_instance_id,
+                    st.light_client_state.latest_instance_id + 1
+                ));
+            }
+
             st.update_state(
                 rt,
                 params.latest_instance_id,
@@ -77,15 +109,19 @@ impl F3LightClient for F3LightClientActor {
 
         // Materialize the current power table for convenience.
         let power_table = {
-            let m = fil_actors_runtime::Map2::<_, u64, PowerEntry>::load(
+            let m = fil_actors_runtime::Map2::<_, u64, PowerEntryValue>::load(
                 rt.store(),
                 &lc.power_table_root,
                 fil_actors_runtime::DEFAULT_HAMT_CONFIG,
                 "f3_power_table",
             )?;
             let mut out = Vec::new();
-            m.for_each(|_k, v| {
-                out.push(v.clone());
+            m.for_each(|id, v| {
+                out.push(PowerEntry {
+                    id,
+                    public_key: v.public_key.clone(),
+                    power_be: v.power_be.clone(),
+                });
                 Ok(())
             })?;
             out.sort_by_key(|e| e.id);
@@ -128,16 +164,25 @@ mod tests {
 
     /// Helper function to create test power entries
     fn create_test_power_entries() -> Vec<PowerEntry> {
+        fn u64_to_power_be(x: u64) -> Vec<u8> {
+            if x == 0 {
+                return Vec::new();
+            }
+            let bytes = x.to_be_bytes();
+            let first = bytes.iter().position(|b| *b != 0).unwrap_or(bytes.len());
+            bytes[first..].to_vec()
+        }
+
         vec![
             PowerEntry {
                 id: 1,
                 public_key: vec![1, 2, 3],
-                power: 100,
+                power_be: u64_to_power_be(100),
             },
             PowerEntry {
                 id: 2,
                 public_key: vec![4, 5, 6],
-                power: 200,
+                power_be: u64_to_power_be(200),
             },
         ]
     }
@@ -200,7 +245,7 @@ mod tests {
 
         let update_params = UpdateStateParams {
             latest_instance_id: 1,
-            latest_finalized_height: 10,
+            latest_finalized_height: 11,
             power_table: create_test_power_entries(),
         };
 
@@ -219,12 +264,12 @@ mod tests {
     fn test_update_state_non_advancing_height() {
         let rt = construct_and_verify(1, create_test_power_entries(), 10);
 
-        // First update to set the finalized height to 102
+        // First update to advance the finalized height.
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let initial_params = UpdateStateParams {
             latest_instance_id: 1,
-            latest_finalized_height: 10,
+            latest_finalized_height: 11,
             power_table: create_test_power_entries(),
         };
         rt.call::<F3LightClientActor>(
@@ -239,7 +284,7 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let update_params = UpdateStateParams {
             latest_instance_id: 1,
-            latest_finalized_height: 10,
+            latest_finalized_height: 11,
             power_table: create_test_power_entries(),
         };
 
@@ -248,10 +293,8 @@ mod tests {
             IpldBlock::serialize_cbor(&update_params).unwrap(),
         );
 
-        // Should fail with illegal argument
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
+        // Allowed (idempotency): equality is ok, only rewinds are rejected.
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -329,16 +372,24 @@ mod tests {
         // Update with a different power table.
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+        fn u64_to_power_be(x: u64) -> Vec<u8> {
+            if x == 0 {
+                return Vec::new();
+            }
+            let bytes = x.to_be_bytes();
+            let first = bytes.iter().position(|b| *b != 0).unwrap_or(bytes.len());
+            bytes[first..].to_vec()
+        }
         let new_power_table = vec![
             PowerEntry {
                 id: 1,
                 public_key: vec![1, 2, 3],
-                power: 999,
+                power_be: u64_to_power_be(999),
             },
             PowerEntry {
                 id: 3,
                 public_key: vec![7, 8, 9],
-                power: 333,
+                power_be: u64_to_power_be(333),
             },
         ];
         let update_params = UpdateStateParams {
@@ -412,7 +463,7 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let initial_params = UpdateStateParams {
             latest_instance_id: 100,
-            latest_finalized_height: 10,
+            latest_finalized_height: 11,
             power_table: create_test_power_entries(),
         };
         rt.call::<F3LightClientActor>(
@@ -427,7 +478,7 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let update_params = UpdateStateParams {
             latest_instance_id: 101,
-            latest_finalized_height: 10,
+            latest_finalized_height: 12,
             power_table: create_test_power_entries(),
         };
 
@@ -447,7 +498,7 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let initial_params = UpdateStateParams {
             latest_instance_id: 100,
-            latest_finalized_height: 10,
+            latest_finalized_height: 11,
             power_table: create_test_power_entries(),
         };
         rt.call::<F3LightClientActor>(
@@ -462,7 +513,7 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let update_params = UpdateStateParams {
             latest_instance_id: 102,
-            latest_finalized_height: 10,
+            latest_finalized_height: 12,
             power_table: create_test_power_entries(),
         };
 
@@ -476,16 +527,16 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_epochs_rejected() {
+    fn test_height_rewind_rejected() {
         let rt = construct_and_verify(1, create_test_power_entries(), 10);
 
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
-        // Try to update with empty finalized_epochs
+        // Try to update with a lower finalized height (rewind).
         let update_params = UpdateStateParams {
             latest_instance_id: 1,
-            latest_finalized_height: 10,
+            latest_finalized_height: 9,
             power_table: create_test_power_entries(),
         };
 

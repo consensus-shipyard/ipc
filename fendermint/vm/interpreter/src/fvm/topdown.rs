@@ -13,9 +13,11 @@ use fvm_ipld_blockstore::Blockstore;
 use crate::fvm::end_block_hook::PowerUpdates;
 use crate::fvm::f3_topdown::{F3TopDownError, F3TopDownHandler};
 use crate::fvm::legacy_topdown::LegacyTopDownHandler;
+use crate::fvm::observe::{F3CacheWaitRecovered, F3CacheWaitStuck, F3CacheWaitTimeout};
 use crate::fvm::state::ipc::tokens_to_mint;
 use crate::types::AppliedMessage;
 use ipc_api::cross::IpcEnvelope;
+use ipc_observability::emit;
 
 #[derive(Clone, Debug)]
 pub struct F3ExecutionCacheRetryConfig {
@@ -89,16 +91,36 @@ where
         let error_after = retry.error_after;
         let mut next_error_log_at = error_after;
         let start = Instant::now();
+        let mut saw_cache_miss = false;
+        let mut exceeded_max_wait = false;
 
         loop {
             match f3.extract_top_down_effects(msg) {
-                Ok(v) => return Ok(v),
+                Ok(v) => {
+                    if saw_cache_miss {
+                        emit(F3CacheWaitRecovered {
+                            epoch: msg.height as u64,
+                            waited_secs: start.elapsed().as_secs_f64(),
+                        });
+                    }
+                    return Ok(v);
+                }
                 Err(e) if Self::is_cache_miss(&e) => {
+                    saw_cache_miss = true;
                     let waited = start.elapsed();
-                    if start.elapsed() >= max_wait {
-                        bail!(
-                            "timed out waiting for local proof cache entry for epoch {}",
-                            msg.height
+                    // Don't abort execution on cache wait: keep retrying forever, but escalate once
+                    // we've been waiting longer than `max_wait` so operators can alert.
+                    if waited >= max_wait && !exceeded_max_wait {
+                        exceeded_max_wait = true;
+                        emit(F3CacheWaitTimeout {
+                            epoch: msg.height as u64,
+                            waited_secs: waited.as_secs_f64(),
+                        });
+                        tracing::error!(
+                            height = msg.height,
+                            waited = ?waited,
+                            max_wait = ?max_wait,
+                            "exceeded max_wait for local proof cache entry; continuing to wait"
                         );
                     }
                     if waited >= next_error_log_at {
@@ -107,6 +129,10 @@ where
                             waited = ?waited,
                             "still missing local proof cache entry; node cannot execute parent-finality-with-cert yet"
                         );
+                        emit(F3CacheWaitStuck {
+                            epoch: msg.height as u64,
+                            waited_secs: waited.as_secs_f64(),
+                        });
                         next_error_log_at += error_after;
                     } else {
                         tracing::warn!(

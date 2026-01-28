@@ -8,8 +8,9 @@ use ipc_observability::{
 };
 
 use prometheus::{
-    register_histogram, register_int_counter, register_int_gauge, register_int_gauge_vec,
-    Histogram, IntCounter, IntGauge, IntGaugeVec, Registry,
+    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge, register_int_gauge_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec, Registry,
 };
 
 use fvm_shared::message::Message;
@@ -38,6 +39,17 @@ register_metrics! {
     );
     BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT: IntGauge
         = register_int_gauge!("bottomup_checkpoint_finalized_height", "Height of the checkpoint finalized");
+
+    F3_TOPDOWN_CACHE_WAIT_TOTAL: IntCounterVec = register_int_counter_vec!(
+        "f3_topdown_cache_wait_total",
+        "Number of times the node waited for the local F3 proof cache during top-down execution",
+        &["status"]
+    );
+    F3_TOPDOWN_CACHE_WAIT_SECS: HistogramVec = register_histogram_vec!(
+        "f3_topdown_cache_wait_secs",
+        "Seconds spent waiting for the local F3 proof cache during top-down execution",
+        &["status"]
+    );
 }
 
 impl_traceables!(TraceLevel::Info, "Execution", MsgExec);
@@ -81,6 +93,14 @@ impl_traceables!(
     CheckpointSigned,
     CheckpointFinalized
 );
+
+impl_traceables!(
+    TraceLevel::Error,
+    "Topdown",
+    F3CacheWaitStuck,
+    F3CacheWaitTimeout
+);
+impl_traceables!(TraceLevel::Info, "Topdown", F3CacheWaitRecovered);
 
 #[derive(Debug)]
 pub struct CheckpointCreated {
@@ -130,6 +150,57 @@ pub struct CheckpointFinalized {
 impl Recordable for CheckpointFinalized {
     fn record_metrics(&self) {
         BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT.set(self.height);
+    }
+}
+
+#[derive(Debug)]
+pub struct F3CacheWaitStuck {
+    pub epoch: u64,
+    pub waited_secs: f64,
+}
+
+impl Recordable for F3CacheWaitStuck {
+    fn record_metrics(&self) {
+        F3_TOPDOWN_CACHE_WAIT_TOTAL
+            .with_label_values(&["stuck"])
+            .inc();
+        F3_TOPDOWN_CACHE_WAIT_SECS
+            .with_label_values(&["stuck"])
+            .observe(self.waited_secs);
+    }
+}
+
+#[derive(Debug)]
+pub struct F3CacheWaitTimeout {
+    pub epoch: u64,
+    pub waited_secs: f64,
+}
+
+impl Recordable for F3CacheWaitTimeout {
+    fn record_metrics(&self) {
+        F3_TOPDOWN_CACHE_WAIT_TOTAL
+            .with_label_values(&["timeout"])
+            .inc();
+        F3_TOPDOWN_CACHE_WAIT_SECS
+            .with_label_values(&["timeout"])
+            .observe(self.waited_secs);
+    }
+}
+
+#[derive(Debug)]
+pub struct F3CacheWaitRecovered {
+    pub epoch: u64,
+    pub waited_secs: f64,
+}
+
+impl Recordable for F3CacheWaitRecovered {
+    fn record_metrics(&self) {
+        F3_TOPDOWN_CACHE_WAIT_TOTAL
+            .with_label_values(&["recovered"])
+            .inc();
+        F3_TOPDOWN_CACHE_WAIT_SECS
+            .with_label_values(&["recovered"])
+            .observe(self.waited_secs);
     }
 }
 
@@ -184,6 +255,19 @@ mod tests {
             height: 1,
             hash: HexEncodableBlockHash(hash.clone()),
             validator: Address::new_id(1),
+        });
+
+        emit(F3CacheWaitStuck {
+            epoch: 1,
+            waited_secs: 120.0,
+        });
+        emit(F3CacheWaitTimeout {
+            epoch: 1,
+            waited_secs: 600.0,
+        });
+        emit(F3CacheWaitRecovered {
+            epoch: 1,
+            waited_secs: 2.0,
         });
     }
 }

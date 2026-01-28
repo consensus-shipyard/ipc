@@ -38,8 +38,11 @@ pub struct PowerEntry {
     pub id: u64,
     /// Public key of the validator
     pub public_key: Vec<u8>,
-    /// Voting power of the validator
-    pub power: u64,
+    /// Voting power of the validator, encoded as unsigned big-endian bytes.
+    ///
+    /// Filecoin power values can exceed 64 bits; storing bytes avoids lossy conversions.
+    /// `[]` represents zero.
+    pub power_be: Vec<u8>,
 }
 
 /// Constructor parameters for the F3 light client actor

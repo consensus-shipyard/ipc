@@ -493,12 +493,12 @@ mod tests {
             fendermint_actor_f3_light_client::types::PowerEntry {
                 id: 1,
                 public_key: vec![1, 2, 3],
-                power: 100,
+                power_be: vec![100],
             },
             fendermint_actor_f3_light_client::types::PowerEntry {
                 id: 2,
                 public_key: vec![4, 5, 6],
-                power: 200,
+                power_be: vec![200],
             },
         ];
         let f3_state = fendermint_actor_f3_light_client::state::State::new(
@@ -549,7 +549,7 @@ mod tests {
         let new_power_table = vec![f3_light_client::PowerEntry {
             id: 99,
             public_key: vec![9u8; 48],
-            power: 999,
+            power_be: vec![0x03, 0xE7],
         }];
         caller
             .update_state(

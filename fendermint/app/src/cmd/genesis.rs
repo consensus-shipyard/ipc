@@ -398,19 +398,24 @@ async fn fetch_f3_params_from_parent(
     // Get base power table for the specified instance
     let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
 
-    // Convert power entries
+    // Convert power entries (power can exceed 64 bits; store as big-endian bytes).
     let power_table: anyhow::Result<Vec<_>> = power_table_response
         .iter()
         .map(|entry| {
             // Decode base64 public key
             let public_key_bytes =
                 base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &entry.pub_key)?;
-            // Parse the power string to u64
-            let power = entry.power.parse::<u64>()?;
+            // Parse the power string as BigInt (decimal) and encode as unsigned big-endian bytes.
+            let power = num_bigint::BigInt::parse_bytes(entry.power.as_bytes(), 10)
+                .ok_or_else(|| anyhow::anyhow!("invalid power string '{}'", entry.power))?;
+            let (sign, power_be) = power.to_bytes_be();
+            if sign == num_bigint::Sign::Minus {
+                anyhow::bail!("negative power for participant id {}", entry.id);
+            }
             Ok(types::PowerEntry {
                 id: entry.id,
                 public_key: public_key_bytes,
-                power,
+                power_be,
             })
         })
         .collect();

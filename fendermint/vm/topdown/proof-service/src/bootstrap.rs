@@ -6,6 +6,7 @@ use crate::config;
 use crate::PowerEntries;
 use anyhow::{Context, Result};
 use ipc_api::subnet_id::SubnetID;
+use num_bigint::Sign;
 
 /// Fetch an F3 certificate for a specific instance from the parent chain.
 ///
@@ -36,7 +37,7 @@ pub fn power_entries_from_actor(
             .iter()
             .map(|e| filecoin_f3_gpbft::PowerEntry {
                 id: e.id,
-                power: num_bigint::BigInt::from(e.power),
+                power: num_bigint::BigInt::from_bytes_be(Sign::Plus, &e.power_be),
                 pub_key: filecoin_f3_gpbft::PubKey(e.public_key.clone()),
             })
             .collect(),

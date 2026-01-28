@@ -10,6 +10,7 @@ use crate::types::{LightClientState, PowerEntry};
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
 use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +25,16 @@ pub struct State {
     pub light_client_state: LightClientState,
 }
 
-pub(crate) type PowerTable<BS> = Map2<BS, u64, PowerEntry>;
+/// Stored HAMT value for power table entries.
+///
+/// The key of the HAMT is the validator ID, so storing `id` in the value would be redundant.
+#[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PowerEntryValue {
+    pub public_key: Vec<u8>,
+    pub power_be: Vec<u8>,
+}
+
+pub(crate) type PowerTable<BS> = Map2<BS, u64, PowerEntryValue>;
 
 impl State {
     /// Create a new F3 light client state
@@ -38,7 +48,13 @@ impl State {
             let mut m = PowerTable::empty(store, DEFAULT_HAMT_CONFIG, "f3_power_table");
             for pe in power_table {
                 let id = pe.id;
-                m.set(&id, pe)?;
+                m.set(
+                    &id,
+                    PowerEntryValue {
+                        public_key: pe.public_key,
+                        power_be: pe.power_be,
+                    },
+                )?;
             }
             m.flush()?
         };
@@ -65,7 +81,13 @@ impl State {
             let mut m = PowerTable::empty(rt.store(), DEFAULT_HAMT_CONFIG, "f3_power_table");
             for pe in power_table {
                 let id = pe.id;
-                m.set(&id, pe)?;
+                m.set(
+                    &id,
+                    PowerEntryValue {
+                        public_key: pe.public_key,
+                        power_be: pe.power_be,
+                    },
+                )?;
             }
             m.flush()?
         };

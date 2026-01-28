@@ -12,7 +12,9 @@
 //! reference the same certificate
 
 use crate::config::CacheConfig;
-use crate::observe::{ProofCached, CACHE_HIT_TOTAL, CACHE_SIZE};
+use crate::observe::{
+    OperationStatus, ProofCacheAtomicWrite, ProofCached, CACHE_HIT_TOTAL, CACHE_SIZE,
+};
 use crate::persistence::ProofCachePersistence;
 use crate::types::{CertificateEntry, EpochProofEntry, EpochProofWithCertificate};
 use anyhow::{Context, Result};
@@ -177,11 +179,30 @@ impl ProofCache {
         cert: CertificateEntry,
         epoch_proofs: Vec<EpochProofEntry>,
     ) -> Result<()> {
+        use std::time::Instant;
+
         let instance_id = cert.instance_id();
         let epochs: Vec<ChainEpoch> = epoch_proofs.iter().map(|e| e.epoch).collect();
 
         // Persist atomically first (if enabled).
-        self.with_persistence(|p| p.save_certificate_with_epoch_proofs(&cert, &epoch_proofs))?;
+        let persist_start = Instant::now();
+        if let Err(e) =
+            self.with_persistence(|p| p.save_certificate_with_epoch_proofs(&cert, &epoch_proofs))
+        {
+            emit(ProofCacheAtomicWrite {
+                instance: instance_id,
+                epoch_count: epochs.len(),
+                status: OperationStatus::Failure,
+                latency: persist_start.elapsed().as_secs_f64(),
+            });
+            return Err(e);
+        }
+        emit(ProofCacheAtomicWrite {
+            instance: instance_id,
+            epoch_count: epochs.len(),
+            status: OperationStatus::Success,
+            latency: persist_start.elapsed().as_secs_f64(),
+        });
 
         // Then update in-memory structures (infallible).
         self.certificates.write().insert(instance_id, cert.clone());

@@ -256,7 +256,7 @@ impl F3TopDownHandler {
         DB: Blockstore + Clone + 'static + Send + Sync,
     {
         // Update F3LightClientActor with new certificate state (on-chain).
-        let power_table = ActorPowerTable::from(&self.get_power_table(instance_id)?).0;
+        let power_table = ActorPowerTable::try_from(&self.get_power_table(instance_id)?)?.0;
         self.update_f3_light_client_actor_state(state, instance_id, epoch, power_table)?;
         tracing::debug!(instance = instance_id, "updated F3LightClientActor state");
 
@@ -349,31 +349,29 @@ impl F3TopDownHandler {
 /// Local helper newtype so we can provide a clean `From` impl at the conversion boundary.
 struct ActorPowerTable(Vec<fendermint_vm_actor_interface::f3_light_client::PowerEntry>);
 
-impl From<&PowerEntries> for ActorPowerTable {
-    fn from(entries: &PowerEntries) -> Self {
-        Self(
-            entries
-                .iter()
-                .map(|pe| {
-                    // Convert BigInt -> u64 (saturating if too large).
-                    // Power should be non-negative; we ignore the sign here and keep the magnitude.
-                    let (_sign, digits) = pe.power.to_u64_digits();
-                    let power = if digits.is_empty() {
-                        0
-                    } else if digits.len() == 1 {
-                        digits[0]
-                    } else {
-                        u64::MAX
-                    };
+impl TryFrom<&PowerEntries> for ActorPowerTable {
+    type Error = anyhow::Error;
 
-                    fendermint_vm_actor_interface::f3_light_client::PowerEntry {
-                        id: pe.id,
-                        public_key: pe.pub_key.0.clone(),
-                        power,
-                    }
+    fn try_from(entries: &PowerEntries) -> Result<Self, Self::Error> {
+        use num_bigint::Sign;
+
+        let out = entries
+            .iter()
+            .map(|pe| {
+                let (sign, power_be) = pe.power.to_bytes_be();
+                if sign == Sign::Minus {
+                    anyhow::bail!("negative power for participant id {}", pe.id);
+                }
+
+                Ok(fendermint_vm_actor_interface::f3_light_client::PowerEntry {
+                    id: pe.id,
+                    public_key: pe.pub_key.0.clone(),
+                    power_be,
                 })
-                .collect(),
-        )
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        Ok(Self(out))
     }
 }
 
@@ -553,7 +551,7 @@ mod tests {
         let genesis_power_table = vec![f3_light_client::PowerEntry {
             id: 10,
             public_key: vec![9u8; 48],
-            power: 9,
+            power_be: vec![9],
         }];
 
         let f3_state = fendermint_actor_f3_light_client::state::State::new(
@@ -651,7 +649,7 @@ mod tests {
         assert_eq!(actor_state.latest_finalized_height, base_epoch + 1);
         assert_eq!(actor_state.power_table.len(), 2);
         assert_eq!(actor_state.power_table[0].id, 1);
-        assert_eq!(actor_state.power_table[0].power, 1000);
+        assert_eq!(actor_state.power_table[0].power_be, vec![0x03, 0xE8]);
 
         // Cache committed cursor updated.
         assert_eq!(
