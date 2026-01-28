@@ -165,6 +165,8 @@ pub struct ResolverOverrideConfig {
 pub struct ConnectionOverrideConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub listen_addr: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_addresses: Option<Vec<String>>,
     #[serde(flatten)]
     pub extra: toml::Table,
 }
@@ -197,6 +199,10 @@ impl FendermintOverrides {
 pub struct P2pConfig {
     /// External IP address for peer connections (defaults to "127.0.0.1")
     pub external_ip: Option<String>,
+    /// Listen IP address for binding services (defaults to "0.0.0.0")
+    /// Use "0.0.0.0" to bind on all interfaces (recommended for cloud VMs)
+    /// Use a specific IP for more restrictive binding
+    pub listen_ip: Option<String>,
     /// Network port configuration
     pub ports: Option<P2pPortsConfig>,
     /// Peer configuration from various sources
@@ -225,6 +231,7 @@ impl Default for P2pConfig {
     fn default() -> Self {
         Self {
             external_ip: Some("127.0.0.1".to_string()),
+            listen_ip: Some("0.0.0.0".to_string()),
             ports: Some(P2pPortsConfig::default()),
             peers: None,
         }
@@ -247,7 +254,7 @@ pub struct PeerInfo {
     pub node_info: NodeInfo,
     /// CometBFT peer information
     pub cometbft: CometBftPeerInfo,
-    /// Fendermint resolver peer information  
+    /// Fendermint resolver peer information
     pub fendermint: FendermintPeerInfo,
 }
 

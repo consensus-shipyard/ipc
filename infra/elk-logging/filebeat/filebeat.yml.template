@@ -1,0 +1,149 @@
+# Filebeat Configuration for IPC Validator Nodes
+# This file will be customized for each validator during deployment
+
+# Filebeat inputs
+filebeat.inputs:
+  # Systemd journal input for ipc-node service
+  - type: journald
+    id: ipc-node-journal
+    enabled: true
+    include_matches:
+      - _SYSTEMD_UNIT=ipc-node.service
+    fields:
+      service: ipc-node
+      validator: __VALIDATOR_NAME__
+      validator_ip: __VALIDATOR_IP__
+      role: __VALIDATOR_ROLE__
+    fields_under_root: false
+
+  # Systemd journal input for ipc-relayer service
+  - type: journald
+    id: ipc-relayer-journal
+    enabled: true
+    include_matches:
+      - _SYSTEMD_UNIT=ipc-relayer.service
+    fields:
+      service: ipc-relayer
+      validator: __VALIDATOR_NAME__
+      validator_ip: __VALIDATOR_IP__
+      role: __VALIDATOR_ROLE__
+    fields_under_root: false
+
+  # File-based logs from node home directory
+  - type: log
+    id: ipc-node-file-logs
+    enabled: true
+    paths:
+      - __NODE_HOME__/logs/*.log
+      - __NODE_HOME__/logs/*.stdout.log
+      - __NODE_HOME__/logs/*.stderr.log
+    fields:
+      service: ipc-node-file
+      validator: __VALIDATOR_NAME__
+      validator_ip: __VALIDATOR_IP__
+      role: __VALIDATOR_ROLE__
+    fields_under_root: false
+    # Multiline pattern for stack traces
+    multiline.pattern: '^[[:space:]]+(at|\.{3})[[:space:]]+\b|^Caused by:'
+    multiline.negate: false
+    multiline.match: after
+    # JSON parsing if logs are in JSON format
+    json.keys_under_root: false
+    json.add_error_key: true
+
+  # CometBFT logs
+  - type: log
+    id: cometbft-logs
+    enabled: true
+    paths:
+      - __NODE_HOME__/cometbft/config/cometbft.log
+      - __NODE_HOME__/.cometbft/logs/*.log
+    fields:
+      service: cometbft
+      validator: __VALIDATOR_NAME__
+      validator_ip: __VALIDATOR_IP__
+      role: __VALIDATOR_ROLE__
+    fields_under_root: false
+
+# Processors - add metadata and process logs
+processors:
+  # Add host metadata
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+      netinfo.enabled: true
+      geo.enabled: false
+
+  # Add cloud metadata (for GCP)
+  - add_cloud_metadata: ~
+
+  # Add Docker metadata if running in containers
+  - add_docker_metadata: ~
+
+  # Drop empty lines
+  - drop_event:
+      when:
+        regexp:
+          message: '^[[:space:]]*$'
+
+  # Add subnet information
+  - add_fields:
+      target: subnet
+      fields:
+        id: __SUBNET_ID__
+        parent_rpc: __PARENT_RPC__
+        parent_chain_id: __PARENT_CHAIN_ID__
+
+# Output to Logstash
+output.logstash:
+  hosts: ["__LOGSTASH_HOST__:5044"]
+  # Enable SSL if configured
+  # ssl.certificate_authorities: ["/etc/filebeat/ca.crt"]
+  # ssl.certificate: "/etc/filebeat/client.crt"
+  # ssl.key: "/etc/filebeat/client.key"
+
+  # Load balancing (if multiple Logstash instances)
+  loadbalance: true
+
+  # Connection settings
+  worker: 2
+  bulk_max_size: 2048
+  timeout: 30s
+
+  # Retry settings
+  max_retries: 3
+  backoff.init: 1s
+  backoff.max: 60s
+
+# Filebeat modules (disabled, using custom inputs)
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+# Logging
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+# Monitoring (internal collection)
+monitoring.enabled: true
+monitoring.cluster_uuid: "ipc-logging-cluster"
+
+# HTTP endpoint for health checks
+http.enabled: true
+http.port: 5066
+http.host: localhost
+
+# Filebeat registry (tracks log file positions)
+filebeat.registry.path: /var/lib/filebeat
+filebeat.registry.flush: 5s
+
+# Resource limits
+queue.mem:
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 1s
+
