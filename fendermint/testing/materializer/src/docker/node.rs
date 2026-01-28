@@ -28,6 +28,7 @@ use super::{
     runner::DockerRunner,
     user_id, DockerMaterials, DockerPortRange, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
 };
+use crate::materials::WithNodeName;
 use crate::{
     docker::DOCKER_ENTRY_FILE_NAME,
     env_vars,
@@ -76,6 +77,12 @@ pub struct DockerNode {
     /// This is the file system directory were all the artifacts
     /// regarding this node are stored, such as docker volumes and keys.
     path: PathBuf,
+}
+
+impl WithNodeName for DockerNode {
+    fn node_name(&self) -> &NodeName {
+        &self.node_name
+    }
 }
 
 impl Display for DockerNode {
@@ -613,7 +620,7 @@ impl HasCometBftApi for DockerNode {
 ///
 /// It consists of `{node-id}-{container}-{hash(node-name)}`,
 /// e.g. "node-12-cometbft-a1b2c3"
-fn container_name(node_name: &NodeName, container: &str) -> String {
+pub fn container_name(node_name: &NodeName, container: &str) -> String {
     let node_id = node_name
         .path()
         .file_stem()

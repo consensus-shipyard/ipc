@@ -235,7 +235,8 @@ impl EthContractDeployer {
         use ipc_api::subnet_id::SubnetID;
 
         let ipc_params = GatewayParams::new(SubnetID::new(self.chain_id, vec![]));
-        let params = GatewayConstructor::new(ipc_params, vec![])
+        let commit_sha = get_commit_sha();
+        let params = GatewayConstructor::new(ipc_params, vec![], commit_sha)
             .context("failed to create gateway constructor parameters")?;
 
         let facets = self
@@ -324,4 +325,39 @@ impl EthContractDeployer {
             &self.lib_addrs,
         )
     }
+}
+
+/// Get the commit SHA for contract deployment.
+/// Uses the COMMIT_SHA environment variable if set, otherwise uses git,
+/// or falls back to a default value.
+fn get_commit_sha() -> [u8; 32] {
+    // Try to get from environment variable first (matches TypeScript deployment)
+    if let Ok(sha) = std::env::var("COMMIT_SHA") {
+        let mut result = [0u8; 32];
+        let bytes = sha.as_bytes();
+        let len = bytes.len().min(32);
+        result[..len].copy_from_slice(&bytes[..len]);
+        return result;
+    }
+
+    // Try to get from git
+    if let Ok(output) = std::process::Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+    {
+        if output.status.success() {
+            let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let mut result = [0u8; 32];
+            let bytes = sha.as_bytes();
+            let len = bytes.len().min(32);
+            result[..len].copy_from_slice(&bytes[..len]);
+            return result;
+        }
+    }
+
+    // Fall back to default value (matches test default)
+    let default_sha = b"c7d8f53f";
+    let mut result = [0u8; 32];
+    result[..default_sha.len()].copy_from_slice(default_sha);
+    result
 }

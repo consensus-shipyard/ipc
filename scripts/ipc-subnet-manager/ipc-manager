@@ -1,0 +1,28 @@
+#!/bin/sh
+# Wrapper script to run ipc-subnet-manager with correct bash version
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Find bash 4.0+
+if command -v /opt/homebrew/bin/bash >/dev/null 2>&1; then
+    BASH_BIN="/opt/homebrew/bin/bash"
+elif command -v /usr/local/bin/bash >/dev/null 2>&1; then
+    BASH_BIN="/usr/local/bin/bash"
+elif command -v bash >/dev/null 2>&1; then
+    # Check version
+    BASH_VERSION=$(bash --version | head -1 | grep -o '[0-9]\+\.[0-9]\+' | head -1)
+    BASH_MAJOR=$(echo "$BASH_VERSION" | cut -d. -f1)
+    if [ "$BASH_MAJOR" -ge 4 ]; then
+        BASH_BIN="bash"
+    else
+        echo "Error: Bash 4.0+ required but not found"
+        echo "Install with: brew install bash"
+        exit 1
+    fi
+else
+    echo "Error: bash not found"
+    exit 1
+fi
+
+exec "$BASH_BIN" "$SCRIPT_DIR/ipc-subnet-manager.sh" "$@"
+

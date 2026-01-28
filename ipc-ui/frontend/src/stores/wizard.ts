@@ -22,6 +22,7 @@ export interface SubnetConfig {
   supplySourceAddress?: string
   minCrossMsgFee?: number
   genesisSubnetIpcContractsOwner?: string
+  chainId?: number
 
   // Advanced configuration (optional)
   activeValidatorsLimit?: number

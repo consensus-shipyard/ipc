@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::fvm::end_block_hook::LightClientCommitments;
 use crate::fvm::state::FvmStateParams;
 use crate::fvm::store::ReadOnlyBlockstore;
 use anyhow::anyhow;
@@ -43,7 +44,7 @@ where
 {
     pub fn new(
         store: BS,
-        state_params: FvmStateParams,
+        state_params: SnapshotPayload,
         block_height: BlockHeight,
     ) -> anyhow::Result<Self> {
         Ok(Self::V1(V1Snapshot::new(
@@ -156,11 +157,17 @@ where
 pub struct V1Snapshot<BS> {
     /// The state tree of the current blockchain
     state_tree: StateTree<ReadOnlyBlockstore<BS>>,
-    state_params: FvmStateParams,
+    payload: SnapshotPayload,
     block_height: BlockHeight,
 }
 
-pub type BlockStateParams = (FvmStateParams, BlockHeight);
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct SnapshotPayload {
+    pub state: FvmStateParams,
+    pub light_client_commitments: Option<LightClientCommitments>,
+}
+
+pub type BlockStateParams = (SnapshotPayload, BlockHeight);
 
 impl<BS> V1Snapshot<BS>
 where
@@ -169,28 +176,28 @@ where
     /// Creates a new V2Snapshot struct. Caller ensure store
     pub fn new(
         store: BS,
-        state_params: FvmStateParams,
+        payload: SnapshotPayload,
         block_height: BlockHeight,
     ) -> anyhow::Result<Self> {
         let state_tree =
-            StateTree::new_from_root(ReadOnlyBlockstore::new(store), &state_params.state_root)?;
+            StateTree::new_from_root(ReadOnlyBlockstore::new(store), &payload.state.state_root)?;
 
         Ok(Self {
             state_tree,
-            state_params,
+            payload,
             block_height,
         })
     }
 
     fn from_root(store: BS, root_cid: Cid) -> anyhow::Result<Self> {
-        if let Some((state_params, block_height)) = store.get_cbor::<BlockStateParams>(&root_cid)? {
-            let state_tree_root = state_params.state_root;
+        if let Some((payload, block_height)) = store.get_cbor::<BlockStateParams>(&root_cid)? {
+            let state_tree_root = payload.state.state_root;
             Ok(Self {
                 state_tree: StateTree::new_from_root(
                     ReadOnlyBlockstore::new(store),
                     &state_tree_root,
                 )?,
-                state_params,
+                payload,
                 block_height,
             })
         } else {
@@ -202,9 +209,9 @@ where
     }
 
     fn into_streamer(self) -> anyhow::Result<(Cid, SnapshotStreamer)> {
-        let state_tree_root = self.state_params.state_root;
+        let state_tree_root = self.payload.state.state_root;
 
-        let block_state_params = (self.state_params, self.block_height);
+        let block_state_params = (self.payload, self.block_height);
         let bytes = fvm_ipld_encoding::to_vec(&block_state_params)?;
         let root_cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes));
 
@@ -220,8 +227,8 @@ where
         self.block_height
     }
 
-    pub fn state_params(&self) -> &FvmStateParams {
-        &self.state_params
+    pub fn state_params(&self) -> &SnapshotPayload {
+        &self.payload
     }
 }
 
@@ -331,6 +338,7 @@ pub(crate) fn derive_cid<T: Serialize>(t: &T) -> anyhow::Result<(Cid, Vec<u8>)> 
 
 #[cfg(test)]
 mod tests {
+    use crate::fvm::state::snapshot::SnapshotPayload;
     use crate::fvm::state::snapshot::{Snapshot, StateTreeStreamer};
     use crate::fvm::state::FvmStateParams;
     use crate::fvm::store::memory::MemoryBlockstore;
@@ -414,11 +422,16 @@ mod tests {
             app_version: 0,
             consensus_params: None,
         };
+        let payload = SnapshotPayload {
+            state: state_params,
+            light_client_commitments: None,
+        };
+
         let block_height = 2048;
 
         let bs = state_tree.into_store();
         let db = ReadOnlyBlockstore::new(bs.clone());
-        let snapshot = Snapshot::new(db, state_params.clone(), block_height).unwrap();
+        let snapshot = Snapshot::new(db, payload.clone(), block_height).unwrap();
 
         let tmp_file = tempfile::NamedTempFile::new().unwrap();
         let r = snapshot.write_car(tmp_file.path()).await;
@@ -429,10 +442,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(state_params, loaded_snapshot.state_params);
+        assert_eq!(payload, loaded_snapshot.payload);
         assert_eq!(block_height, loaded_snapshot.block_height);
         assert_tree2_contains_tree1(
-            &StateTree::new_from_root(bs, &loaded_snapshot.state_params.state_root).unwrap(),
+            &StateTree::new_from_root(bs, &loaded_snapshot.payload.state.state_root).unwrap(),
             &loaded_snapshot.state_tree,
         );
     }

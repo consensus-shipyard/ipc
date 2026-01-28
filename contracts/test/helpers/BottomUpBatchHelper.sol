@@ -36,9 +36,9 @@ library BottomUpBatchHelper {
 
         if (msgs.length == 1) {
             BottomUpBatch.MerkleHash[] memory proof = new BottomUpBatch.MerkleHash[](0);
-            BottomUpBatch.Inclusion[] memory inclusions = new BottomUpBatch.Inclusion[](1);
-            inclusions[0] = BottomUpBatch.Inclusion({msg: msgs[0], proof: proof});
-            return inclusions;
+            BottomUpBatch.Inclusion[] memory inclusions2 = new BottomUpBatch.Inclusion[](1);
+            inclusions2[0] = BottomUpBatch.Inclusion({msg: msgs[0], proof: proof});
+            return inclusions2;
         }
 
         (, bytes32[][] memory proofs) = MerkleTreeHelper.createMerkleProofsForBottomUpBatch(msgs);

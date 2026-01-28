@@ -1,0 +1,27 @@
+# Elasticsearch Configuration for IPC Log Aggregation
+
+cluster.name: "ipc-logs"
+node.name: "ipc-es-node"
+network.host: 0.0.0.0
+
+# Path settings
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+
+# Security settings
+xpack.security.enabled: true
+xpack.security.enrollment.enabled: true
+
+# Disable SSL for internal network (enable for production with proper certs)
+xpack.security.http.ssl.enabled: false
+xpack.security.transport.ssl.enabled: false
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Index lifecycle management
+xpack.ilm.enabled: true
+
+# Monitoring
+xpack.monitoring.collection.enabled: true
+

@@ -203,3 +203,32 @@ impl<'de> DeserializeAs<'de, TokenAmount> for IsHumanReadable {
         }
     }
 }
+
+impl SerializeAs<Vec<u8>> for IsHumanReadable {
+    /// Serialize bytes as human readable decimal string.
+    fn serialize_as<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            hex::encode(bytes).serialize(serializer)
+        } else {
+            bytes.serialize(serializer)
+        }
+    }
+}
+
+impl<'de> DeserializeAs<'de, Vec<u8>> for IsHumanReadable {
+    fn deserialize_as<D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            let s = String::deserialize(deserializer)?;
+            Ok(hex::decode(s)
+                .map_err(|e| D::Error::custom(format!("cannot parse from str {e}")))?)
+        } else {
+            Vec::<u8>::deserialize(deserializer)
+        }
+    }
+}

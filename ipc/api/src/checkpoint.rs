@@ -9,7 +9,6 @@ use cid::Cid;
 use ethers::abi::AbiEncode;
 use ethers::utils::hex;
 use fvm_ipld_encoding::DAG_CBOR;
-use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::checkpointing_facet;
@@ -52,18 +51,6 @@ impl Display for QuorumReachedEvent {
             self.quorum_weight
         )
     }
-}
-
-/// The collection of items for the bottom up checkpoint submission
-#[serde_as]
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct BottomUpCheckpointBundle {
-    pub checkpoint: BottomUpCheckpoint,
-    /// The list of signatures that have signed the checkpoint hash
-    #[serde_as(as = "Vec<HumanReadable>")]
-    pub signatures: Vec<Signature>,
-    /// The list of addresses that have signed the checkpoint hash
-    pub signatories: Vec<Address>,
 }
 
 /// The collection of items for the bottom up checkpoint submission
@@ -190,28 +177,6 @@ pub mod consensus {
         /// The commitment for the validator details, so that we don't have to transmit them in full.
         pub data_root_commitment: Vec<u8>,
     }
-}
-
-#[serde_as]
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct BottomUpCheckpoint {
-    /// Child subnet ID, for replay protection from other subnets where the exact same validators operate.
-    /// Alternatively it can be appended to the hash before signing, similar to how we use the chain ID.
-    pub subnet_id: SubnetID,
-    /// The height of the child subnet at which this checkpoint was cut.
-    /// Has to follow the previous checkpoint by checkpoint period.
-    pub block_height: ChainEpoch,
-    /// The hash of the block.
-    #[serde_as(as = "HumanReadable")]
-    pub block_hash: Vec<u8>,
-    /// The number of the membership (validator set) which is going to sign the next checkpoint.
-    /// This one expected to be signed by the validators from the membership reported in the previous checkpoint.
-    /// 0 could mean "no change".
-    pub next_configuration_number: u64,
-    /// The list of messages for execution
-    pub msgs: BottomUpBatchCommitment,
-    /// The activity commitment from child subnet to parent subnet
-    pub activity_rollup: CompressedActivityRollup,
 }
 
 pub fn serialize_vec_bytes_to_vec_hex<T: AsRef<[u8]>, S>(

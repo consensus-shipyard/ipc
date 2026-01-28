@@ -68,6 +68,8 @@ uuid = { version = "1.0", features = ["v4"] }
 mime_guess = "2.0"
 include_dir = "0.7"
 fendermint_eth_api = { path = "../../fendermint/eth/api" }
+fendermint_rpc = { path = "../../fendermint/rpc" }
+tendermint-rpc = { workspace = true }
 
 ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
 ipc-provider = { path = "../../ipc/provider" }

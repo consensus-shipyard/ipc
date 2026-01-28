@@ -4,16 +4,13 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_interpreter::fvm::bottomup::BottomUpManager;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
-use fendermint_vm_interpreter::fvm::{Broadcaster, ValidatorContext};
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
@@ -38,7 +35,9 @@ use crate::cmd::key::read_secret_key;
 use crate::ipc::{AppParentFinalityQuery, AppVote};
 use crate::observe::register_metrics as register_consensus_metrics;
 use crate::{App, AppConfig, AppStore, BitswapBlockstore};
-use fendermint_app_settings::Settings;
+use fendermint_app_settings::{AccountKind, Settings};
+
+use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
 
 // Database collection names.
 namespaces! {
@@ -106,23 +105,6 @@ pub async fn run(
             .expect("secp256k1 secret key");
         let kp = libp2p::identity::secp256k1::Keypair::from(sk);
         libp2p::identity::Keypair::from(kp)
-    });
-
-    let validator_ctx = validator.map(|(sk, addr)| {
-        // For now we are using the validator key for submitting transactions.
-        // This allows us to identify transactions coming from empowered validators, to give priority to protocol related transactions.
-        let broadcaster = Broadcaster::new(
-            tendermint_client.clone(),
-            addr,
-            sk.clone(),
-            settings.fvm.gas_fee_cap.clone(),
-            settings.fvm.gas_premium.clone(),
-            settings.fvm.gas_overestimation_rate,
-        )
-        .with_max_retries(settings.broadcast.max_retries)
-        .with_retry_delay(settings.broadcast.retry_delay);
-
-        ValidatorContext::new(sk, addr, broadcaster)
     });
 
     let testing_settings = match settings.testing.as_ref() {
@@ -262,14 +244,14 @@ pub async fn run(
         None
     };
 
-    let bottom_up_manager = BottomUpManager::new(tendermint_client.clone(), validator_ctx);
+    let end_block_manager = EndBlockManager::new();
     let top_down_manager = TopDownManager::new(
         parent_finality_provider.clone(),
         parent_finality_votes.clone(),
     );
 
     let interpreter = FvmMessagesInterpreter::new(
-        bottom_up_manager,
+        end_block_manager,
         top_down_manager,
         UpgradeScheduler::new(),
         testing_settings.is_none_or(|t| t.push_chain_meta),
@@ -282,7 +264,8 @@ pub async fn run(
         AppConfig {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
-            state_hist_size: settings.db.state_hist_size,
+            // keep all state history for light client validation
+            state_hist_size: 0,
             halt_height: settings.halt_height,
         },
         db,
@@ -544,9 +527,9 @@ async fn dispatch_vote(
                     tracing::warn!(error = e.to_string(), "failed to handle vote");
                 }
                 Err(e @ (
-                      VoteError::Uninitialized // early vote, we're not ready yet
-                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
-                    | VoteError::UnexpectedBlock(_, _) // won't happen here
+                VoteError::Uninitialized // early vote, we're not ready yet
+                | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
                     tracing::debug!(error = e.to_string(), "failed to handle vote");
                 }

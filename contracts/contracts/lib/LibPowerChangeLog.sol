@@ -5,6 +5,7 @@ import {PowerChangeLog, PowerChange, PowerOperation} from "../structs/Subnet.sol
 
 /// The util library for `PowerChangeLog`
 library LibPowerChangeLog {
+    // Keep in sync with the event signature in the proof-service: fendermint/vm/topdown/proof-service/src/assembler.rs:NEW_POWER_CHANGE_REQUEST_SIGNATURE
     event NewPowerChangeRequest(PowerOperation op, address validator, bytes payload, uint64 configurationNumber);
 
     /// @notice Validator request to update its metadata

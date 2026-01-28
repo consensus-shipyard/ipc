@@ -1,18 +1,21 @@
 {
-  "block_height": 670944554,
-  "size": 5279996817261953086,
-  "chunks": 66302186,
-  "checksum": "011880E7FEFF7B89F7F900CA8A8A31EE01005B714996EB6E56A9C94629C68E05",
+  "block_height": 2240087710,
+  "size": 6454902246908356242,
+  "chunks": 3547732664,
+  "checksum": "DAE8EFB1ACBD5F7BB2FA218E42FF5058230058AAE7E4DC61FF9112C650D8FBC6",
   "state_params": {
-    "state_root": "QmRAmJvPSFPjeHkVJyPktbmM2SRHURjbM7xs7JRD1zCjWJ",
-    "timestamp": 4213217894191243202,
-    "network_version": 4294967295,
-    "base_fee": "8250707776968713539450246576050714477",
-    "circ_supply": "91104274315546431878752615555686100806",
-    "chain_id": 2521733350176005,
-    "power_scale": 3,
-    "app_version": 0,
-    "consensus_params": null
+    "state": {
+      "state_root": "QmVMjG1vtuPYEBqwSP41dVGVEnWHPGvZ3DcaHZ6cyZzcfJ",
+      "timestamp": 1,
+      "network_version": 4294967295,
+      "base_fee": "114487637048321179",
+      "circ_supply": "318606965824655163786137171207939122800",
+      "chain_id": 0,
+      "power_scale": 0,
+      "app_version": 0,
+      "consensus_params": null
+    },
+    "light_client_commitments": null
   },
-  "version": 1130599963
+  "version": 1644255627
 }

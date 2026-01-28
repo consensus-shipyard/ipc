@@ -18,8 +18,8 @@ use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::{
-    account, activity, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system,
-    EMPTY_ARR,
+    account, activity, burntfunds, chainmetadata, cron, eam, f3_light_client, gas_market, init,
+    ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -442,6 +442,32 @@ impl<'a> GenesisBuilder<'a> {
             )
             .context("failed to create activity tracker actor")?;
 
+        // F3 Light Client actor - manages F3 light client state for proof-based parent finality
+        if let Some(f3_params) = &genesis.f3 {
+            // For subnets with F3 parameters, initialize with the provided F3 data
+            // Note: finalized_epochs always starts empty at genesis
+            let constructor_params = fendermint_actor_f3_light_client::types::ConstructorParams {
+                instance_id: f3_params.instance_id,
+                power_table: f3_params.power_table.clone(),
+                finalized_epochs: Vec::new(),
+            };
+            let f3_state = fendermint_actor_f3_light_client::state::State::new(
+                constructor_params.instance_id,
+                constructor_params.power_table,
+                constructor_params.finalized_epochs,
+            )?;
+
+            state
+                .create_custom_actor(
+                    fendermint_actor_f3_light_client::F3_LIGHT_CLIENT_ACTOR_NAME,
+                    f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID,
+                    &f3_state,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create F3 light client actor")?;
+        };
+
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
         // The next ID is going to be _after_ the accounts, which have already been assigned an ID by the `Init` actor.
@@ -509,6 +535,16 @@ struct DeployConfig<'a> {
     deployer_addr: ethers::types::Address,
 }
 
+/// Get the commit SHA for genesis contract deployment.
+/// For genesis, we use a default value as genesis is typically built at compile time.
+fn get_genesis_commit_sha() -> [u8; 32] {
+    // Use default value for genesis (matches test default)
+    let default_sha = b"c7d8f53f";
+    let mut result = [0u8; 32];
+    result[..default_sha.len()].copy_from_slice(default_sha);
+    result
+}
+
 fn deploy_contracts(
     ipc_contracts: Vec<ContractSourceAndName>,
     top_level_contracts: &EthContractMap,
@@ -539,7 +575,9 @@ fn deploy_contracts(
             GatewayParams::new(SubnetID::new(config.chain_id.into(), vec![]))
         };
 
-        let params = ConstructorParameters::new(ipc_params, validators)
+        // Get commit SHA for genesis deployment
+        let commit_sha = get_genesis_commit_sha();
+        let params = ConstructorParameters::new(ipc_params, validators, commit_sha)
             .context("failed to create gateway constructor")?;
 
         let facets = deployer

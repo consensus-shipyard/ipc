@@ -14,7 +14,7 @@ use fvm_shared::version::NetworkVersion;
 use fvm_shared::{address::Address, econ::TokenAmount};
 
 use fendermint_crypto::{normalize_public_key, PublicKey};
-use fendermint_vm_core::{chainid, Timestamp};
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_encoding::IsHumanReadable;
 
 #[cfg(feature = "arb")]
@@ -32,7 +32,7 @@ pub struct Genesis {
     /// It will be used to derive a chain ID as well as being
     /// the network name in the `InitActor`.
     pub chain_name: String,
-    pub chain_id: Option<u64>,
+    pub chain_id: u64,
     pub timestamp: Timestamp,
     pub network_version: NetworkVersion,
     #[serde_as(as = "IsHumanReadable")]
@@ -47,19 +47,19 @@ pub struct Genesis {
     /// The custom eam permission mode that controls who can deploy contracts
     pub eam_permission_mode: PermissionMode,
     /// IPC related configuration, if enabled.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ipc: Option<ipc::IpcParams>,
     /// The owner of the IPC Solidity contracts within the subnet
     pub ipc_contracts_owner: ethers::types::Address,
+    /// F3 (Fast Finality) consensus parameters, if enabled.
+    /// Used for proof-based parent finality.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub f3: Option<ipc::F3Params>,
 }
 
 impl Genesis {
     pub fn chain_id(&self) -> anyhow::Result<ChainID> {
-        let id = match self.chain_id {
-            None => chainid::from_str_hashed(&self.chain_name)?.into(),
-            Some(v) => v,
-        };
-        Ok(id.into())
+        Ok(self.chain_id.into())
     }
 }
 
@@ -278,6 +278,15 @@ pub mod ipc {
                 ..Default::default()
             }
         }
+    }
+
+    /// F3 parameters for proof-based parent finality
+    #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+    pub struct F3Params {
+        /// F3 instance ID from parent chain
+        pub instance_id: u64,
+        /// Power table for F3 consensus from parent chain
+        pub power_table: Vec<fendermint_actor_f3_light_client::types::PowerEntry>,
     }
 }
 

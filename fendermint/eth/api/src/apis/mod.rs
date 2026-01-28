@@ -123,6 +123,8 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         sendRawTransaction,
         subscribe,
         syncing,
+        getCommitSignedHeader,
+        getStateRoot,
         uninstallFilter,
         unsubscribe
     });

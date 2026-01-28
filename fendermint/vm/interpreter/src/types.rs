@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::fvm::bottomup::PowerUpdates;
+use crate::fvm::end_block_hook::{LightClientCommitments, PowerUpdates};
 use crate::fvm::FvmMessage;
 use actors_custom_api::gas_market::Reading;
 use cid::Cid;
@@ -90,8 +90,8 @@ pub struct BeginBlockResponse {
 pub struct EndBlockResponse {
     pub power_updates: PowerUpdates,
     pub gas_market: Reading,
-    /// End-block events to be recorded.
-    pub events: BlockEndEvents,
+    pub light_client_commitments: Option<LightClientCommitments>,
+    pub end_block_events: BlockEndEvents,
 }
 
 /// Response for preparing messages for a block.

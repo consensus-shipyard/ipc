@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {FullActivityRollup} from "../structs/Activity.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
@@ -22,9 +22,6 @@ interface IGateway {
     /// @notice Kill propagates the kill signal from a subnet actor to unregister it from th
     /// hierarchy.
     function kill() external;
-
-    /// @notice commitCheckpoint propagates the commitment of a checkpoint from a child
-    function commitCheckpoint(BottomUpCheckpoint calldata bottomUpCheckpoint) external;
 
     /// @notice submit a verified batch of committed cross-net messages for execution.
     function execBottomUpMsgBatch(IpcEnvelope[] calldata msgs) external;
@@ -70,12 +67,4 @@ interface IGateway {
 
     /// @notice commit the ipc parent finality into storage
     function commitParentFinality(ParentFinality calldata finality) external;
-
-    /// @notice creates a new bottom-up checkpoint
-    function createBottomUpCheckpoint(
-        BottomUpCheckpoint calldata checkpoint,
-        bytes32 membershipRootHash,
-        uint256 membershipWeight,
-        FullActivityRollup calldata activity
-    ) external;
 }
