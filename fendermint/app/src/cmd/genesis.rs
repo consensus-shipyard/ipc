@@ -373,7 +373,7 @@ async fn fetch_f3_params_from_parent(
     let lotus_client = LotusJsonRPCClient::new(jsonrpc_client, SubnetID::default());
 
     // Fetch the F3 certificate for the specific instance so we can deterministically
-    // derive the ECChain base epoch (the overlap point finalized by the previous certificate).
+    // derive the last finalized epoch for this instance (and its ETH block hash).
     let cert = fendermint_vm_topdown_proof_service::fetch_certificate(
         &parent_endpoint.to_string(),
         subnet_id,
@@ -388,12 +388,24 @@ async fn fetch_f3_params_from_parent(
             cert.gpbft_instance
         );
     }
-    let base_epoch = cert.ec_chain.base().map(|b| b.epoch).ok_or_else(|| {
-        anyhow::anyhow!(
-            "F3 certificate instance {} has no ECChain base (cannot derive genesis base_epoch)",
-            instance_id
+    // Genesis treats the configured `instance_id` certificate as already committed.
+    // Use the cert's committed epoch cursor tipset:
+    // - base-only ECChain (len=1): use the base tipset
+    // - otherwise: use the last provable parent tipset (second-to-last)
+    let last_provable_tipset =
+        fendermint_vm_topdown_proof_service::types::committed_cursor_tipset(&cert.ec_chain)
+            .with_context(|| {
+                format!(
+                    "failed to derive genesis base_epoch from cert {}",
+                    instance_id
+                )
+            })?;
+    let base_epoch = last_provable_tipset.epoch;
+    let base_epoch_eth_block_hash =
+        fendermint_vm_topdown_proof_service::types::eth_hash_from_tipset_key_bytes(
+            &last_provable_tipset.key,
         )
-    })?;
+        .context("failed to derive base_epoch_eth_block_hash from ECChain last provable tipset")?;
 
     // Get base power table for the specified instance
     let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
@@ -428,6 +440,7 @@ async fn fetch_f3_params_from_parent(
     Ok(Some(ipc::F3Params {
         instance_id,
         base_epoch,
+        base_epoch_eth_block_hash,
         power_table,
     }))
 }

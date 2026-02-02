@@ -5,11 +5,9 @@ use anyhow::{bail, Context};
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::ipc::ParentFinalityWithCert;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::BytesSer;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
-use multihash_codetable::{Code, MultihashDigest};
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -38,19 +36,7 @@ pub struct ExtractedTopDownEffects {
 fn eth_hash_from_tipset_key_bytes(
     tipset: &fendermint_vm_topdown_proof_service::types::FinalizedTipset,
 ) -> anyhow::Result<[u8; 32]> {
-    // Lotus eth block hash for a tipset is the multihash digest of `TipSetKey.Cid()`, where
-    // `TipSetKey` is the concatenation of block header CID bytes (order-sensitive), and
-    // `TipSetKey.Cid()` is computed over the DAG-CBOR bytestring-wrapped key bytes.
-    //
-    // See: https://docs.filecoin.io/basics/the-blockchain/blocks-and-tipsets#tipsets-in-the-ethereum-json-rpc
-    // Force CBOR *bytestring* encoding (not array-of-ints) for the key bytes.
-    let wrapped = fvm_ipld_encoding::to_vec(&BytesSer(&tipset.block_cids))
-        .context("failed to CBOR-encode tipset key bytes as bytestring")?;
-    let digest = Code::Blake2b256.digest(&wrapped);
-
-    let mut out = [0u8; 32];
-    out.copy_from_slice(digest.digest());
-    Ok(out)
+    fendermint_vm_topdown_proof_service::types::eth_hash_from_tipset_key_bytes(&tipset.block_cids)
 }
 
 /// F3 finality handler - handles all F3 proof-based finality logic
@@ -146,18 +132,18 @@ impl F3TopDownHandler {
 
         // Certificate instance must not go backwards; it either stays the same (multiple epochs can
         // be proven under the same certificate) or advances by exactly 1.
-        if instance_id < f3_state.latest_instance_id {
+        if instance_id < f3_state.processed_instance_id {
             bail!(
                 "certificate instance went backwards: {} < {}",
                 instance_id,
-                f3_state.latest_instance_id
+                f3_state.processed_instance_id
             );
         }
-        if instance_id > f3_state.latest_instance_id + 1 {
+        if instance_id > f3_state.processed_instance_id + 1 {
             bail!(
                 "certificate instance jumped: {} > {}",
                 instance_id,
-                f3_state.latest_instance_id + 1
+                f3_state.processed_instance_id + 1
             );
         }
 
@@ -172,7 +158,7 @@ impl F3TopDownHandler {
             .ok_or_else(|| {
                 anyhow::anyhow!(
                     "no cached proof available after last committed epoch {}",
-                    f3_state.latest_finalized_height
+                    self.proof_cache.last_committed_epoch()
                 )
             })?;
         if msg.height != expected_epoch {
@@ -255,10 +241,23 @@ impl F3TopDownHandler {
     where
         DB: Blockstore + Clone + 'static + Send + Sync,
     {
-        // Update F3LightClientActor with new certificate state (on-chain).
-        let power_table = ActorPowerTable::try_from(&self.get_power_table(instance_id)?)?.0;
-        self.update_f3_light_client_actor_state(state, instance_id, epoch, power_table)?;
-        tracing::debug!(instance = instance_id, "updated F3LightClientActor state");
+        // Update F3LightClientActor with new certificate state (on-chain), but ONLY once we've
+        // executed the *last provable epoch* of this certificate.
+        //
+        // A certificate's ECChain contains tipsets [T0, T1, ... TN]. Proofs are generated for
+        // parent epochs in windows(2), i.e. for T0..T(N-1). The final tipset TN has no child in
+        // this certificate, so it is proven by the next certificate (as its base).
+        //
+        // Therefore we only advance the on-chain instance/power-table once we execute epoch T(N-1),
+        // i.e. the second-to-last tipset epoch in the certificate.
+        if self.is_last_provable_epoch_for_instance(instance_id, epoch)? {
+            let power_table = ActorPowerTable::try_from(&self.get_power_table(instance_id)?)?.0;
+            self.update_f3_light_client_actor_state(state, instance_id, power_table)?;
+            tracing::debug!(
+                instance = instance_id,
+                "updated F3LightClientActor state (end of cert)"
+            );
+        }
 
         // Mark epoch as committed in cache.
         if let Err(e) = self.mark_committed(epoch, instance_id) {
@@ -328,21 +327,35 @@ impl F3TopDownHandler {
     fn update_f3_light_client_actor_state<DB>(
         &self,
         state: &mut FvmExecState<DB>,
-        latest_instance_id: u64,
-        latest_finalized_height: fvm_shared::clock::ChainEpoch,
+        processed_instance_id: u64,
         power_table: Vec<fendermint_vm_actor_interface::f3_light_client::PowerEntry>,
     ) -> anyhow::Result<()>
     where
         DB: Blockstore + Clone + 'static + Send + Sync,
     {
         self.f3_light_client_actor_caller
-            .update_state(
-                state,
-                latest_instance_id,
-                latest_finalized_height,
-                power_table,
-            )
+            .update_state(state, processed_instance_id, power_table)
             .context("failed to update F3LightClientActor state")
+    }
+
+    fn is_last_provable_epoch_for_instance(
+        &self,
+        instance_id: u64,
+        epoch: fvm_shared::clock::ChainEpoch,
+    ) -> anyhow::Result<bool> {
+        let cert_entry = self
+            .proof_cache
+            .get_certificate(instance_id)
+            .ok_or_else(|| {
+                anyhow::anyhow!("certificate not found in cache for instance {instance_id}")
+            })?;
+        let Some(last_provable) = fendermint_vm_topdown_proof_service::types::last_provable_tipset(
+            &cert_entry.certificate.ec_chain,
+        ) else {
+            // Base-only certificate (len < 2): valid but has no provable `(parent, child)` pair.
+            return Ok(false);
+        };
+        Ok(epoch == last_provable.epoch)
     }
 }
 
@@ -557,7 +570,6 @@ mod tests {
         let f3_state = fendermint_actor_f3_light_client::state::State::new(
             genesis_state.store(),
             instance_id,
-            base_epoch,
             genesis_power_table,
         )
         .context("failed to create F3 light client actor state")?;
@@ -587,8 +599,11 @@ mod tests {
             .map_err(|_| anyhow::anyhow!("genesis exec state missing"))?;
 
         // Prepare a cache with exactly one next epoch proof.
+        //
+        // Proofs are generated for parent epochs in `windows(2)`. With a certified chain
+        // `[base_epoch, base_epoch + 1]`, the only provable (parent) epoch is `base_epoch`.
         let cache = ProofCache::new(
-            base_epoch,
+            base_epoch - 1,
             instance_id,
             CacheConfig {
                 lookahead_instances: 10,
@@ -603,7 +618,7 @@ mod tests {
             .context("failed to insert certificate")?;
         cache
             .insert_epoch_proofs(vec![EpochProofEntry::new(
-                base_epoch + 1,
+                base_epoch,
                 UnifiedProofBundle {
                     storage_proofs: vec![],
                     event_proofs: vec![],
@@ -623,7 +638,7 @@ mod tests {
             ChainMessage::Ipc(IpcMessage::ParentFinalityWithCert(m)) => m,
             other => anyhow::bail!("unexpected chain message: {other:?}"),
         };
-        assert_eq!(msg.height, base_epoch + 1);
+        assert_eq!(msg.height, base_epoch);
 
         // Attest: cache match + on-chain continuity.
         handler
@@ -642,11 +657,11 @@ mod tests {
             .finalize_after_execution(&mut exec_state, msg.height, extracted.instance_id)
             .context("finalize failed")?;
 
-        // Actor state updated.
+        // Actor state updated (we update at the cert's last provable epoch).
         let caller = crate::fvm::state::ipc::F3LightClientCaller::new();
         let actor_state = caller.get_state(&mut exec_state)?;
-        assert_eq!(actor_state.latest_instance_id, instance_id);
-        assert_eq!(actor_state.latest_finalized_height, base_epoch + 1);
+        assert_eq!(actor_state.processed_instance_id, instance_id);
+        // Actor no longer tracks finalized height; the epoch cursor is stored in the gateway.
         assert_eq!(actor_state.power_table.len(), 2);
         assert_eq!(actor_state.power_table[0].id, 1);
         assert_eq!(actor_state.power_table[0].power_be, vec![0x03, 0xE8]);
@@ -654,7 +669,7 @@ mod tests {
         // Cache committed cursor updated.
         assert_eq!(
             handler.proof_cache().last_committed(),
-            (base_epoch + 1, instance_id)
+            (base_epoch, instance_id)
         );
 
         // Sanity: message certificate is FilecoinF3 (we don't decode internals here).
@@ -662,6 +677,27 @@ mod tests {
             Certificate::FilecoinF3(_) => {}
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn base_only_certificate_is_not_last_provable_epoch() -> anyhow::Result<()> {
+        // A base-only certificate (ECChain len=1) has no provable `(parent, child)` pair,
+        // therefore there is no "last provable epoch" for that instance.
+        use fendermint_vm_topdown_proof_service::cache::ProofCache;
+        use fendermint_vm_topdown_proof_service::config::CacheConfig;
+
+        let instance_id = 7u64;
+        let base_epoch: ChainEpoch = 50;
+
+        let cache = ProofCache::new(base_epoch, instance_id, CacheConfig::default());
+        cache
+            .insert_certificate(mk_test_certificate_entry(instance_id, vec![base_epoch]))
+            .context("failed to insert base-only certificate")?;
+
+        let handler = F3TopDownHandler::new(Arc::new(cache));
+
+        assert!(!handler.is_last_provable_epoch_for_instance(instance_id, base_epoch)?);
         Ok(())
     }
 }

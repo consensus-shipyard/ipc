@@ -260,9 +260,11 @@ pub struct F3ExecutionCacheRetrySettings {
     /// Maximum backoff between retries.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub backoff_max: Duration,
-    /// Maximum time to wait for the cache entry before failing block execution.
+    /// After this much waiting for a local cache entry during block execution, emit an
+    /// error-severity signal (but keep retrying).
     #[serde_as(as = "DurationSeconds<u64>")]
-    pub max_wait: Duration,
+    #[serde(alias = "max_wait")]
+    pub critical_after: Duration,
     /// Emit an `error!` log after this much waiting (and then periodically thereafter).
     #[serde_as(as = "DurationSeconds<u64>")]
     pub error_after: Duration,
@@ -273,7 +275,7 @@ impl Default for F3ExecutionCacheRetrySettings {
         Self {
             backoff_initial: Duration::from_millis(200),
             backoff_max: Duration::from_secs(5),
-            max_wait: Duration::from_secs(10 * 60),
+            critical_after: Duration::from_secs(10 * 60),
             error_after: Duration::from_secs(2 * 60),
         }
     }

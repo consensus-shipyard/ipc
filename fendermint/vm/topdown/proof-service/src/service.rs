@@ -272,6 +272,7 @@ impl ProofGeneratorService {
         let finalized_tipsets = FinalizedTipsets::from(&cert.ec_chain);
 
         let mut epoch_proofs = Vec::with_capacity(tipset_pairs.len());
+        let mut cursor: Option<crate::verifier::EventNumberCursor> = None;
 
         // Generate proofs for each (parent, child) pair.
         // The child tipset contains `parentReceipts` which commits to the parent's execution.
@@ -297,7 +298,12 @@ impl ProofGeneratorService {
             // Additional semantic checks:
             // - top-down message nonce continuity (from decoded events)
             // - power change configurationNumber continuity, and consistency with proved storage slot
-            crate::verifier::verify_event_number_continuity(parent_epoch, &proof_bundle)
+            // Maintain a cursor across epochs within this certificate so we can detect omitted
+            // events at the beginning of an epoch (anchored to proved end-of-epoch storage).
+            //
+            // Note: the first epoch proven in a certificate does not have a previous cursor.
+            self.verifier
+                .verify_event_number_continuity(parent_epoch, &proof_bundle, &mut cursor)
                 .with_context(|| {
                     format!(
                         "Nonce/config continuity check failed for epoch {}",

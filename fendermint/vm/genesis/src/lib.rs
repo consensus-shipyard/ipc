@@ -285,12 +285,18 @@ pub mod ipc {
     pub struct F3Params {
         /// F3 instance ID from parent chain
         pub instance_id: u64,
-        /// Base epoch of the ECChain for `instance_id`.
+        /// Last finalized epoch committed at genesis for `instance_id`.
         ///
-        /// This is the overlap point: the last epoch finalized by the previous certificate.
-        /// We treat it as already finalized/committed at genesis, so the first epoch to
-        /// prove/execute is `base_epoch + 1`.
+        /// The proof-service fetches certificates from `instance_id + 1`, so this value must
+        /// represent the overlap point for the *next* certificate: the last epoch in the
+        /// ECChain of `instance_id`.
+        ///
+        /// The first epoch to prove/execute is `base_epoch + 1` (allowing for null rounds).
         pub base_epoch: fvm_shared::clock::ChainEpoch,
+        /// Ethereum JSON-RPC block hash (bytes32) for the `base_epoch` tipset.
+        ///
+        /// Derived deterministically from the F3 certificate's ECChain base tipset key bytes.
+        pub base_epoch_eth_block_hash: [u8; 32],
         /// Power table for F3 consensus from parent chain
         pub power_table: Vec<fendermint_actor_f3_light_client::types::PowerEntry>,
     }

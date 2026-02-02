@@ -1,6 +1,9 @@
 //! Verified storage layout constants for the Gateway contract.
 //!
-//! These are derived from the compiled Foundry `storageLayout` for `GatewayDiamond`.
+//! These are derived from the Solidity compiler `storageLayout` for `GatewayDiamond`.
+//! In this repo the reliable source of `storageLayout` is the Hardhat build-info artifacts
+//! under `contracts/artifacts/build-info/*.json` (not `contracts/out/*`).
+//!
 //! Keeping them in one place avoids "magic numbers" duplicated across assembler and checks.
 
 /// `GatewayActorStorage.subnets` mapping slot.
@@ -24,47 +27,47 @@ pub const NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT: u64 = 20;
 mod tests {
     use super::*;
     use anyhow::{Context, Result};
-    use contracts_artifacts::extract_to_tempdir;
     use serde_json::Value;
 
     fn load_gateway_diamond_storage_layout() -> Result<Value> {
-        // Foundry artifacts are embedded in the `contracts-artifacts` crate.
-        // We extract them to a temp dir and locate the `GatewayDiamond` JSON artifact.
-        let (_tmp, base) =
-            extract_to_tempdir().context("failed to extract embedded contract artifacts")?;
+        // Prefer Hardhat build-info artifacts, which include Solidity `storageLayout`:
+        // `contracts/artifacts/build-info/*.json`
+        //
+        // We resolve paths relative to this crate so tests work regardless of cwd.
+        let build_info_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../contracts/artifacts/build-info");
 
-        fn find_file_named(
-            dir: &std::path::Path,
-            name: &str,
-        ) -> std::io::Result<Option<std::path::PathBuf>> {
-            for entry in std::fs::read_dir(dir)? {
-                let entry = entry?;
-                let path = entry.path();
-                let ft = entry.file_type()?;
-                if ft.is_dir() {
-                    if let Some(found) = find_file_named(&path, name)? {
-                        return Ok(Some(found));
-                    }
-                } else if ft.is_file() {
-                    if path.file_name().and_then(|n| n.to_str()) == Some(name) {
-                        return Ok(Some(path));
-                    }
-                }
+        let entries = std::fs::read_dir(&build_info_dir).with_context(|| {
+            format!(
+                "failed to read Hardhat build-info directory: {:?}",
+                build_info_dir
+            )
+        })?;
+
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
             }
-            Ok(None)
+
+            let bytes =
+                std::fs::read(&path).with_context(|| format!("failed to read {:?}", path))?;
+            let json: Value = match serde_json::from_slice(bytes.as_slice()) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
+            let layout = &json["output"]["contracts"]["contracts/GatewayDiamond.sol"]
+                ["GatewayDiamond"]["storageLayout"];
+            if layout["storage"].as_array().is_some() && layout["types"].as_object().is_some() {
+                return Ok(layout.clone());
+            }
         }
 
-        let gateway_path = find_file_named(&base, "GatewayDiamond.json")
-            .context("failed to traverse extracted contracts artifacts")?
-            .context("GatewayDiamond.json not found in extracted contracts artifacts")?;
-
-        let bytes = std::fs::read(&gateway_path)
-            .with_context(|| format!("failed to read {:?}", gateway_path))?;
-
-        let json: Value = serde_json::from_slice(bytes.as_slice())
-            .with_context(|| format!("failed to parse {:?} as JSON", gateway_path))?;
-
-        Ok(json["storageLayout"].clone())
+        anyhow::bail!(
+            "no Hardhat build-info artifact contained GatewayDiamond storageLayout (expected under contracts/artifacts/build-info)"
+        )
     }
 
     fn parse_slot_u64(v: &Value) -> Result<u64> {

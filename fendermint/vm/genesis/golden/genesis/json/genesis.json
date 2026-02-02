@@ -1,80 +1,82 @@
 {
-  "chain_name": "⮧\t§LN",
-  "chain_id": null,
-  "timestamp": 9166950190161876321,
+  "chain_name": "7",
+  "chain_id": 101,
+  "timestamp": 17133465601291489619,
   "network_version": 21,
-  "base_fee": "92132748893613804737712518769207785210",
+  "base_fee": "0",
   "power_scale": 0,
   "validators": [
     {
-      "public_key": "BJ2ICxPgqIpgPxTkWHeENqdDxgMukcg/4a1l8CH51rIabdszVkESNJQ61+NUNq2BqKn8jLA+pRRR+Lng3IODoq0=",
-      "power": "119680730293037942857664149531788261571"
+      "public_key": "BOaJm/wQCVEyouz1u6+43/t+RsrsT7YBK8x7fOBj5JYzkmZ0zjWvt4tNrUzFwKCykzkY5XUk8SULr9XhE2kCKgM=",
+      "power": "133436547121158909513477972881658559922"
     },
     {
-      "public_key": "BFChHN77vnsbUNg4/l06mVTfF6qvbV5kaqV2btTLpPUL9mBsgEKwGPlQJuWBAYBv6G9VPhwX7lrztjpayy7jhEk=",
-      "power": "35254282891067121059299756507316764434"
+      "public_key": "BHYo2AfRilJS1GHpeE93pAb/gx/lOPjESuA9ntxQSB5iKAqKMOgpcl/RMTI3/EDOwSdx8T4yCwVWhhq4bl5mAXQ=",
+      "power": "240244227391930844362499398952384284081"
+    },
+    {
+      "public_key": "BH5D8ccOKZTLbslmKgVzhkzYJUH8HfUHJ+GpgDNQe7R5TIpjhlJOB3i8O76iebA05LzpDPmKHu/3fw+E9PH+bJM=",
+      "power": "91680598785060915932670932172996893971"
+    },
+    {
+      "public_key": "BA5IaVwESz+YmgJYU2ebuCqcRdCwTWQcboPi7damKfFkdkC3Wig8VaIWjiYwcE+H0R8XaE2Jg0rZ2TCOiRJ7cWk=",
+      "power": "203185844703013843453464423669543643840"
+    },
+    {
+      "public_key": "BPs6vRJsPlUB+3ipe/r+4701HXWSV3E01vd/MkdRikAlfN+ALllUEkGmvK/exyeC7JLMr5ahI621l8ZEviYPpQ0=",
+      "power": "226575883433545164735832720684510944066"
+    },
+    {
+      "public_key": "BK/bT0XF7NcvLtxYLjuCNf9Jh4Lm7yzx9127OupNaS0aMClpWLXbMDAVokzCM62LF7/h359fgfRIDpZkqTuVC10=",
+      "power": "86547577664969384614076978215207358206"
+    },
+    {
+      "public_key": "BKeJffIrsfHZAT1LRYivDtggz53c/HoT3QQbM7nh8jo0R1eZ6jQ3ReAzyhSKP7JYFgMgACcsdmvONGGH2Sw9uDs=",
+      "power": "45906758430646698643388752623232051481"
     }
   ],
   "accounts": [
     {
       "meta": {
-        "Account": {
-          "owner": "f410flavvsjwlqczzuapnpzwuo7ftq32nvr6kyrzvnna"
+        "Multisig": {
+          "signers": [
+            "f1wfp3qxaniskb2wrmuznq4lh5f7yosusizebxj2a",
+            "f1hf25io4nmjhex2qdjqmdzyt4ckswceefcx2yqmi",
+            "f1zqyla4dld6ifsfaqp3syfycmkq25f5pidb7jyea"
+          ],
+          "threshold": 3,
+          "vesting_duration": 6751209550894226961,
+          "vesting_start": 6976100918620151485
         }
       },
-      "balance": "197011208717819580134214681012943466690"
-    },
-    {
-      "meta": {
-        "Account": {
-          "owner": "f410f4pd4avs4gwsdwh5cqgvwg7bhzk4gkyotlez27aa"
-        }
-      },
-      "balance": "102137686532253315554542634423215460983"
-    },
-    {
-      "meta": {
-        "Account": {
-          "owner": "f410fk6imdbvngrp4vzmvb4g7k3vt4q3ivds72dm4yvq"
-        }
-      },
-      "balance": "153374264530312302270000858553190959779"
+      "balance": "97156951261594553286313547130067065459"
     },
     {
       "meta": {
         "Multisig": {
           "signers": [
-            "f1caopsapwuhdielvfbshr3tk3zhrtn7h4de6ubty",
-            "f1fi2ofihi7ynbrkshlnqnmg4fw5v7ftbjmq6xtsq",
-            "f1ozfuvcwlf2e3dznoeq23mag3xjdfmd3vw2sn2ri",
-            "f1u453i6v24omn6yffy75z4c6fs6p2fiwczt5rdui"
+            "f1pdcdgdja64kfotq3cnwpj7yjkqleqr2xbbt6mzi",
+            "f15v3rxxexa5gppkzx74nkjft5ndxrygmzl5rmifq",
+            "f1nwtqqcnslcn2annevfckkzz5tx2dbylupbshkla"
           ],
-          "threshold": 2,
-          "vesting_duration": 3306299543311472807,
-          "vesting_start": 14249729871702503296
+          "threshold": 1,
+          "vesting_duration": 2114408940148013,
+          "vesting_start": 371510136937269349
         }
       },
-      "balance": "309092999959441721106188818455929111123"
+      "balance": "251556828864509738395289928249703715510"
     },
     {
       "meta": {
         "Account": {
-          "owner": "f1brtfivrytkaf6jnkj2bejpwdeausws6jnenpn6i"
+          "owner": "f1cgubsj6dus4eod774qyoczn45am6i7g3hcffnhi"
         }
       },
-      "balance": "268168639178429380690207903639563038123"
+      "balance": "283041057149337595479796882931880733859"
     }
   ],
   "eam_permission_mode": {
     "mode": "unrestricted"
   },
-  "ipc": {
-    "gateway": {
-      "subnet_id": "/r7209731025411039793/f00",
-      "bottom_up_check_period": 1,
-      "majority_percentage": 59,
-      "active_validators_limit": 67
-    }
-  },
-  "ipc_contracts_owner": "0x9191919191919191919191919191919191919191"
+  "ipc_contracts_owner": "0x2424242424242424242424242424242424242424"
 }

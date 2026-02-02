@@ -39,12 +39,7 @@ impl F3LightClientActor {
     pub fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
-        let state = State::new(
-            rt.store(),
-            params.latest_instance_id,
-            params.latest_finalized_height,
-            params.power_table,
-        )?;
+        let state = State::new(rt.store(), params.processed_instance_id, params.power_table)?;
 
         rt.create(&state)?;
         Ok(())
@@ -61,41 +56,28 @@ impl F3LightClient for F3LightClientActor {
             // Basic monotonicity checks to prevent accidental rewinds or no-op updates.
             //
             // Note: multiple epochs can be proven under the same certificate instance, so
-            // `latest_instance_id` may stay the same across updates, but it must never go
+            // `processed_instance_id` may stay the same across updates, but it must never go
             // backwards and must not jump by more than 1.
             //
             // Also, we allow re-applying the same update (idempotency) by permitting equality.
-            if params.latest_finalized_height < st.light_client_state.latest_finalized_height {
+            if params.processed_instance_id < st.light_client_state.processed_instance_id {
                 return Err(actor_error!(
                     illegal_argument,
-                    "latest_finalized_height went backwards: {} < {}",
-                    params.latest_finalized_height,
-                    st.light_client_state.latest_finalized_height
+                    "processed_instance_id went backwards: {} < {}",
+                    params.processed_instance_id,
+                    st.light_client_state.processed_instance_id
                 ));
             }
-            if params.latest_instance_id < st.light_client_state.latest_instance_id {
+            if params.processed_instance_id > st.light_client_state.processed_instance_id + 1 {
                 return Err(actor_error!(
                     illegal_argument,
-                    "latest_instance_id went backwards: {} < {}",
-                    params.latest_instance_id,
-                    st.light_client_state.latest_instance_id
-                ));
-            }
-            if params.latest_instance_id > st.light_client_state.latest_instance_id + 1 {
-                return Err(actor_error!(
-                    illegal_argument,
-                    "latest_instance_id jumped: {} > {}",
-                    params.latest_instance_id,
-                    st.light_client_state.latest_instance_id + 1
+                    "processed_instance_id jumped: {} > {}",
+                    params.processed_instance_id,
+                    st.light_client_state.processed_instance_id + 1
                 ));
             }
 
-            st.update_state(
-                rt,
-                params.latest_instance_id,
-                params.latest_finalized_height,
-                params.power_table,
-            )?;
+            st.update_state(rt, params.processed_instance_id, params.power_table)?;
             Ok(())
         })
     }
@@ -129,8 +111,7 @@ impl F3LightClient for F3LightClientActor {
         };
 
         Ok(GetStateResponse {
-            latest_instance_id: lc.latest_instance_id,
-            latest_finalized_height: lc.latest_finalized_height,
+            processed_instance_id: lc.processed_instance_id,
             power_table_root: lc.power_table_root.clone(),
             power_table,
         })
@@ -159,7 +140,6 @@ mod tests {
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
-    use fvm_shared::clock::ChainEpoch;
     use fvm_shared::error::ExitCode;
 
     /// Helper function to create test power entries
@@ -191,7 +171,6 @@ mod tests {
     pub fn construct_and_verify(
         current_instance_id: u64,
         power_table: Vec<PowerEntry>,
-        latest_finalized_epoch: ChainEpoch,
     ) -> MockRuntime {
         let rt = MockRuntime {
             receiver: Address::new_id(10),
@@ -203,8 +182,7 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         let constructor_params = ConstructorParams {
-            latest_instance_id: current_instance_id,
-            latest_finalized_height: latest_finalized_epoch,
+            processed_instance_id: current_instance_id,
             power_table,
         };
 
@@ -224,28 +202,27 @@ mod tests {
 
     #[test]
     fn test_constructor_empty_power_table() {
-        let _rt = construct_and_verify(0, vec![], 10);
+        let _rt = construct_and_verify(0, vec![]);
         // Constructor test passed if we get here without panicking
     }
 
     #[test]
     fn test_constructor_with_power_table() {
         let power_entries = create_test_power_entries();
-        let _rt = construct_and_verify(1, power_entries, 10);
+        let _rt = construct_and_verify(1, power_entries);
         // Constructor test passed if we get here without panicking
     }
 
     #[test]
     fn test_update_state_success() {
-        let rt = construct_and_verify(1, create_test_power_entries(), 10);
+        let rt = construct_and_verify(1, create_test_power_entries());
 
         // Set caller to system actor
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         let update_params = UpdateStateParams {
-            latest_instance_id: 1,
-            latest_finalized_height: 11,
+            processed_instance_id: 1,
             power_table: create_test_power_entries(),
         };
 
@@ -261,15 +238,13 @@ mod tests {
     }
 
     #[test]
-    fn test_update_state_non_advancing_height() {
-        let rt = construct_and_verify(1, create_test_power_entries(), 10);
+    fn test_update_state_idempotent_allowed() {
+        let rt = construct_and_verify(1, create_test_power_entries());
 
-        // First update to advance the finalized height.
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let initial_params = UpdateStateParams {
-            latest_instance_id: 1,
-            latest_finalized_height: 11,
+            processed_instance_id: 1,
             power_table: create_test_power_entries(),
         };
         rt.call::<F3LightClientActor>(
@@ -279,12 +254,11 @@ mod tests {
         .unwrap();
         rt.reset();
 
-        // Try to update with same height
+        // Try to update with same instance
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let update_params = UpdateStateParams {
-            latest_instance_id: 1,
-            latest_finalized_height: 11,
+            processed_instance_id: 1,
             power_table: create_test_power_entries(),
         };
 
@@ -299,7 +273,7 @@ mod tests {
 
     #[test]
     fn test_update_state_unauthorized_caller() {
-        let rt = construct_and_verify(1, create_test_power_entries(), 10);
+        let rt = construct_and_verify(1, create_test_power_entries());
 
         // Set caller to non-system actor
         let unauthorized_caller = Address::new_id(999);
@@ -307,8 +281,7 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         let update_params = UpdateStateParams {
-            latest_instance_id: 1,
-            latest_finalized_height: 11,
+            processed_instance_id: 1,
             power_table: create_test_power_entries(),
         };
 
@@ -326,14 +299,13 @@ mod tests {
     #[test]
     fn test_get_state() {
         let power_entries = create_test_power_entries();
-        let rt = construct_and_verify(42, power_entries.clone(), 10);
+        let rt = construct_and_verify(42, power_entries.clone());
 
         // Update state first
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let update_params = UpdateStateParams {
-            latest_instance_id: 42,
-            latest_finalized_height: 11,
+            processed_instance_id: 42,
             power_table: power_entries.clone(),
         };
         rt.call::<F3LightClientActor>(
@@ -351,14 +323,13 @@ mod tests {
             .unwrap();
 
         let response = result.deserialize::<GetStateResponse>().unwrap();
-        assert_eq!(response.latest_instance_id, 42);
-        assert_eq!(response.latest_finalized_height, 11);
+        assert_eq!(response.processed_instance_id, 42);
         assert_eq!(response.power_table, power_entries);
     }
 
     #[test]
     fn test_power_table_root_changes_on_update() {
-        let rt = construct_and_verify(42, create_test_power_entries(), 10);
+        let rt = construct_and_verify(42, create_test_power_entries());
 
         // Read initial state.
         rt.expect_validate_caller_any();
@@ -393,8 +364,7 @@ mod tests {
             },
         ];
         let update_params = UpdateStateParams {
-            latest_instance_id: 42,
-            latest_finalized_height: 11,
+            processed_instance_id: 42,
             power_table: new_power_table.clone(),
         };
         rt.call::<F3LightClientActor>(
@@ -422,14 +392,13 @@ mod tests {
 
     #[test]
     fn test_state_progression() {
-        let rt = construct_and_verify(1, create_test_power_entries(), 10);
+        let rt = construct_and_verify(1, create_test_power_entries());
 
         // Update with first state
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let params1 = UpdateStateParams {
-            latest_instance_id: 1,
-            latest_finalized_height: 100,
+            processed_instance_id: 1,
             power_table: create_test_power_entries(),
         };
         rt.call::<F3LightClientActor>(
@@ -439,12 +408,11 @@ mod tests {
         .unwrap();
         rt.reset();
 
-        // Update with second state (higher height)
+        // Update with same instance again (idempotent allowed)
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let params2 = UpdateStateParams {
-            latest_instance_id: 1,
-            latest_finalized_height: 200,
+            processed_instance_id: 1,
             power_table: create_test_power_entries(),
         };
         let result = rt.call::<F3LightClientActor>(
@@ -456,14 +424,13 @@ mod tests {
 
     #[test]
     fn test_instance_id_progression_next_instance() {
-        let rt = construct_and_verify(100, create_test_power_entries(), 10);
+        let rt = construct_and_verify(100, create_test_power_entries());
 
         // First state at instance 100
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let initial_params = UpdateStateParams {
-            latest_instance_id: 100,
-            latest_finalized_height: 11,
+            processed_instance_id: 100,
             power_table: create_test_power_entries(),
         };
         rt.call::<F3LightClientActor>(
@@ -477,8 +444,7 @@ mod tests {
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let update_params = UpdateStateParams {
-            latest_instance_id: 101,
-            latest_finalized_height: 12,
+            processed_instance_id: 101,
             power_table: create_test_power_entries(),
         };
 
@@ -491,14 +457,13 @@ mod tests {
 
     #[test]
     fn test_instance_id_skip_rejected() {
-        let rt = construct_and_verify(100, create_test_power_entries(), 10);
+        let rt = construct_and_verify(100, create_test_power_entries());
 
         // First state at instance 100
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let initial_params = UpdateStateParams {
-            latest_instance_id: 100,
-            latest_finalized_height: 11,
+            processed_instance_id: 100,
             power_table: create_test_power_entries(),
         };
         rt.call::<F3LightClientActor>(
@@ -512,8 +477,7 @@ mod tests {
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let update_params = UpdateStateParams {
-            latest_instance_id: 102,
-            latest_finalized_height: 12,
+            processed_instance_id: 102,
             power_table: create_test_power_entries(),
         };
 
@@ -526,26 +490,5 @@ mod tests {
         assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
     }
 
-    #[test]
-    fn test_height_rewind_rejected() {
-        let rt = construct_and_verify(1, create_test_power_entries(), 10);
-
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-
-        // Try to update with a lower finalized height (rewind).
-        let update_params = UpdateStateParams {
-            latest_instance_id: 1,
-            latest_finalized_height: 9,
-            power_table: create_test_power_entries(),
-        };
-
-        let result = rt.call::<F3LightClientActor>(
-            Method::UpdateState as u64,
-            IpldBlock::serialize_cbor(&update_params).unwrap(),
-        );
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
-    }
+    // Note: the epoch cursor is tracked in the gateway contract; the actor no longer stores height.
 }

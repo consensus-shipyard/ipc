@@ -4,7 +4,6 @@
 use anyhow::{bail, Context};
 
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::ActorID;
 use num_traits::Zero;
@@ -303,7 +302,7 @@ fn membership_to_power_table(
 /// Caller for the F3 Light Client actor
 ///
 /// This actor is responsible for:
-/// - Storing finalized F3 instance state (instance ID, finalized epochs, validator power table)
+/// - Storing finalized F3 instance state (instance ID, validator power table)
 /// - Validator power table
 #[derive(Clone)]
 pub struct F3LightClientCaller {
@@ -323,15 +322,13 @@ impl F3LightClientCaller {
     pub fn update_state(
         &self,
         state: &mut FvmExecState<impl Blockstore + Clone>,
-        latest_instance_id: u64,
-        latest_finalized_height: ChainEpoch,
+        processed_instance_id: u64,
         power_table: Vec<f3_light_client::PowerEntry>,
     ) -> anyhow::Result<()> {
         let method_num = f3_light_client::Method::UpdateState as u64;
 
         let params = f3_light_client::UpdateStateParams {
-            latest_instance_id,
-            latest_finalized_height,
+            processed_instance_id,
             power_table,
         };
 
@@ -488,7 +485,7 @@ mod tests {
 
         // Create the F3 light client custom actor.
         let instance_id = 10u64;
-        let base_epoch: ChainEpoch = 1234;
+        let _base_epoch: ChainEpoch = 1234;
         let power_table = vec![
             fendermint_actor_f3_light_client::types::PowerEntry {
                 id: 1,
@@ -504,7 +501,6 @@ mod tests {
         let f3_state = fendermint_actor_f3_light_client::state::State::new(
             genesis_state.store(),
             instance_id,
-            base_epoch,
             power_table.clone(),
         )
         .context("failed to create F3 light client actor state")?;
@@ -538,31 +534,25 @@ mod tests {
 
         // Round-trip: read initial actor state.
         let state0 = caller.get_state(&mut exec_state)?;
-        assert_eq!(state0.latest_instance_id, instance_id);
-        assert_eq!(state0.latest_finalized_height, base_epoch);
+        assert_eq!(state0.processed_instance_id, instance_id);
+        // Epoch cursor is stored in the gateway; the actor no longer tracks finalized height.
         assert_eq!(state0.power_table.len(), power_table.len());
         assert_eq!(state0.power_table[0].id, 1);
 
         // Update state and read again.
         let new_instance = instance_id + 1;
-        let new_epoch = base_epoch + 1;
         let new_power_table = vec![f3_light_client::PowerEntry {
             id: 99,
             public_key: vec![9u8; 48],
             power_be: vec![0x03, 0xE7],
         }];
         caller
-            .update_state(
-                &mut exec_state,
-                new_instance,
-                new_epoch,
-                new_power_table.clone(),
-            )
+            .update_state(&mut exec_state, new_instance, new_power_table.clone())
             .context("failed to update F3LightClientActor state")?;
 
         let state1 = caller.get_state(&mut exec_state)?;
-        assert_eq!(state1.latest_instance_id, new_instance);
-        assert_eq!(state1.latest_finalized_height, new_epoch);
+        assert_eq!(state1.processed_instance_id, new_instance);
+        // Epoch cursor is stored in the gateway; the actor no longer tracks finalized height.
         assert_eq!(state1.power_table, new_power_table);
 
         // Also sanity-check that read-only exec doesn't mutate the actor (it reverts effects).

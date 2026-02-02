@@ -546,12 +546,12 @@ impl<'a> GenesisBuilder<'a> {
 
         // F3 Light Client actor - manages F3 light client state for proof-based parent finality
         if let Some(f3_params) = &genesis.f3 {
-            // We treat the ECChain base epoch for the configured instance as already finalized
-            // by the previous certificate. The node will start proving/executing from base_epoch + 1.
+            // We treat `base_epoch` as already finalized/committed at genesis.
+            // The proof-service starts fetching from `instance_id + 1`, so the node will start
+            // proving/executing from `base_epoch + 1` (allowing for null rounds).
             let f3_state = fendermint_actor_f3_light_client::state::State::new(
                 state.store(),
                 f3_params.instance_id,
-                f3_params.base_epoch as fvm_shared::clock::ChainEpoch,
                 f3_params.power_table.clone(),
             )?;
 
@@ -619,6 +619,27 @@ impl<'a> GenesisBuilder<'a> {
             state,
             config,
         )?;
+
+        // If we have F3 enabled, seed the gateway's parent finality cursor at genesis.
+        // This anchors the epoch cursor in on-chain contract state for late joiners.
+        if let Some(f3) = genesis.f3.as_ref() {
+            let exec_state = state
+                .exec_state()
+                .ok_or_else(|| anyhow::anyhow!("exec state not initialized in genesis builder"))?;
+
+            let gateway = crate::fvm::state::ipc::GatewayCaller::<
+                crate::fvm::store::memory::MemoryBlockstore,
+            >::default();
+
+            let base_finality = fendermint_vm_topdown::IPCParentFinality::new(
+                f3.base_epoch,
+                f3.base_epoch_eth_block_hash.to_vec(),
+            );
+
+            gateway
+                .commit_parent_finality(exec_state, base_finality)
+                .context("failed to seed gateway parent finality at genesis")?;
+        }
 
         Ok(out)
     }
@@ -890,6 +911,14 @@ pub async fn create_test_genesis_state(
 #[cfg(test)]
 mod tests {
     use crate::genesis::GenesisAppState;
+    use fendermint_crypto::SecretKey;
+    use fendermint_vm_genesis::ipc::{F3Params, GatewayParams, IpcParams};
+    use fendermint_vm_genesis::{Collateral, Genesis, PermissionMode, Validator, ValidatorKey};
+    use fendermint_vm_topdown::IPCParentFinality;
+    use fvm_shared::econ::TokenAmount;
+    use fvm_shared::version::NetworkVersion;
+    use ipc_api::subnet_id::SubnetID;
+    use rand::thread_rng;
 
     #[test]
     fn test_compression() {
@@ -903,5 +932,66 @@ mod tests {
         let recovered = GenesisAppState::decode_and_decompress(&s).unwrap();
 
         assert_eq!(recovered, bytes);
+    }
+
+    #[tokio::test]
+    async fn test_genesis_seeds_gateway_parent_finality_when_f3_enabled() -> anyhow::Result<()> {
+        use crate::fvm::bundle::contracts_path;
+        use crate::fvm::state::ipc::GatewayCaller;
+
+        // Minimal genesis with IPC + F3 enabled.
+        let mut rng = thread_rng();
+        let pk = SecretKey::random(&mut rng).public_key();
+
+        let base_epoch = 123_i64;
+        let base_epoch_eth_block_hash = [0xABu8; 32];
+
+        let genesis = Genesis {
+            chain_name: "test".to_string(),
+            chain_id: 1234,
+            timestamp: fendermint_vm_core::Timestamp(0),
+            network_version: NetworkVersion::V21,
+            base_fee: TokenAmount::from_atto(0),
+            power_scale: 0,
+            validators: vec![Validator {
+                public_key: ValidatorKey::new(pk),
+                power: Collateral(TokenAmount::from_atto(1)),
+            }],
+            accounts: vec![],
+            eam_permission_mode: PermissionMode::Unrestricted,
+            ipc: Some(IpcParams {
+                gateway: GatewayParams::new(SubnetID::new(1234u64, vec![])),
+            }),
+            ipc_contracts_owner: ethers::types::Address::repeat_byte(0x11),
+            f3: Some(F3Params {
+                instance_id: 10,
+                base_epoch,
+                base_epoch_eth_block_hash,
+                power_table: vec![],
+            }),
+        };
+
+        let (state, _out) = crate::genesis::create_test_genesis_state(
+            actors_builtin_car::CAR,
+            actors_custom_car::CAR,
+            contracts_path(),
+            genesis,
+        )
+        .await?;
+
+        let mut exec_state = state
+            .into_exec_state()
+            .map_err(|_| anyhow::anyhow!("failed to convert genesis state into exec state"))?;
+
+        let gateway = GatewayCaller::default();
+        let got = gateway.get_latest_parent_finality(&mut exec_state)?;
+
+        let want = IPCParentFinality::new(base_epoch, base_epoch_eth_block_hash.to_vec());
+        assert_eq!(
+            got, want,
+            "gateway latest parent finality should be seeded from genesis.f3"
+        );
+
+        Ok(())
     }
 }

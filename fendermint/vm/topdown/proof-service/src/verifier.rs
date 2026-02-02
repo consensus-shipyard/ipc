@@ -11,14 +11,19 @@
 //! by the F3 certificates. With the two-level cache design, proofs are verified
 //! against pre-merged tipsets from both the parent and child certificates.
 
-use crate::storage_layout::NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT;
+use crate::storage_layout::{
+    NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, SUBNETS_MAPPING_SLOT, SUBNET_TOPDOWN_NONCE_OFFSET,
+};
 use crate::types::{EpochProofWithCertificate, FinalizedTipsets};
 use anyhow::{Context, Result};
 use cid::Cid;
 use ethers::abi::RawLog;
 use ethers::contract::EthEvent;
 use ethers::types::H256;
-use fendermint_vm_evm_event_utils::{parse_u64_from_0x_word_low64, raw_log_from_event_proof};
+use fendermint_vm_evm_event_utils::{
+    decode_new_power_change_request, decode_new_topdown_message, parse_u64_from_0x_word_low64,
+    raw_log_from_event_proof,
+};
 use ipc_actors_abis::{lib_gateway, lib_power_change_log};
 use proofs::proofs::common::bundle::{UnifiedProofBundle, UnifiedVerificationResult};
 use proofs::proofs::events::bundle::EventProofBundle;
@@ -26,9 +31,23 @@ use proofs::proofs::events::verifier::verify_event_proof;
 use proofs::proofs::storage::verifier::verify_storage_proof;
 
 use proofs::proofs::common::evm::{ascii_to_bytes32, extract_evm_log, hash_event_signature};
+use proofs::proofs::storage::utils::compute_mapping_slot;
 
 pub struct ProofVerifier {
     events: Vec<Vec<[u8; 32]>>,
+    subnet_id: String,
+}
+
+/// Cursor derived from *proved* end-of-epoch storage values.
+///
+/// If provided across epochs, this lets us detect omitted events at the beginning of an epoch by
+/// checking that the storage delta matches the number of events observed in the bundle.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct EventNumberCursor {
+    /// Next top-down message nonce (`subnets[...].topDownNonce`) after applying the epoch.
+    pub next_topdown_message_nonce: u64,
+    /// Next power-change configuration number after applying the epoch.
+    pub next_power_change_config_number: u64,
 }
 
 impl ProofVerifier {
@@ -43,7 +62,7 @@ impl ProofVerifier {
             )],
         ];
 
-        Self { events }
+        Self { events, subnet_id }
     }
 
     /// Verify a inclusion proof in the proof bundle using pre-merged tipsets from certificates
@@ -139,6 +158,66 @@ impl ProofVerifier {
             }
         }
     }
+
+    /// Verify semantic properties of the EVM events included in a proof bundle.
+    ///
+    /// This is **not** inclusion verification (that is handled by [`ProofVerifier::verify_proof_bundle_with_tipsets`]).
+    /// Instead, this checks properties like:
+    /// - contiguity of top-down event nonces
+    /// - contiguity of power-change configuration numbers
+    ///
+    /// All checks are anchored to proved end-of-epoch storage values:
+    /// - `subnets[...].topDownNonce`
+    /// - `validatorsTracker.changes.nextConfigurationNumber`
+    ///
+    /// If `cursor` is provided (derived from the previous epoch's proved end values), we also
+    /// verify that `end - prev_end == observed_count`, which detects omitted events at the
+    /// beginning of an epoch.
+    pub(crate) fn verify_event_number_continuity(
+        &self,
+        parent_epoch: i64,
+        bundle: &UnifiedProofBundle,
+        cursor: &mut Option<EventNumberCursor>,
+    ) -> Result<()> {
+        // 1) Extract values.
+        let mut nums = extract_epoch_event_numbers(parent_epoch, bundle)
+            .with_context(|| format!("failed to extract event numbers for epoch {parent_epoch}"))?;
+
+        // 2) Verify local contiguity within the epoch.
+        verify_contiguous_u64(&mut nums.topdown_nonces, "top-down message nonces")?;
+        verify_contiguous_u64(
+            &mut nums.config_numbers,
+            "power-change configuration numbers",
+        )?;
+
+        // 3) Anchor both sequences to proved "next" storage values.
+        // Storage holds the next nonce/config-number *after* applying the epoch.
+        let next_topdown = next_topdown_message_nonce_from_storage(bundle, &self.subnet_id)?;
+        let next_cfg = next_power_change_config_number_from_storage(bundle)?;
+
+        verify_sequence_against_storage_next(
+            "top-down message nonces",
+            next_topdown,
+            cursor.as_ref().map(|c| c.next_topdown_message_nonce),
+            &nums.topdown_nonces,
+        )?;
+        verify_sequence_against_storage_next(
+            "power-change configuration numbers",
+            next_cfg,
+            cursor.as_ref().map(|c| c.next_power_change_config_number),
+            &nums.config_numbers,
+        )?;
+
+        *cursor = Some(EventNumberCursor {
+            next_topdown_message_nonce: next_topdown,
+            next_power_change_config_number: next_cfg,
+        });
+
+        Ok(())
+    }
+
+    // Intentionally no “cursor init from previous epoch”: the proof generator may start on any
+    // certificate/epoch after restart, and we don't currently persist a cursor in shared state.
 }
 
 #[cfg(test)]
@@ -152,31 +231,90 @@ mod tests {
     }
 }
 
-/// Verify semantic properties of the EVM events included in a proof bundle.
-///
-/// This is **not** inclusion verification (that is handled by [`ProofVerifier::verify_proof_bundle_with_tipsets`]).
-/// Instead, this checks properties like contiguity of top-down nonces and power-change configuration numbers.
-///
-/// Notes on scope:
-/// - These checks are meaningful for the proof-generator as a correctness guardrail.
-/// - The strongest possible checks should be anchored to proved storage (when available).
-pub fn verify_event_number_continuity(
-    parent_epoch: i64,
+// (Semantic continuity verification lives on `ProofVerifier` to access `subnet_id`.)
+
+fn h256_to_0x(h: H256) -> String {
+    format!("0x{}", hex::encode(h.as_bytes()))
+}
+
+fn expected_topdown_nonce_slot(subnet_id: &str) -> H256 {
+    let key = ascii_to_bytes32(subnet_id);
+    let base = compute_mapping_slot(key, SUBNETS_MAPPING_SLOT);
+    let mut slot_bytes = base;
+    let base_u256 = ethers::types::U256::from_big_endian(&base);
+    let slot_u256 = base_u256 + ethers::types::U256::from(SUBNET_TOPDOWN_NONCE_OFFSET);
+    slot_u256.to_big_endian(&mut slot_bytes);
+    H256::from(slot_bytes)
+}
+
+fn next_topdown_message_nonce_from_storage(
     bundle: &UnifiedProofBundle,
+    subnet_id: &str,
+) -> Result<u64> {
+    let expected_slot = h256_to_0x(expected_topdown_nonce_slot(subnet_id));
+    let storage = bundle
+        .storage_proofs
+        .iter()
+        .find(|sp| sp.slot.eq_ignore_ascii_case(&expected_slot))
+        .context("missing storage proof for subnets[...].topDownNonce")?;
+    parse_u64_from_0x_word_low64(&storage.value)
+        .context("failed to parse topDownNonce from storage proof")
+}
+
+fn next_power_change_config_number_from_storage(bundle: &UnifiedProofBundle) -> Result<u64> {
+    let expected_slot = format!("0x{:064x}", NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT);
+    let storage = bundle
+        .storage_proofs
+        .iter()
+        .find(|sp| sp.slot.eq_ignore_ascii_case(&expected_slot))
+        .context("missing storage proof for nextConfigurationNumber (slot 20)")?;
+    parse_u64_from_0x_word_low64(&storage.value)
+        .context("failed to parse nextConfigurationNumber from storage proof")
+}
+
+fn verify_sequence_against_storage_next(
+    what: &str,
+    storage_next: u64,
+    prev_storage_next: Option<u64>,
+    values: &[u64],
 ) -> Result<()> {
-    // 1) Extract values.
-    let mut nums = extract_epoch_event_numbers(parent_epoch, bundle)
-        .with_context(|| format!("failed to extract event numbers for epoch {parent_epoch}"))?;
+    let count = values.len() as u64;
 
-    // 2) Verify local contiguity within the epoch.
-    verify_contiguous_u64(&mut nums.topdown_nonces, "top-down nonces")?;
-    verify_contiguous_u64(
-        &mut nums.config_numbers,
-        "power change configuration numbers",
-    )?;
+    // If we have a previous cursor, enforce that the storage delta matches the number of
+    // observed events. This detects omitted initial events (or invented extras).
+    if let Some(prev) = prev_storage_next {
+        let delta = storage_next.checked_sub(prev).with_context(|| {
+            format!("{what} mismatch: storage_next {storage_next} < prev {prev}")
+        })?;
+        if delta != count {
+            anyhow::bail!(
+                "{what} event-count mismatch: storage_delta {delta} != observed_count {count}"
+            );
+        }
+    }
 
-    // 3) Anchor power-change event numbers against proved storage post-state.
-    verify_next_config_number_matches_events(bundle, &nums.config_numbers)?;
+    if values.is_empty() {
+        return Ok(());
+    }
+
+    let first = values[0];
+    let last = *values.last().unwrap();
+    if storage_next != last + 1 {
+        anyhow::bail!(
+            "{what} mismatch: storage_next {storage_next} != last_event+1 {}",
+            last + 1
+        );
+    }
+
+    let expected_first = match prev_storage_next {
+        Some(prev) => prev,
+        None => storage_next.checked_sub(count).with_context(|| {
+            format!("{what} mismatch: storage_next {storage_next} < count {count}")
+        })?,
+    };
+    if first != expected_first {
+        anyhow::bail!("{what} first value mismatch: expected {expected_first}, got {first}");
+    }
 
     Ok(())
 }
@@ -223,16 +361,10 @@ fn extract_epoch_event_numbers(
         }
 
         if topics[0] == topdown_sig {
-            let decoded =
-                lib_gateway::NewTopDownMessageFilter::decode_log(&RawLog { topics, data })
-                    .context("failed to decode NewTopDownMessage")?;
+            let decoded = decode_new_topdown_message(&RawLog { topics, data })?;
             out.topdown_nonces.push(decoded.message.local_nonce);
         } else if topics[0] == power_sig {
-            let decoded = lib_power_change_log::NewPowerChangeRequestFilter::decode_log(&RawLog {
-                topics,
-                data,
-            })
-            .context("failed to decode NewPowerChangeRequest")?;
+            let decoded = decode_new_power_change_request(&RawLog { topics, data })?;
             out.config_numbers.push(decoded.configuration_number);
         }
     }
@@ -240,46 +372,7 @@ fn extract_epoch_event_numbers(
     Ok(out)
 }
 
-fn verify_next_config_number_matches_events(
-    bundle: &UnifiedProofBundle,
-    config_numbers: &[u64],
-) -> Result<()> {
-    if config_numbers.is_empty() {
-        return Ok(());
-    }
-
-    let expected_slot = format!("0x{:064x}", NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT);
-    let storage = bundle
-        .storage_proofs
-        .iter()
-        .find(|sp| sp.slot.eq_ignore_ascii_case(&expected_slot))
-        .context("missing storage proof for nextConfigurationNumber (slot 20)")?;
-    let end_next = parse_u64_from_0x_word_low64(&storage.value)
-        .context("failed to parse nextConfigurationNumber from storage proof")?;
-
-    // If we observed k events ending at N, then the post-state should be N+1.
-    // Also, the first observed event must be `end_next - k`.
-    let last = *config_numbers.last().unwrap();
-    let count = config_numbers.len() as u64;
-    if end_next != last + 1 {
-        anyhow::bail!(
-            "nextConfigurationNumber mismatch: end_next {} != last_event+1 {}",
-            end_next,
-            last + 1
-        );
-    }
-    let first = config_numbers[0];
-    if end_next < count || end_next - count != first {
-        anyhow::bail!(
-            "nextConfigurationNumber mismatch: expected first_event {} from end_next {} and count {}",
-            first,
-            end_next,
-            count
-        );
-    }
-
-    Ok(())
-}
+// (Replaced by `next_power_change_config_number_from_storage` + `verify_sequence_against_storage_next`.)
 
 #[cfg(test)]
 mod event_number_continuity_tests {
@@ -317,6 +410,22 @@ mod event_number_continuity_tests {
 
     fn mk_storage_proof(slot_u64: u64, value_u64: u64) -> StorageProof {
         let slot = format!("0x{:064x}", slot_u64);
+        let mut word = [0u8; 32];
+        word[24..].copy_from_slice(&value_u64.to_be_bytes());
+        StorageProof {
+            child_epoch: 0,
+            child_block_cid: "bafy...child".to_string(),
+            parent_state_root: "bafy...state".to_string(),
+            actor_id: 1000,
+            actor_state_cid: "bafy...actor".to_string(),
+            storage_root: "bafy...storage".to_string(),
+            slot,
+            value: bytes_to_0x(&word),
+        }
+    }
+
+    fn mk_storage_proof_h256(slot: H256, value_u64: u64) -> StorageProof {
+        let slot = h256_to_0x(slot);
         let mut word = [0u8; 32];
         word[24..].copy_from_slice(&value_u64.to_be_bytes());
         StorageProof {
@@ -387,6 +496,8 @@ mod event_number_continuity_tests {
     #[test]
     fn continuity_check_passes_for_contiguous_nonces_and_config_numbers() -> Result<()> {
         let epoch = 100;
+        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let mut cursor: Option<EventNumberCursor> = None;
 
         // Two topdown messages with contiguous nonces: 10, 11.
         let td0 = mk_topdown_rawlog(EthAddress::random(), [7u8; 32], 10);
@@ -398,9 +509,12 @@ mod event_number_continuity_tests {
 
         // nextConfigurationNumber after applying 2 changes should be 9.
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 9);
+        // topDownNonce after applying 2 messages with nonces 10,11 should be 12.
+        let topdown_nonce_storage =
+            mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 12);
 
         let bundle = UnifiedProofBundle {
-            storage_proofs: vec![next_config_storage],
+            storage_proofs: vec![next_config_storage, topdown_nonce_storage],
             event_proofs: vec![
                 mk_event_proof(epoch, td0),
                 mk_event_proof(epoch, td1),
@@ -410,49 +524,101 @@ mod event_number_continuity_tests {
             blocks: vec![],
         };
 
-        verify_event_number_continuity(epoch, &bundle)?;
+        verifier.verify_event_number_continuity(epoch, &bundle, &mut cursor)?;
         Ok(())
     }
 
     #[test]
     fn continuity_check_fails_on_config_storage_mismatch() -> Result<()> {
         let epoch = 100;
+        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let mut cursor: Option<EventNumberCursor> = None;
 
         let pc0 = mk_power_change_rawlog(7);
         let pc1 = mk_power_change_rawlog(8);
 
         // WRONG: should be 9, but we claim 10.
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 10);
+        let topdown_nonce_storage =
+            mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 0);
 
         let bundle = UnifiedProofBundle {
-            storage_proofs: vec![next_config_storage],
+            storage_proofs: vec![next_config_storage, topdown_nonce_storage],
             event_proofs: vec![mk_event_proof(epoch, pc0), mk_event_proof(epoch, pc1)],
             blocks: vec![],
         };
 
-        let err = verify_event_number_continuity(epoch, &bundle)
+        let err = verifier
+            .verify_event_number_continuity(epoch, &bundle, &mut cursor)
             .expect_err("expected mismatch to be rejected");
         let msg = err.to_string();
-        assert!(msg.contains("nextConfigurationNumber mismatch"));
+        assert!(msg.contains("power-change configuration numbers mismatch"));
         Ok(())
     }
 
     #[test]
     fn continuity_check_fails_on_nonce_gap() -> Result<()> {
         let epoch = 100;
+        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let mut cursor: Option<EventNumberCursor> = None;
 
         let td0 = mk_topdown_rawlog(EthAddress::random(), [7u8; 32], 10);
         let td1 = mk_topdown_rawlog(EthAddress::random(), [8u8; 32], 12); // gap!
+        let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0);
+        let topdown_nonce_storage =
+            mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 13);
 
         let bundle = UnifiedProofBundle {
-            storage_proofs: vec![],
+            storage_proofs: vec![next_config_storage, topdown_nonce_storage],
             event_proofs: vec![mk_event_proof(epoch, td0), mk_event_proof(epoch, td1)],
             blocks: vec![],
         };
 
-        let err = verify_event_number_continuity(epoch, &bundle)
+        let err = verifier
+            .verify_event_number_continuity(epoch, &bundle, &mut cursor)
             .expect_err("expected nonce gap to be rejected");
-        assert!(err.to_string().contains("top-down nonces not contiguous"));
+        assert!(err
+            .to_string()
+            .contains("top-down message nonces not contiguous"));
+        Ok(())
+    }
+
+    #[test]
+    fn continuity_check_detects_omitted_initial_events_via_storage_delta() -> Result<()> {
+        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let mut cursor: Option<EventNumberCursor> = None;
+
+        // Epoch 100: two topdown messages (10,11) -> end nonce 12.
+        let epoch0 = 100;
+        let td0 = mk_topdown_rawlog(EthAddress::random(), [7u8; 32], 10);
+        let td1 = mk_topdown_rawlog(EthAddress::random(), [8u8; 32], 11);
+        let bundle0 = UnifiedProofBundle {
+            storage_proofs: vec![
+                mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0),
+                mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 12),
+            ],
+            event_proofs: vec![mk_event_proof(epoch0, td0), mk_event_proof(epoch0, td1)],
+            blocks: vec![],
+        };
+        verifier.verify_event_number_continuity(epoch0, &bundle0, &mut cursor)?;
+
+        // Epoch 101: actual storage end indicates 3 messages (delta=3), but we only include 2 events.
+        // This simulates omitting the first event in the epoch while keeping contiguity.
+        let epoch1 = 101;
+        let td2 = mk_topdown_rawlog(EthAddress::random(), [9u8; 32], 13);
+        let td3 = mk_topdown_rawlog(EthAddress::random(), [10u8; 32], 14);
+        let bundle1 = UnifiedProofBundle {
+            storage_proofs: vec![
+                mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0),
+                mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 15),
+            ],
+            event_proofs: vec![mk_event_proof(epoch1, td2), mk_event_proof(epoch1, td3)],
+            blocks: vec![],
+        };
+        let err = verifier
+            .verify_event_number_continuity(epoch1, &bundle1, &mut cursor)
+            .expect_err("expected omitted-initial-event to be detected");
+        assert!(err.to_string().contains("event-count mismatch"));
         Ok(())
     }
 }

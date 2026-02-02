@@ -11,7 +11,6 @@ use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
-use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
 /// State of the F3 light client actor.
@@ -40,8 +39,7 @@ impl State {
     /// Create a new F3 light client state
     pub fn new<BS: Blockstore>(
         store: &BS,
-        latest_instance_id: u64,
-        latest_finalized_height: ChainEpoch,
+        processed_instance_id: u64,
         power_table: Vec<PowerEntry>,
     ) -> Result<State, ActorError> {
         let power_table_root = {
@@ -61,8 +59,7 @@ impl State {
 
         let state = State {
             light_client_state: LightClientState {
-                latest_instance_id,
-                latest_finalized_height,
+                processed_instance_id,
                 power_table_root,
             },
         };
@@ -73,8 +70,7 @@ impl State {
     pub fn update_state(
         &mut self,
         rt: &impl Runtime,
-        latest_instance_id: u64,
-        latest_finalized_height: ChainEpoch,
+        processed_instance_id: u64,
         power_table: Vec<PowerEntry>,
     ) -> Result<(), ActorError> {
         let power_table_root = {
@@ -92,8 +88,7 @@ impl State {
             m.flush()?
         };
 
-        self.light_client_state.latest_instance_id = latest_instance_id;
-        self.light_client_state.latest_finalized_height = latest_finalized_height;
+        self.light_client_state.processed_instance_id = processed_instance_id;
         self.light_client_state.power_table_root = power_table_root;
         Ok(())
     }

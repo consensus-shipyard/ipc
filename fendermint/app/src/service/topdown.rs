@@ -110,6 +110,8 @@ pub(super) async fn start_topdown_if_enabled(
 
     let f3_enabled_in_config = topdown_config.f3.is_some();
     let f3_state_in_genesis = query_f3_state_in_genesis(db, state_store, app_namespace.clone())?;
+    let gateway_finality_in_genesis =
+        query_gateway_parent_finality_in_genesis(db, state_store, app_namespace.clone())?;
 
     // Fail-fast consistency between config and committed/genesis state.
     //
@@ -123,7 +125,16 @@ pub(super) async fn start_topdown_if_enabled(
     }
 
     if f3_enabled_in_config {
-        return start_f3_topdown(settings, topdown_config, f3_state_in_genesis).await;
+        if gateway_finality_in_genesis.is_none() {
+            bail!("F3 is enabled but gateway latest parent finality is missing in genesis");
+        }
+        return start_f3_topdown(
+            settings,
+            topdown_config,
+            f3_state_in_genesis,
+            gateway_finality_in_genesis,
+        )
+        .await;
     }
 
     start_legacy_topdown(
@@ -155,6 +166,31 @@ fn query_f3_state_in_genesis(
     };
 
     Ok(f3_state_in_genesis)
+}
+
+fn query_gateway_parent_finality_in_genesis(
+    db: &RocksDb,
+    state_store: &NamespaceBlockstore,
+    app_namespace: <AppStore as KVStore>::Namespace,
+) -> anyhow::Result<Option<IPCParentFinality>> {
+    type ROStore = fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore<
+        std::sync::Arc<NamespaceBlockstore>,
+    >;
+    // Query the gateway's latest parent finality from committed/genesis state once.
+    let exec_state =
+        crate::app::create_read_only_exec_state::<_, _, AppStore>(db, state_store, app_namespace)
+            .context("failed to create read-only exec state")?;
+
+    let latest = match exec_state {
+        Some(mut state) => {
+            let gw =
+                fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller::<ROStore>::default();
+            Some(gw.get_latest_parent_finality(&mut state)?)
+        }
+        None => None,
+    };
+
+    Ok(latest)
 }
 
 fn make_resolver_service(
@@ -306,6 +342,7 @@ async fn start_f3_topdown(
     settings: &Settings,
     topdown_config: &TopDownSettings,
     f3_state_in_genesis: Option<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>,
+    gateway_finality_in_genesis: Option<IPCParentFinality>,
 ) -> anyhow::Result<TopDownInit> {
     let f3_config = topdown_config
         .f3
@@ -314,8 +351,11 @@ async fn start_f3_topdown(
 
     let f3_state = f3_state_in_genesis
         .context("F3 is enabled in config but initial F3 state is missing in genesis")?;
-    let initial_instance = f3_state.latest_instance_id;
-    let initial_epoch = f3_state.latest_finalized_height;
+    let initial_instance = f3_state.processed_instance_id;
+    // Epoch cursor comes from the gateway contract (seeded at genesis).
+    let initial_epoch = gateway_finality_in_genesis
+        .context("F3 enabled but gateway latest parent finality missing in genesis")?
+        .height as fvm_shared::clock::ChainEpoch;
 
     let db_path = Some(settings.data_dir().join("proof-cache"));
     let cache = Arc::new(
@@ -367,7 +407,7 @@ async fn start_f3_topdown(
             fendermint_vm_interpreter::fvm::topdown::F3ExecutionCacheRetryConfig {
                 backoff_initial: f3_config.execution_cache_retry.backoff_initial,
                 backoff_max: f3_config.execution_cache_retry.backoff_max,
-                max_wait: f3_config.execution_cache_retry.max_wait,
+                critical_after: f3_config.execution_cache_retry.critical_after,
                 error_after: f3_config.execution_cache_retry.error_after,
             },
         ),

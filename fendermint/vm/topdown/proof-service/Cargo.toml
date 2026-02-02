@@ -21,6 +21,7 @@ humantime-serde = { workspace = true }
 cid = { workspace = true }
 hex = { workspace = true }
 multihash = { workspace = true }
+multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 futures = { workspace = true }
 fvm_ipld_bitfield = "0.7.2"
@@ -70,6 +71,5 @@ required-features = ["dev-tools"]
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "rt-multi-thread"] }
 tracing-subscriber = { workspace = true }
-multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
 tempfile = "3.8"
 contracts_artifacts = { package = "contracts-artifacts", path = "../../../../contracts-artifacts" }

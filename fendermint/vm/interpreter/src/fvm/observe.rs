@@ -97,8 +97,7 @@ impl_traceables!(
 impl_traceables!(
     TraceLevel::Error,
     "Topdown",
-    F3CacheWaitStuck,
-    F3CacheWaitTimeout
+    F3CacheWaitStuck
 );
 impl_traceables!(TraceLevel::Info, "Topdown", F3CacheWaitRecovered);
 
@@ -170,22 +169,7 @@ impl Recordable for F3CacheWaitStuck {
     }
 }
 
-#[derive(Debug)]
-pub struct F3CacheWaitTimeout {
-    pub epoch: u64,
-    pub waited_secs: f64,
-}
-
-impl Recordable for F3CacheWaitTimeout {
-    fn record_metrics(&self) {
-        F3_TOPDOWN_CACHE_WAIT_TOTAL
-            .with_label_values(&["timeout"])
-            .inc();
-        F3_TOPDOWN_CACHE_WAIT_SECS
-            .with_label_values(&["timeout"])
-            .observe(self.waited_secs);
-    }
-}
+// NOTE: We intentionally do not have a one-shot "timeout" event. Execution waits indefinitely.
 
 #[derive(Debug)]
 pub struct F3CacheWaitRecovered {
@@ -260,10 +244,6 @@ mod tests {
         emit(F3CacheWaitStuck {
             epoch: 1,
             waited_secs: 120.0,
-        });
-        emit(F3CacheWaitTimeout {
-            epoch: 1,
-            waited_secs: 600.0,
         });
         emit(F3CacheWaitRecovered {
             epoch: 1,

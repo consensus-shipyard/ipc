@@ -6,8 +6,11 @@ use anyhow::{bail, Context, Result};
 use filecoin_f3_certs::{FinalityCertificate, PowerTableDelta, PowerTableDiff};
 use filecoin_f3_gpbft::{self, Cid, ECChain, PowerEntries, PowerEntry, SupplementalData, Tipset};
 use fvm_ipld_bitfield::BitField;
+use fvm_ipld_encoding::BytesSer;
 use fvm_shared::clock::ChainEpoch;
 use keccak_hash::H256;
+use multihash_codetable::Code;
+use multihash_codetable::MultihashDigest;
 use num_bigint::BigInt;
 use proofs::proofs::common::bundle::UnifiedProofBundle;
 use serde::{Deserialize, Serialize};
@@ -99,6 +102,99 @@ pub struct FinalizedTipset {
     pub epoch: i64,
     /// Canonically ordered concatenated block-header CIDs
     pub block_cids: Vec<u8>,
+}
+
+/// Derive the Ethereum JSON-RPC "blockHash" for a Filecoin tipset.
+///
+/// This matches Lotus' `EthBlockHash` derivation for a tipset key:
+/// \( \text{blake2b-256}(\text{DAG-CBOR bytestring}(\text{tipsetKeyBytes})) \).
+///
+/// The input must be the canonically ordered concatenated block-header CIDs bytes
+/// (i.e. `Tipset.key` / `FinalizedTipset.block_cids`).
+pub fn eth_hash_from_tipset_key_bytes(block_cids: &[u8]) -> Result<[u8; 32]> {
+    let wrapped = fvm_ipld_encoding::to_vec(&BytesSer(block_cids))
+        .context("failed to CBOR-encode tipset key bytes as bytestring")?;
+    let digest = Code::Blake2b256.digest(&wrapped);
+
+    let mut out = [0u8; 32];
+    out.copy_from_slice(digest.digest());
+    Ok(out)
+}
+
+/// Return the last provable tipset (the parent tipset of the last `(parent, child)` pair).
+///
+/// Proofs are generated for parent epochs via `windows(2)` over the certified ECChain tipsets.
+/// For a chain `[T0, T1, .., TN]`, the last provable parent epoch is `T(N-1)` (second-to-last tipset).
+///
+/// Returns:
+/// - `None` if the chain has fewer than 2 tipsets (no provable `(parent, child)` pair).
+/// - `Some(&Tipset)` otherwise.
+pub fn last_provable_tipset(ec_chain: &ECChain) -> Option<&Tipset> {
+    let mut rev = ec_chain.iter().rev();
+    let _last = rev.next()?; // empty chain => None
+    rev.next() // len < 2 => None
+}
+
+/// Return the tipset to use as the *committed epoch cursor* for this certificate.
+///
+/// - If the ECChain has at least 2 tipsets, we return the last provable parent tipset
+///   (second-to-last), matching `windows(2)` proof generation.
+/// - If the ECChain has exactly 1 tipset (base only), we return that base tipset.
+///
+/// This is useful for genesis/bootstrap where we treat the configured instance as already
+/// committed, but the certificate may have an empty suffix.
+pub fn committed_cursor_tipset(ec_chain: &ECChain) -> Result<&Tipset> {
+    let mut rev = ec_chain.iter().rev();
+    let last = rev.next().context("ECChain is empty (no tipsets)")?;
+    Ok(rev.next().unwrap_or(last))
+}
+
+#[cfg(test)]
+mod last_provable_tipset_tests {
+    use super::*;
+    use keccak_hash::H256;
+
+    #[test]
+    fn last_provable_tipset_requires_two_tipsets() {
+        let empty = ECChain::new_unvalidated(vec![]);
+        assert!(last_provable_tipset(&empty).is_none());
+
+        let one = ECChain::new_unvalidated(vec![Tipset {
+            epoch: 1,
+            key: vec![0],
+            power_table: Cid::default(),
+            commitments: H256::zero(),
+        }]);
+        assert!(last_provable_tipset(&one).is_none());
+    }
+
+    #[test]
+    fn committed_cursor_tipset_allows_base_only() {
+        let one = ECChain::new_unvalidated(vec![Tipset {
+            epoch: 7,
+            key: vec![7],
+            power_table: Cid::default(),
+            commitments: H256::zero(),
+        }]);
+        assert_eq!(committed_cursor_tipset(&one).unwrap().epoch, 7);
+
+        let two = ECChain::new_unvalidated(vec![
+            Tipset {
+                epoch: 10,
+                key: vec![10],
+                power_table: Cid::default(),
+                commitments: H256::zero(),
+            },
+            Tipset {
+                epoch: 11,
+                key: vec![11],
+                power_table: Cid::default(),
+                commitments: H256::zero(),
+            },
+        ]);
+        // For [10, 11], last provable parent is 10 (second-to-last).
+        assert_eq!(committed_cursor_tipset(&two).unwrap().epoch, 10);
+    }
 }
 
 impl FinalizedTipset {
