@@ -121,8 +121,7 @@ where
                             critical_after = ?critical_after,
                             "still missing local proof cache entry after critical_after; continuing to wait"
                         );
-                    }
-                    if waited >= next_error_log_at {
+                    } else if waited >= next_error_log_at {
                         if entered_critical {
                             tracing::error!(
                                 height = msg.height,

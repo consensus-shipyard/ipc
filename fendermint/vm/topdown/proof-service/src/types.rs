@@ -135,15 +135,15 @@ pub fn last_provable_tipset(ec_chain: &ECChain) -> Option<&Tipset> {
     rev.next() // len < 2 => None
 }
 
-/// Return the tipset to use as the *committed epoch cursor* for this certificate.
+/// Return the last provable parent tipset, or the base tipset if the chain has no provable window.
 ///
-/// - If the ECChain has at least 2 tipsets, we return the last provable parent tipset
-///   (second-to-last), matching `windows(2)` proof generation.
-/// - If the ECChain has exactly 1 tipset (base only), we return that base tipset.
+/// - If the ECChain has at least 2 tipsets, returns the last provable parent tipset (second-to-last),
+///   matching `windows(2)` proof generation.
+/// - If the ECChain has exactly 1 tipset (base only), returns that base tipset.
 ///
-/// This is useful for genesis/bootstrap where we treat the configured instance as already
-/// committed, but the certificate may have an empty suffix.
-pub fn committed_cursor_tipset(ec_chain: &ECChain) -> Result<&Tipset> {
+/// This is useful for genesis/bootstrap cursor seeding where we treat the configured instance as
+/// already committed, but the certificate may have an empty suffix.
+pub fn last_provable_or_base_tipset(ec_chain: &ECChain) -> Result<&Tipset> {
     let mut rev = ec_chain.iter().rev();
     let last = rev.next().context("ECChain is empty (no tipsets)")?;
     Ok(rev.next().unwrap_or(last))
@@ -169,14 +169,14 @@ mod last_provable_tipset_tests {
     }
 
     #[test]
-    fn committed_cursor_tipset_allows_base_only() {
+    fn last_provable_or_base_tipset_allows_base_only() {
         let one = ECChain::new_unvalidated(vec![Tipset {
             epoch: 7,
             key: vec![7],
             power_table: Cid::default(),
             commitments: H256::zero(),
         }]);
-        assert_eq!(committed_cursor_tipset(&one).unwrap().epoch, 7);
+        assert_eq!(last_provable_or_base_tipset(&one).unwrap().epoch, 7);
 
         let two = ECChain::new_unvalidated(vec![
             Tipset {
@@ -193,7 +193,7 @@ mod last_provable_tipset_tests {
             },
         ]);
         // For [10, 11], last provable parent is 10 (second-to-last).
-        assert_eq!(committed_cursor_tipset(&two).unwrap().epoch, 10);
+        assert_eq!(last_provable_or_base_tipset(&two).unwrap().epoch, 10);
     }
 }
 

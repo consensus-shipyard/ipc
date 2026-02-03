@@ -389,11 +389,11 @@ async fn fetch_f3_params_from_parent(
         );
     }
     // Genesis treats the configured `instance_id` certificate as already committed.
-    // Use the cert's committed epoch cursor tipset:
+    // Use the cert's last provable parent tipset, or the base tipset if the ECChain has no provable window:
     // - base-only ECChain (len=1): use the base tipset
     // - otherwise: use the last provable parent tipset (second-to-last)
     let last_provable_tipset =
-        fendermint_vm_topdown_proof_service::types::committed_cursor_tipset(&cert.ec_chain)
+        fendermint_vm_topdown_proof_service::types::last_provable_or_base_tipset(&cert.ec_chain)
             .with_context(|| {
                 format!(
                     "failed to derive genesis base_epoch from cert {}",

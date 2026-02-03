@@ -546,9 +546,8 @@ impl<'a> GenesisBuilder<'a> {
 
         // F3 Light Client actor - manages F3 light client state for proof-based parent finality
         if let Some(f3_params) = &genesis.f3 {
-            // We treat `base_epoch` as already finalized/committed at genesis.
-            // The proof-service starts fetching from `instance_id + 1`, so the node will start
-            // proving/executing from `base_epoch + 1` (allowing for null rounds).
+            // We treat the configured F3 `instance_id` as already committed at genesis.
+            // The proof-service starts fetching/validating from `instance_id + 1`.
             let f3_state = fendermint_actor_f3_light_client::state::State::new(
                 state.store(),
                 f3_params.instance_id,

@@ -34,8 +34,28 @@ pub fn parse_u64_from_0x_word_low64(word_0x: &str) -> Result<u64> {
         padded.append(&mut b);
         b = padded;
     }
+    // Enforce that the word actually fits in u64 (high 192 bits must be zero).
+    if b[..24].iter().any(|x| *x != 0) {
+        anyhow::bail!("value does not fit in u64 (high 192 bits are non-zero)");
+    }
     let tail: [u8; 8] = b[24..32].try_into().expect("slice is 8 bytes");
     Ok(u64::from_be_bytes(tail))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_u64_accepts_short_hex_quantity() {
+        assert_eq!(parse_u64_from_0x_word_low64("0x01").unwrap(), 1);
+    }
+
+    #[test]
+    fn parse_u64_rejects_overflow() {
+        // 2^64, i.e. low64=0 but high bits non-zero.
+        assert!(parse_u64_from_0x_word_low64("0x010000000000000000").is_err());
+    }
 }
 
 /// Convert an `EventProof` into an `ethers::abi::RawLog`.

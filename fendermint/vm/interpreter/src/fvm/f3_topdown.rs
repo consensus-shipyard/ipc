@@ -132,6 +132,10 @@ impl F3TopDownHandler {
 
         // Certificate instance must not go backwards; it either stays the same (multiple epochs can
         // be proven under the same certificate) or advances by exactly 1.
+        //
+        // Note: Some instances may be "base-only" (empty suffix), in which case no epoch will be
+        // proven/executed under that instance. To avoid stalling, we allow skipping over such
+        // instances *iff* all intermediate instances are present in cache and base-only.
         if instance_id < f3_state.processed_instance_id {
             bail!(
                 "certificate instance went backwards: {} < {}",
@@ -139,7 +143,9 @@ impl F3TopDownHandler {
                 f3_state.processed_instance_id
             );
         }
-        if instance_id > f3_state.processed_instance_id + 1 {
+        if instance_id > f3_state.processed_instance_id + 1
+            && !self.can_skip_base_only_instances(f3_state.processed_instance_id, instance_id)?
+        {
             bail!(
                 "certificate instance jumped: {} > {}",
                 instance_id,
@@ -241,6 +247,10 @@ impl F3TopDownHandler {
     where
         DB: Blockstore + Clone + 'static + Send + Sync,
     {
+        // Catch up any intermediate base-only instances before processing the current one.
+        self.catch_up_base_only_instances(state, instance_id)
+            .context("failed to catch up base-only instances")?;
+
         // Update F3LightClientActor with new certificate state (on-chain), but ONLY once we've
         // executed the *last provable epoch* of this certificate.
         //
@@ -357,6 +367,71 @@ impl F3TopDownHandler {
         };
         Ok(epoch == last_provable.epoch)
     }
+
+    fn can_skip_base_only_instances(
+        &self,
+        processed_instance_id: u64,
+        target_instance_id: u64,
+    ) -> anyhow::Result<bool> {
+        if target_instance_id <= processed_instance_id + 1 {
+            return Ok(true);
+        }
+        for i in (processed_instance_id + 1)..target_instance_id {
+            let cert_entry = match self.proof_cache.get_certificate(i) {
+                Some(c) => c,
+                None => return Ok(false),
+            };
+            // Only base-only instances (no provable windows) can be skipped.
+            if fendermint_vm_topdown_proof_service::types::last_provable_tipset(
+                &cert_entry.certificate.ec_chain,
+            )
+            .is_some()
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn catch_up_base_only_instances<DB>(
+        &self,
+        state: &mut FvmExecState<DB>,
+        current_instance_id: u64,
+    ) -> anyhow::Result<()>
+    where
+        DB: Blockstore + Clone + 'static + Send + Sync,
+    {
+        let mut actor_state = self.get_f3_light_client_actor_state(state)?;
+        let mut processed = actor_state.processed_instance_id;
+
+        while processed + 1 < current_instance_id {
+            let next = processed + 1;
+            let cert_entry = self.proof_cache.get_certificate(next).ok_or_else(|| {
+                anyhow::anyhow!("missing cached certificate for skipped instance {next}")
+            })?;
+
+            // Only base-only instances can be skipped deterministically.
+            if fendermint_vm_topdown_proof_service::types::last_provable_tipset(
+                &cert_entry.certificate.ec_chain,
+            )
+            .is_some()
+            {
+                anyhow::bail!(
+                    "cannot skip instance {next}: certificate has provable epochs, but no execution occurred"
+                );
+            }
+
+            // Advance actor to this base-only instance using its cached power table.
+            let power_table = ActorPowerTable::try_from(&cert_entry.power_table)?.0;
+            self.update_f3_light_client_actor_state(state, next, power_table)?;
+
+            // Refresh processed id for next loop (actor can reject if jump > 1).
+            actor_state = self.get_f3_light_client_actor_state(state)?;
+            processed = actor_state.processed_instance_id;
+        }
+
+        Ok(())
+    }
 }
 
 /// Local helper newtype so we can provide a clean `From` impl at the conversion boundary.
@@ -454,6 +529,21 @@ mod tests {
     }
 
     fn mk_test_certificate_entry(instance_id: u64, epochs: Vec<ChainEpoch>) -> CertificateEntry {
+        mk_test_certificate_entry_with_powers(
+            instance_id,
+            epochs,
+            vec![
+                (1u64, "1000".to_string(), vec![1u8; 48]),
+                (2u64, "2000".to_string(), vec![2u8; 48]),
+            ],
+        )
+    }
+
+    fn mk_test_certificate_entry_with_powers(
+        instance_id: u64,
+        epochs: Vec<ChainEpoch>,
+        powers: Vec<(u64, String, Vec<u8>)>,
+    ) -> CertificateEntry {
         let mh = Multihash::<64>::wrap(0x12, &[0u8; 32]).expect("valid multihash");
         let power_table_cid = cid::Cid::new_v1(0x55, mh).to_string();
 
@@ -479,18 +569,12 @@ mod tests {
                 signature: vec![],
                 power_table_delta: vec![],
             },
-            power_table: SerializablePowerEntries(vec![
-                SerializablePowerEntry {
-                    id: 1,
-                    power: "1000".to_string(),
-                    pub_key: vec![1u8; 48],
-                },
-                SerializablePowerEntry {
-                    id: 2,
-                    power: "2000".to_string(),
-                    pub_key: vec![2u8; 48],
-                },
-            ]),
+            power_table: SerializablePowerEntries(
+                powers
+                    .into_iter()
+                    .map(|(id, power, pub_key)| SerializablePowerEntry { id, power, pub_key })
+                    .collect(),
+            ),
             source_rpc: "test".to_string(),
             fetched_at: std::time::SystemTime::now(),
         };
@@ -676,6 +760,199 @@ mod tests {
         match msg.certificate {
             Certificate::FilecoinF3(_) => {}
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn f3_topdown_skips_base_only_instances_and_catches_up() -> anyhow::Result<()> {
+        // This test covers the tricky case where there are intermediate "base-only" certificates
+        // (ECChain len=1, no provable `(parent, child)` windows) between the actor's processed
+        // instance and the instance referenced by the next epoch proof.
+        //
+        // We must be able to:
+        // - Attest a message whose instance jumps over base-only instances (iff they are cached).
+        // - Execute and deterministically catch up the actor state (without violating +1 monotonicity).
+
+        // Minimal FVM genesis state with F3LightClientActor so attestation can query actor state.
+        let store = MemoryBlockstore::new();
+        let multi_engine = Arc::new(MultiEngine::new(1));
+        let mut genesis_state = FvmGenesisState::new(
+            store,
+            multi_engine,
+            actors_builtin_car::CAR,
+            actors_custom_car::CAR,
+        )
+        .await
+        .context("failed to create FVM genesis state")?;
+
+        // System actor (required so the FVM can load the builtin actor manifest).
+        genesis_state
+            .create_builtin_actor(
+                system::SYSTEM_ACTOR_CODE_ID,
+                system::SYSTEM_ACTOR_ID,
+                &system::State {
+                    builtin_actors: genesis_state.manifest_data_cid,
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create system actor")?;
+
+        // Init actor (safe default for message execution environment).
+        let (init_state, _addr_to_id) = init::State::new(
+            genesis_state.store(),
+            "test".to_string(),
+            &[],
+            &BTreeSet::new(),
+            0,
+        )
+        .context("failed to create init state")?;
+        genesis_state
+            .create_builtin_actor(
+                init::INIT_ACTOR_CODE_ID,
+                init::INIT_ACTOR_ID,
+                &init_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create init actor")?;
+
+        // Gas market custom actor: required by BlockGasTracker initialization.
+        let gas_market_state = fendermint_actor_gas_market_eip1559::State {
+            base_fee: TokenAmount::from_atto(100),
+            constants: fendermint_actor_gas_market_eip1559::Constants::default(),
+        };
+        genesis_state
+            .create_custom_actor(
+                fendermint_actor_gas_market_eip1559::ACTOR_NAME,
+                gas_market::GAS_MARKET_ACTOR_ID,
+                &gas_market_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create gas market actor")?;
+
+        // Actor starts at instance 1.
+        let initial_processed_instance = 1u64;
+        let initial_power_table = vec![f3_light_client::PowerEntry {
+            id: 10,
+            public_key: vec![9u8; 48],
+            power_be: vec![9],
+        }];
+        let f3_state = fendermint_actor_f3_light_client::state::State::new(
+            genesis_state.store(),
+            initial_processed_instance,
+            initial_power_table,
+        )
+        .context("failed to create F3 light client actor state")?;
+        genesis_state
+            .create_custom_actor(
+                fendermint_actor_f3_light_client::F3_LIGHT_CLIENT_ACTOR_NAME,
+                f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID,
+                &f3_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create F3 light client actor")?;
+
+        // Initialize execution params (required for executing implicit/read-only messages).
+        genesis_state
+            .init_exec_state(
+                Timestamp(1),
+                NetworkVersion::V21,
+                TokenAmount::from_atto(100),
+                TokenAmount::zero(),
+                1,
+                0 as PowerScale,
+            )
+            .context("failed to init exec state")?;
+        let mut exec_state = genesis_state
+            .into_exec_state()
+            .map_err(|_| anyhow::anyhow!("genesis exec state missing"))?;
+
+        // Build a cache with:
+        // - Instance 2: base-only cert (no epoch proofs).
+        // - Instance 3: cert with a provable window `[E, E+1]`, so we can propose/execute epoch `E`.
+        let target_instance = 3u64;
+        let epoch_e: ChainEpoch = 50;
+        let cache = ProofCache::new(
+            epoch_e - 1,
+            initial_processed_instance,
+            CacheConfig {
+                lookahead_instances: 10,
+                retention_epochs: 10,
+            },
+        );
+
+        cache
+            .insert_certificate(mk_test_certificate_entry_with_powers(
+                2,
+                vec![epoch_e - 10], // base-only: len=1
+                vec![
+                    (1u64, "1111".to_string(), vec![3u8; 48]),
+                    (2u64, "2222".to_string(), vec![4u8; 48]),
+                ],
+            ))
+            .context("failed to insert base-only certificate (instance 2)")?;
+
+        cache
+            .insert_certificate(mk_test_certificate_entry_with_powers(
+                target_instance,
+                vec![epoch_e, epoch_e + 1], // provable parent epoch is `epoch_e`
+                vec![
+                    (1u64, "3333".to_string(), vec![5u8; 48]),
+                    (2u64, "4444".to_string(), vec![6u8; 48]),
+                ],
+            ))
+            .context("failed to insert certificate (instance 3)")?;
+
+        cache
+            .insert_epoch_proofs(vec![EpochProofEntry::new(
+                epoch_e,
+                UnifiedProofBundle {
+                    storage_proofs: vec![],
+                    event_proofs: vec![],
+                    blocks: vec![],
+                },
+                target_instance,
+            )])
+            .context("failed to insert epoch proof (instance 3)")?;
+
+        let handler = F3TopDownHandler::new(Arc::new(cache.clone()));
+
+        // Propose from cache: should propose epoch `epoch_e` under instance 3.
+        let chain_msg = handler
+            .chain_message_from_proof_cache()
+            .expect("next uncommitted epoch proof exists");
+        let msg = match chain_msg {
+            ChainMessage::Ipc(IpcMessage::ParentFinalityWithCert(m)) => m,
+            other => anyhow::bail!("unexpected chain message: {other:?}"),
+        };
+        assert_eq!(msg.height, epoch_e);
+
+        // Attest: must allow the instance jump 1 -> 3 because instance 2 is cached and base-only.
+        handler
+            .attest(&mut exec_state, &msg)
+            .await
+            .context("attestation failed")?;
+
+        // Execute and finalize: should catch up actor 1 -> 2 -> 3 without violating monotonicity.
+        let extracted = handler.extract_top_down_effects(&msg)?;
+        assert_eq!(extracted.instance_id, target_instance);
+        handler
+            .finalize_after_execution(&mut exec_state, msg.height, extracted.instance_id)
+            .context("finalize failed")?;
+
+        let caller = crate::fvm::state::ipc::F3LightClientCaller::new();
+        let actor_state = caller.get_state(&mut exec_state)?;
+        assert_eq!(actor_state.processed_instance_id, target_instance);
+
+        // Cache committed cursor updated.
+        assert_eq!(
+            handler.proof_cache().last_committed(),
+            (epoch_e, target_instance)
+        );
 
         Ok(())
     }

@@ -489,6 +489,4 @@ mod tests {
         let err = result.unwrap_err();
         assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
     }
-
-    // Note: the epoch cursor is tracked in the gateway contract; the actor no longer stores height.
 }

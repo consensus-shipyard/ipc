@@ -215,9 +215,6 @@ impl ProofVerifier {
 
         Ok(())
     }
-
-    // Intentionally no “cursor init from previous epoch”: the proof generator may start on any
-    // certificate/epoch after restart, and we don't currently persist a cursor in shared state.
 }
 
 #[cfg(test)]
@@ -297,23 +294,12 @@ fn verify_sequence_against_storage_next(
         return Ok(());
     }
 
-    let first = values[0];
     let last = *values.last().unwrap();
     if storage_next != last + 1 {
         anyhow::bail!(
             "{what} mismatch: storage_next {storage_next} != last_event+1 {}",
             last + 1
         );
-    }
-
-    let expected_first = match prev_storage_next {
-        Some(prev) => prev,
-        None => storage_next.checked_sub(count).with_context(|| {
-            format!("{what} mismatch: storage_next {storage_next} < count {count}")
-        })?,
-    };
-    if first != expected_first {
-        anyhow::bail!("{what} first value mismatch: expected {expected_first}, got {first}");
     }
 
     Ok(())
@@ -324,10 +310,12 @@ fn verify_contiguous_u64(values: &mut Vec<u64>, what: &str) -> Result<()> {
         return Ok(());
     }
     values.sort_unstable();
-    values.dedup();
     for w in values.windows(2) {
         let a = w[0];
         let b = w[1];
+        if b == a {
+            anyhow::bail!("{what} contains duplicate value: {a}");
+        }
         if b != a + 1 {
             anyhow::bail!("{what} not contiguous: {a} -> {b}");
         }
@@ -371,8 +359,6 @@ fn extract_epoch_event_numbers(
 
     Ok(out)
 }
-
-// (Replaced by `next_power_change_config_number_from_storage` + `verify_sequence_against_storage_next`.)
 
 #[cfg(test)]
 mod event_number_continuity_tests {
@@ -580,6 +566,34 @@ mod event_number_continuity_tests {
         assert!(err
             .to_string()
             .contains("top-down message nonces not contiguous"));
+        Ok(())
+    }
+
+    #[test]
+    fn continuity_check_fails_on_duplicate_nonce() -> Result<()> {
+        let epoch = 100;
+        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let mut cursor: Option<EventNumberCursor> = None;
+
+        // Duplicate nonce 10 twice.
+        let td0 = mk_topdown_rawlog(EthAddress::random(), [7u8; 32], 10);
+        let td1 = mk_topdown_rawlog(EthAddress::random(), [8u8; 32], 10);
+
+        // Storage indicates two messages were applied (delta=2) ending at nonce 12.
+        let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0);
+        let topdown_nonce_storage =
+            mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 12);
+
+        let bundle = UnifiedProofBundle {
+            storage_proofs: vec![next_config_storage, topdown_nonce_storage],
+            event_proofs: vec![mk_event_proof(epoch, td0), mk_event_proof(epoch, td1)],
+            blocks: vec![],
+        };
+
+        let err = verifier
+            .verify_event_number_continuity(epoch, &bundle, &mut cursor)
+            .expect_err("expected duplicate nonce to be rejected");
+        assert!(err.to_string().contains("contains duplicate"));
         Ok(())
     }
 

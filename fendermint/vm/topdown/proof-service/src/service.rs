@@ -237,6 +237,12 @@ impl ProofGeneratorService {
         cert: &FinalityCertificate,
         power_table: &PowerEntries,
     ) -> Result<()> {
+        // Always cache the validated certificate entry, even if it has no provable (parent, child)
+        // windows. A certificate may be "base-only" (empty suffix), yet it still advances the F3
+        // instance and can carry a new power table needed to validate subsequent certificates.
+        let rpc_endpoint = self.f3_client.rpc_endpoint().to_string();
+        let cert_entry = CertificateEntry::new(cert.clone(), power_table.clone(), rpc_endpoint);
+
         // Build (parent, child) pairs using windows - this makes the requirement explicit
         let tipset_pairs: Vec<_> = cert
             .ec_chain
@@ -252,6 +258,9 @@ impl ProofGeneratorService {
                 instance = cert.gpbft_instance,
                 "Certificate has fewer than 2 tipsets, no (parent, child) pairs to prove"
             );
+            self.cache
+                .insert_certificate_with_epoch_proofs(cert_entry, Vec::new())
+                .context("failed to cache base-only certificate")?;
             return Ok(());
         }
 
@@ -319,8 +328,6 @@ impl ProofGeneratorService {
         }
 
         // Cache the certificate and proofs
-        let rpc_endpoint = self.f3_client.rpc_endpoint().to_string();
-        let cert_entry = CertificateEntry::new(cert.clone(), power_table.clone(), rpc_endpoint);
         self.cache
             .insert_certificate_with_epoch_proofs(cert_entry, epoch_proofs)?;
 

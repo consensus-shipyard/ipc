@@ -263,23 +263,38 @@ async fn start_legacy_topdown(
         .add_provided_subnet(own_subnet_id.clone())
         .context("error adding own provided subnet.")?;
 
-    let key = validator_keypair.context("validator key missing but legacy topdown is enabled")?;
-    let parent_finality_votes_for_votes_loop = parent_finality_votes.clone();
-    let vote_interval = settings.ipc.vote_interval;
-    let vote_timeout = settings.ipc.vote_timeout;
-    tracing::info!("starting the parent finality vote gossip loop...");
-    tokio::spawn(async move {
-        publish_vote_loop(
-            parent_finality_votes_for_votes_loop,
-            vote_interval,
-            vote_timeout,
-            key,
-            own_subnet_id,
-            client,
-            |height, block_hash| AppVote::ParentFinality(IPCParentFinality { height, block_hash }),
-        )
-        .await
-    });
+    // NOTE: Legacy topdown can run in a non-validator mode.
+    //
+    // Non-validator nodes should still start up and subscribe to votes (so they can
+    // observe quorum and execute committed checkpoints), but they cannot *publish*
+    // votes without a validator keypair.
+    if let Some(key) = validator_keypair {
+        let parent_finality_votes_for_votes_loop = parent_finality_votes.clone();
+        let vote_interval = settings.ipc.vote_interval;
+        let vote_timeout = settings.ipc.vote_timeout;
+        let own_subnet_id_for_votes_loop = own_subnet_id.clone();
+        let client_for_votes_loop = client.clone();
+
+        tracing::info!("starting the parent finality vote gossip loop...");
+        tokio::spawn(async move {
+            publish_vote_loop(
+                parent_finality_votes_for_votes_loop,
+                vote_interval,
+                vote_timeout,
+                key,
+                own_subnet_id_for_votes_loop,
+                client_for_votes_loop,
+                |height, block_hash| {
+                    AppVote::ParentFinality(IPCParentFinality { height, block_hash })
+                },
+            )
+            .await
+        });
+    } else {
+        tracing::warn!(
+            "validator key missing; legacy topdown enabled but vote publishing is disabled (non-validator mode)"
+        );
+    }
 
     tracing::info!("subscribing to gossip...");
     let rx = service.subscribe();
