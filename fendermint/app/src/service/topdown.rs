@@ -109,30 +109,34 @@ pub(super) async fn start_topdown_if_enabled(
         .context("topdown is enabled but topdown config is missing")?;
 
     let f3_enabled_in_config = topdown_config.f3.is_some();
-    let f3_state_in_genesis = query_f3_state_in_genesis(db, state_store, app_namespace.clone())?;
-    let gateway_finality_in_genesis =
-        query_gateway_parent_finality_in_genesis(db, state_store, app_namespace.clone())?;
+    let f3_state_in_committed_state =
+        query_f3_state_in_committed_state(db, state_store, app_namespace.clone())?;
+    let gateway_finality_in_committed_state =
+        query_gateway_parent_finality_in_committed_state(db, state_store, app_namespace.clone())?;
+    let gateway_event_cursor_in_committed_state =
+        query_gateway_event_cursor_in_committed_state(db, state_store, app_namespace.clone())?;
 
-    // Fail-fast consistency between config and committed/genesis state.
+    // Fail-fast consistency between config and committed state.
     //
-    // - If genesis has F3 state, config must enable F3.
-    // - If config enables F3, genesis must have initial F3 state.
-    if f3_state_in_genesis.is_some() && !f3_enabled_in_config {
-        bail!("F3 is enabled in genesis but not in config");
+    // - If committed state has F3 state, config must enable F3.
+    // - If config enables F3, committed state must have initial F3 state.
+    if f3_state_in_committed_state.is_some() && !f3_enabled_in_config {
+        bail!("F3 is enabled in committed state but not in config");
     }
-    if f3_enabled_in_config && f3_state_in_genesis.is_none() {
-        bail!("F3 is enabled in config but initial F3 state is missing in genesis");
+    if f3_enabled_in_config && f3_state_in_committed_state.is_none() {
+        bail!("F3 is enabled in config but initial F3 state is missing in committed state");
     }
 
     if f3_enabled_in_config {
-        if gateway_finality_in_genesis.is_none() {
-            bail!("F3 is enabled but gateway latest parent finality is missing in genesis");
+        if gateway_finality_in_committed_state.is_none() {
+            bail!("F3 is enabled but gateway latest parent finality is missing in committed state");
         }
         return start_f3_topdown(
             settings,
             topdown_config,
-            f3_state_in_genesis,
-            gateway_finality_in_genesis,
+            f3_state_in_committed_state,
+            gateway_finality_in_committed_state,
+            gateway_event_cursor_in_committed_state,
         )
         .await;
     }
@@ -149,26 +153,32 @@ pub(super) async fn start_topdown_if_enabled(
     .await
 }
 
-fn query_f3_state_in_genesis(
+#[derive(Debug, Clone, Copy)]
+struct GatewayEventCursor {
+    applied_top_down_nonce: u64,
+    next_power_change_config_number: u64,
+}
+
+fn query_f3_state_in_committed_state(
     db: &RocksDb,
     state_store: &NamespaceBlockstore,
     app_namespace: <AppStore as KVStore>::Namespace,
 ) -> anyhow::Result<Option<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>> {
-    // Query F3 state from committed/genesis state once (used for fail-fast + F3 cache init).
+    // Query F3 state from committed state once (used for fail-fast + F3 cache init).
     let exec_state =
         crate::app::create_read_only_exec_state::<_, _, AppStore>(db, state_store, app_namespace)
             .context("failed to create read-only exec state")?;
 
-    let f3_state_in_genesis = match exec_state {
+    let f3_state_in_committed_state = match exec_state {
         Some(mut state) => crate::app::query_f3_state(&mut state)
-            .context("failed to query F3 state from genesis")?,
+            .context("failed to query F3 state from committed state")?,
         None => None,
     };
 
-    Ok(f3_state_in_genesis)
+    Ok(f3_state_in_committed_state)
 }
 
-fn query_gateway_parent_finality_in_genesis(
+fn query_gateway_parent_finality_in_committed_state(
     db: &RocksDb,
     state_store: &NamespaceBlockstore,
     app_namespace: <AppStore as KVStore>::Namespace,
@@ -191,6 +201,35 @@ fn query_gateway_parent_finality_in_genesis(
     };
 
     Ok(latest)
+}
+
+fn query_gateway_event_cursor_in_committed_state(
+    db: &RocksDb,
+    state_store: &NamespaceBlockstore,
+    app_namespace: <AppStore as KVStore>::Namespace,
+) -> anyhow::Result<Option<GatewayEventCursor>> {
+    type ROStore = fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore<
+        std::sync::Arc<NamespaceBlockstore>,
+    >;
+    let exec_state =
+        crate::app::create_read_only_exec_state::<_, _, AppStore>(db, state_store, app_namespace)
+            .context("failed to create read-only exec state")?;
+
+    let cursor = match exec_state {
+        Some(mut state) => {
+            let gw =
+                fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller::<ROStore>::default();
+            let applied_top_down_nonce = gw.applied_top_down_nonce(&mut state)?;
+            let (next_cfg, _start_cfg) = gw.tracker_configuration_numbers(&mut state)?;
+            Some(GatewayEventCursor {
+                applied_top_down_nonce,
+                next_power_change_config_number: next_cfg,
+            })
+        }
+        None => None,
+    };
+
+    Ok(cursor)
 }
 
 fn make_resolver_service(
@@ -356,21 +395,26 @@ async fn start_legacy_topdown(
 async fn start_f3_topdown(
     settings: &Settings,
     topdown_config: &TopDownSettings,
-    f3_state_in_genesis: Option<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>,
-    gateway_finality_in_genesis: Option<IPCParentFinality>,
+    f3_state_in_committed_state: Option<
+        fendermint_vm_actor_interface::f3_light_client::GetStateResponse,
+    >,
+    gateway_finality_in_committed_state: Option<IPCParentFinality>,
+    gateway_event_cursor_in_committed_state: Option<GatewayEventCursor>,
 ) -> anyhow::Result<TopDownInit> {
     let f3_config = topdown_config
         .f3
         .as_ref()
         .context("F3 is enabled in config but missing F3 config section")?;
 
-    let f3_state = f3_state_in_genesis
-        .context("F3 is enabled in config but initial F3 state is missing in genesis")?;
+    let f3_state = f3_state_in_committed_state
+        .context("F3 is enabled in config but initial F3 state is missing in committed state")?;
     let initial_instance = f3_state.processed_instance_id;
     // Epoch cursor comes from the gateway contract (seeded at genesis).
-    let initial_epoch = gateway_finality_in_genesis
-        .context("F3 enabled but gateway latest parent finality missing in genesis")?
+    let initial_epoch = gateway_finality_in_committed_state
+        .context("F3 enabled but gateway latest parent finality missing in committed state")?
         .height as fvm_shared::clock::ChainEpoch;
+    let gateway_cursor = gateway_event_cursor_in_committed_state
+        .context("F3 enabled but gateway event cursor missing in committed state")?;
 
     let db_path = Some(settings.data_dir().join("proof-cache"));
     let cache = Arc::new(
@@ -401,6 +445,8 @@ async fn start_f3_topdown(
             &subnet_id,
             initial_instance,
             fendermint_vm_topdown_proof_service::power_entries_from_actor(&f3_state.power_table),
+            gateway_cursor.applied_top_down_nonce,
+            gateway_cursor.next_power_change_config_number,
         )
         .await
         .context("Failed to create F3 proof service")?;

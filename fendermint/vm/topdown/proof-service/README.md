@@ -208,6 +208,8 @@ let (cache, handle) = launch_service(
     initial_epoch,
     initial_instance,
     power_table,
+    applied_top_down_nonce,
+    next_power_change_config_number,
     db_path,
 ).await?.unwrap();
 

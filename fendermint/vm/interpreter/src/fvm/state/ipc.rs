@@ -150,6 +150,24 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         self.getter.call(state, |c| c.get_current_membership())
     }
 
+    /// Return the next top-down message nonce expected to be applied by this gateway.
+    ///
+    /// This is the L2 execution cursor enforced when applying incoming top-down cross messages.
+    pub fn applied_top_down_nonce(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+        self.getter.call(state, |c| c.applied_top_down_nonce())
+    }
+
+    /// Return the validator tracker configuration numbers (next, start).
+    ///
+    /// `nextConfigurationNumber` advances as power-change requests are stored on the gateway.
+    pub fn tracker_configuration_numbers(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<(u64, u64)> {
+        self.topdown
+            .call(state, |c| c.get_tracker_configuration_numbers())
+    }
+
     /// Get the current power table, which is the same as the membership but parsed into domain types.
     pub fn current_power_table(
         &self,

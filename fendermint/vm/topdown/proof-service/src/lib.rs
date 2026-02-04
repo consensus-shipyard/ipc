@@ -67,6 +67,8 @@ pub async fn launch_service(
     initial_committed_epoch: ChainEpoch,
     initial_instance: u64,
     initial_power_table: filecoin_f3_gpbft::PowerEntries,
+    initial_applied_top_down_nonce: u64,
+    initial_next_power_change_config_number: u64,
     db_path: Option<std::path::PathBuf>,
 ) -> Result<Option<(Arc<ProofCache>, tokio::task::JoinHandle<()>)>> {
     // Check if disabled first
@@ -120,6 +122,8 @@ pub async fn launch_service(
             &subnet_id,
             initial_instance,
             power_table_clone,
+            initial_applied_top_down_nonce,
+            initial_next_power_change_config_number,
         )
         .await
         {
@@ -147,7 +151,7 @@ mod tests {
 
         let power_table = PowerEntries(vec![]);
         let subnet_id = SubnetID::default();
-        let result = launch_service(config, subnet_id, 0, 0, power_table, None).await;
+        let result = launch_service(config, subnet_id, 0, 0, power_table, 0, 0, None).await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
     }
@@ -168,7 +172,7 @@ mod tests {
         let power_table = PowerEntries(vec![]);
         let subnet_id = SubnetID::default();
 
-        let result = launch_service(config, subnet_id, 100, 5, power_table, None).await;
+        let result = launch_service(config, subnet_id, 100, 5, power_table, 0, 0, None).await;
         assert!(result.is_ok());
 
         let (_cache, handle) = result.unwrap().unwrap();

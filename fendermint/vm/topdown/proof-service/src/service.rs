@@ -35,6 +35,11 @@ pub struct ProofGeneratorService {
     f3_client: F3Client,
     assembler: ProofAssembler,
     verifier: ProofVerifier,
+    /// Cursor for continuity checks, seeded from L2 gateway state on startup.
+    ///
+    /// This allows fresh nodes to perform "storage delta vs observed event count" checks without
+    /// relying on local cache history.
+    event_number_cursor: crate::verifier::EventNumberCursor,
 }
 
 impl ProofGeneratorService {
@@ -55,6 +60,8 @@ impl ProofGeneratorService {
         subnet_id: &SubnetID,
         initial_instance: u64,
         initial_power_table: PowerEntries,
+        initial_applied_top_down_nonce: u64,
+        initial_next_power_change_config_number: u64,
     ) -> Result<Self> {
         let gateway_actor_id = extract_gateway_actor_id_from_config(&config).await?;
 
@@ -103,6 +110,10 @@ impl ProofGeneratorService {
             f3_client,
             assembler,
             verifier: ProofVerifier::new(subnet_id.to_string()),
+            event_number_cursor: crate::verifier::EventNumberCursor {
+                next_parent_topdown_nonce: initial_applied_top_down_nonce,
+                next_parent_power_change_config_number: initial_next_power_change_config_number,
+            },
         })
     }
 
@@ -233,7 +244,7 @@ impl ProofGeneratorService {
     /// - E2 (using E3 as child)
     /// - E3 has no child in this certificate, will be proven with next certificate
     async fn generate_proofs_for_certificate(
-        &self,
+        &mut self,
         cert: &FinalityCertificate,
         power_table: &PowerEntries,
     ) -> Result<()> {
@@ -281,7 +292,9 @@ impl ProofGeneratorService {
         let finalized_tipsets = FinalizedTipsets::from(&cert.ec_chain);
 
         let mut epoch_proofs = Vec::with_capacity(tipset_pairs.len());
-        let mut cursor: Option<crate::verifier::EventNumberCursor> = None;
+        // Seed the cursor from L2 gateway state for fresh-node restarts, then keep it updated
+        // across epochs and certificates.
+        let mut cursor: crate::verifier::EventNumberCursor = self.event_number_cursor;
 
         // Generate proofs for each (parent, child) pair.
         // The child tipset contains `parentReceipts` which commits to the parent's execution.
@@ -330,6 +343,9 @@ impl ProofGeneratorService {
         // Cache the certificate and proofs
         self.cache
             .insert_certificate_with_epoch_proofs(cert_entry, epoch_proofs)?;
+
+        // Persist updated cursor only after successful generation + caching.
+        self.event_number_cursor = cursor;
 
         tracing::info!(
             epoch_count = epochs_to_prove.len(),
@@ -383,7 +399,8 @@ mod tests {
 
         // Note: Service creation succeeds with F3Client::new() even with a fake RPC endpoint
         // The actual RPC calls will fail later when the service tries to fetch certificates
-        let result = ProofGeneratorService::new(config, cache, &subnet_id, 0, power_table).await;
+        let result =
+            ProofGeneratorService::new(config, cache, &subnet_id, 0, power_table, 0, 0).await;
         assert!(result.is_ok());
     }
 }

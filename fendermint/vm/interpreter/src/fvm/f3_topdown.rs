@@ -130,26 +130,17 @@ impl F3TopDownHandler {
         let f3_state = self.get_f3_light_client_actor_state(state)?;
         let instance_id = cached.certificate.gpbft_instance;
 
-        // Certificate instance must not go backwards; it either stays the same (multiple epochs can
-        // be proven under the same certificate) or advances by exactly 1.
+        // Certificate instance must not go backwards; it may stay the same (multiple epochs can be
+        // proven under the same certificate) or advance by more than 1.
         //
-        // Note: Some instances may be "base-only" (empty suffix), in which case no epoch will be
-        // proven/executed under that instance. To avoid stalling, we allow skipping over such
-        // instances *iff* all intermediate instances are present in cache and base-only.
+        // We allow forward jumps because intermediate instances may be "base-only" (empty suffix),
+        // which have no epoch execution point at which the on-chain light client actor could be
+        // updated. The actor itself allows forward jumps in a single atomic state transition.
         if instance_id < f3_state.processed_instance_id {
             bail!(
                 "certificate instance went backwards: {} < {}",
                 instance_id,
                 f3_state.processed_instance_id
-            );
-        }
-        if instance_id > f3_state.processed_instance_id + 1
-            && !self.can_skip_base_only_instances(f3_state.processed_instance_id, instance_id)?
-        {
-            bail!(
-                "certificate instance jumped: {} > {}",
-                instance_id,
-                f3_state.processed_instance_id + 1
             );
         }
 
@@ -247,10 +238,6 @@ impl F3TopDownHandler {
     where
         DB: Blockstore + Clone + 'static + Send + Sync,
     {
-        // Catch up any intermediate base-only instances before processing the current one.
-        self.catch_up_base_only_instances(state, instance_id)
-            .context("failed to catch up base-only instances")?;
-
         // Update F3LightClientActor with new certificate state (on-chain), but ONLY once we've
         // executed the *last provable epoch* of this certificate.
         //
@@ -366,71 +353,6 @@ impl F3TopDownHandler {
             return Ok(false);
         };
         Ok(epoch == last_provable.epoch)
-    }
-
-    fn can_skip_base_only_instances(
-        &self,
-        processed_instance_id: u64,
-        target_instance_id: u64,
-    ) -> anyhow::Result<bool> {
-        if target_instance_id <= processed_instance_id + 1 {
-            return Ok(true);
-        }
-        for i in (processed_instance_id + 1)..target_instance_id {
-            let cert_entry = match self.proof_cache.get_certificate(i) {
-                Some(c) => c,
-                None => return Ok(false),
-            };
-            // Only base-only instances (no provable windows) can be skipped.
-            if fendermint_vm_topdown_proof_service::types::last_provable_tipset(
-                &cert_entry.certificate.ec_chain,
-            )
-            .is_some()
-            {
-                return Ok(false);
-            }
-        }
-        Ok(true)
-    }
-
-    fn catch_up_base_only_instances<DB>(
-        &self,
-        state: &mut FvmExecState<DB>,
-        current_instance_id: u64,
-    ) -> anyhow::Result<()>
-    where
-        DB: Blockstore + Clone + 'static + Send + Sync,
-    {
-        let mut actor_state = self.get_f3_light_client_actor_state(state)?;
-        let mut processed = actor_state.processed_instance_id;
-
-        while processed + 1 < current_instance_id {
-            let next = processed + 1;
-            let cert_entry = self.proof_cache.get_certificate(next).ok_or_else(|| {
-                anyhow::anyhow!("missing cached certificate for skipped instance {next}")
-            })?;
-
-            // Only base-only instances can be skipped deterministically.
-            if fendermint_vm_topdown_proof_service::types::last_provable_tipset(
-                &cert_entry.certificate.ec_chain,
-            )
-            .is_some()
-            {
-                anyhow::bail!(
-                    "cannot skip instance {next}: certificate has provable epochs, but no execution occurred"
-                );
-            }
-
-            // Advance actor to this base-only instance using its cached power table.
-            let power_table = ActorPowerTable::try_from(&cert_entry.power_table)?.0;
-            self.update_f3_light_client_actor_state(state, next, power_table)?;
-
-            // Refresh processed id for next loop (actor can reject if jump > 1).
-            actor_state = self.get_f3_light_client_actor_state(state)?;
-            processed = actor_state.processed_instance_id;
-        }
-
-        Ok(())
     }
 }
 
@@ -765,14 +687,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn f3_topdown_skips_base_only_instances_and_catches_up() -> anyhow::Result<()> {
-        // This test covers the tricky case where there are intermediate "base-only" certificates
-        // (ECChain len=1, no provable `(parent, child)` windows) between the actor's processed
-        // instance and the instance referenced by the next epoch proof.
-        //
-        // We must be able to:
-        // - Attest a message whose instance jumps over base-only instances (iff they are cached).
-        // - Execute and deterministically catch up the actor state (without violating +1 monotonicity).
+    async fn f3_topdown_allows_forward_instance_jumps_without_catchup() -> anyhow::Result<()> {
+        // This test covers the case where the message certificate instance is ahead of the actor's
+        // processed instance due to intermediate base-only instances. We allow forward jumps and
+        // update the actor in a single atomic state transition (no grinding through intermediates).
 
         // Minimal FVM genesis state with F3LightClientActor so attestation can query actor state.
         let store = MemoryBlockstore::new();
@@ -931,13 +849,13 @@ mod tests {
         };
         assert_eq!(msg.height, epoch_e);
 
-        // Attest: must allow the instance jump 1 -> 3 because instance 2 is cached and base-only.
+        // Attest: must allow the instance jump 1 -> 3 (actor continuity is monotonic-only).
         handler
             .attest(&mut exec_state, &msg)
             .await
             .context("attestation failed")?;
 
-        // Execute and finalize: should catch up actor 1 -> 2 -> 3 without violating monotonicity.
+        // Execute and finalize: should update actor directly to instance 3.
         let extracted = handler.extract_top_down_effects(&msg)?;
         assert_eq!(extracted.instance_id, target_instance);
         handler

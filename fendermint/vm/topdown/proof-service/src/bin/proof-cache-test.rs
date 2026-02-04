@@ -168,6 +168,8 @@ async fn run_service(
         initial_committed_epoch,
         initial_instance,
         power_table,
+        0,
+        0,
         db_path,
     )
     .await?

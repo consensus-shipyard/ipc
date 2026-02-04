@@ -44,10 +44,12 @@ pub struct ProofVerifier {
 /// checking that the storage delta matches the number of events observed in the bundle.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct EventNumberCursor {
-    /// Next top-down message nonce (`subnets[...].topDownNonce`) after applying the epoch.
-    pub next_topdown_message_nonce: u64,
-    /// Next power-change configuration number after applying the epoch.
-    pub next_power_change_config_number: u64,
+    /// Next top-down message nonce on the **parent gateway** (`subnets[...].topDownNonce`)
+    /// after applying the epoch.
+    pub next_parent_topdown_nonce: u64,
+    /// Next power-change configuration number on the **parent gateway**
+    /// (`validatorsTracker.changes.nextConfigurationNumber`) after applying the epoch.
+    pub next_parent_power_change_config_number: u64,
 }
 
 impl ProofVerifier {
@@ -177,7 +179,7 @@ impl ProofVerifier {
         &self,
         parent_epoch: i64,
         bundle: &UnifiedProofBundle,
-        cursor: &mut Option<EventNumberCursor>,
+        cursor: &mut EventNumberCursor,
     ) -> Result<()> {
         // 1) Extract values.
         let mut nums = extract_epoch_event_numbers(parent_epoch, bundle)
@@ -198,20 +200,18 @@ impl ProofVerifier {
         verify_sequence_against_storage_next(
             "top-down message nonces",
             next_topdown,
-            cursor.as_ref().map(|c| c.next_topdown_message_nonce),
+            Some(cursor.next_parent_topdown_nonce),
             &nums.topdown_nonces,
         )?;
         verify_sequence_against_storage_next(
             "power-change configuration numbers",
             next_cfg,
-            cursor.as_ref().map(|c| c.next_power_change_config_number),
+            Some(cursor.next_parent_power_change_config_number),
             &nums.config_numbers,
         )?;
 
-        *cursor = Some(EventNumberCursor {
-            next_topdown_message_nonce: next_topdown,
-            next_power_change_config_number: next_cfg,
-        });
+        cursor.next_parent_topdown_nonce = next_topdown;
+        cursor.next_parent_power_change_config_number = next_cfg;
 
         Ok(())
     }
@@ -483,7 +483,10 @@ mod event_number_continuity_tests {
     fn continuity_check_passes_for_contiguous_nonces_and_config_numbers() -> Result<()> {
         let epoch = 100;
         let verifier = ProofVerifier::new("test-subnet".to_string());
-        let mut cursor: Option<EventNumberCursor> = None;
+        let mut cursor = EventNumberCursor {
+            next_parent_topdown_nonce: 10,
+            next_parent_power_change_config_number: 7,
+        };
 
         // Two topdown messages with contiguous nonces: 10, 11.
         let td0 = mk_topdown_rawlog(EthAddress::random(), [7u8; 32], 10);
@@ -518,7 +521,10 @@ mod event_number_continuity_tests {
     fn continuity_check_fails_on_config_storage_mismatch() -> Result<()> {
         let epoch = 100;
         let verifier = ProofVerifier::new("test-subnet".to_string());
-        let mut cursor: Option<EventNumberCursor> = None;
+        let mut cursor = EventNumberCursor {
+            next_parent_topdown_nonce: 0,
+            next_parent_power_change_config_number: 7,
+        };
 
         let pc0 = mk_power_change_rawlog(7);
         let pc1 = mk_power_change_rawlog(8);
@@ -538,7 +544,11 @@ mod event_number_continuity_tests {
             .verify_event_number_continuity(epoch, &bundle, &mut cursor)
             .expect_err("expected mismatch to be rejected");
         let msg = err.to_string();
-        assert!(msg.contains("power-change configuration numbers mismatch"));
+        assert!(
+            msg.contains("power-change configuration numbers mismatch")
+                || msg.contains("power-change configuration numbers event-count mismatch"),
+            "unexpected error message: {msg}"
+        );
         Ok(())
     }
 
@@ -546,7 +556,10 @@ mod event_number_continuity_tests {
     fn continuity_check_fails_on_nonce_gap() -> Result<()> {
         let epoch = 100;
         let verifier = ProofVerifier::new("test-subnet".to_string());
-        let mut cursor: Option<EventNumberCursor> = None;
+        let mut cursor = EventNumberCursor {
+            next_parent_topdown_nonce: 10,
+            next_parent_power_change_config_number: 0,
+        };
 
         let td0 = mk_topdown_rawlog(EthAddress::random(), [7u8; 32], 10);
         let td1 = mk_topdown_rawlog(EthAddress::random(), [8u8; 32], 12); // gap!
@@ -573,7 +586,10 @@ mod event_number_continuity_tests {
     fn continuity_check_fails_on_duplicate_nonce() -> Result<()> {
         let epoch = 100;
         let verifier = ProofVerifier::new("test-subnet".to_string());
-        let mut cursor: Option<EventNumberCursor> = None;
+        let mut cursor = EventNumberCursor {
+            next_parent_topdown_nonce: 10,
+            next_parent_power_change_config_number: 0,
+        };
 
         // Duplicate nonce 10 twice.
         let td0 = mk_topdown_rawlog(EthAddress::random(), [7u8; 32], 10);
@@ -600,7 +616,11 @@ mod event_number_continuity_tests {
     #[test]
     fn continuity_check_detects_omitted_initial_events_via_storage_delta() -> Result<()> {
         let verifier = ProofVerifier::new("test-subnet".to_string());
-        let mut cursor: Option<EventNumberCursor> = None;
+        // Epoch 100 starts at nonce 10 (two events) and config-number 0 (no events).
+        let mut cursor = EventNumberCursor {
+            next_parent_topdown_nonce: 10,
+            next_parent_power_change_config_number: 0,
+        };
 
         // Epoch 100: two topdown messages (10,11) -> end nonce 12.
         let epoch0 = 100;

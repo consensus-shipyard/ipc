@@ -57,7 +57,12 @@ impl F3LightClient for F3LightClientActor {
             //
             // Note: multiple epochs can be proven under the same certificate instance, so
             // `processed_instance_id` may stay the same across updates, but it must never go
-            // backwards and must not jump by more than 1.
+            // backwards.
+            //
+            // We intentionally allow forward jumps: intermediate F3 instances may be "base-only"
+            // (empty suffix), meaning there is no epoch proof/execution point at which to update
+            // the actor. In that case, the executor may update the actor directly to a later
+            // instance in a single atomic state transition.
             //
             // Also, we allow re-applying the same update (idempotency) by permitting equality.
             if params.processed_instance_id < st.light_client_state.processed_instance_id {
@@ -66,14 +71,6 @@ impl F3LightClient for F3LightClientActor {
                     "processed_instance_id went backwards: {} < {}",
                     params.processed_instance_id,
                     st.light_client_state.processed_instance_id
-                ));
-            }
-            if params.processed_instance_id > st.light_client_state.processed_instance_id + 1 {
-                return Err(actor_error!(
-                    illegal_argument,
-                    "processed_instance_id jumped: {} > {}",
-                    params.processed_instance_id,
-                    st.light_client_state.processed_instance_id + 1
                 ));
             }
 
@@ -456,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    fn test_instance_id_skip_rejected() {
+    fn test_instance_id_skip_allowed_but_rewind_rejected() {
         let rt = construct_and_verify(100, create_test_power_entries());
 
         // First state at instance 100
@@ -473,7 +470,7 @@ mod tests {
         .unwrap();
         rt.reset();
 
-        // Try to skip instance (100 -> 102) should fail
+        // Skipping forward instances is allowed (base-only instances may have no epoch execution point).
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let update_params = UpdateStateParams {
@@ -484,6 +481,20 @@ mod tests {
         let result = rt.call::<F3LightClientActor>(
             Method::UpdateState as u64,
             IpldBlock::serialize_cbor(&update_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.reset();
+
+        // Rewinding is still forbidden.
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+        let rewind_params = UpdateStateParams {
+            processed_instance_id: 101,
+            power_table: create_test_power_entries(),
+        };
+        let result = rt.call::<F3LightClientActor>(
+            Method::UpdateState as u64,
+            IpldBlock::serialize_cbor(&rewind_params).unwrap(),
         );
         assert!(result.is_err());
         let err = result.unwrap_err();
