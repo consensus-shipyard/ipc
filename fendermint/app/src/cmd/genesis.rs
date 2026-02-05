@@ -343,6 +343,7 @@ pub async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> any
     let builder = GenesisBuilder::new(
         builtin_actors.as_ref(),
         custom_actors.as_ref(),
+        None,
         artifacts_path,
         genesis_params,
     );

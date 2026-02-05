@@ -161,7 +161,8 @@ pub struct GenesisBuilder<'a> {
     builtin_actors: &'a [u8],
     /// The custom actors bundle
     custom_actors: &'a [u8],
-
+    /// The end user actors bundle
+    user_actors: Option<&'a [u8]>,
     /// Genesis params
     genesis_params: Genesis,
 }
@@ -170,6 +171,7 @@ impl<'a> GenesisBuilder<'a> {
     pub fn new(
         builtin_actors: &'a [u8],
         custom_actors: &'a [u8],
+        user_actors: Option<&'a [u8]>,
         artifacts_path: PathBuf,
         genesis_params: Genesis,
     ) -> Self {
@@ -177,6 +179,7 @@ impl<'a> GenesisBuilder<'a> {
             hardhat: Hardhat::new(artifacts_path),
             builtin_actors,
             custom_actors,
+            user_actors,
             genesis_params,
         }
     }
@@ -244,6 +247,7 @@ impl<'a> GenesisBuilder<'a> {
             Arc::new(MultiEngine::new(1)),
             self.builtin_actors,
             self.custom_actors,
+            self.user_actors,
         )
         .await
         .context("failed to create genesis state")
@@ -522,6 +526,8 @@ impl<'a> GenesisBuilder<'a> {
             config,
         )?;
 
+        state.load_user_actor(next_id)?;
+
         Ok(out)
     }
 }
@@ -774,12 +780,14 @@ fn circ_supply(g: &Genesis) -> TokenAmount {
 pub async fn create_test_genesis_state(
     builtin_actors_bundle: &[u8],
     custom_actors_bundle: &[u8],
+    user_actors_bundle: Option<&[u8]>,
     ipc_path: PathBuf,
     genesis_params: Genesis,
 ) -> anyhow::Result<(FvmGenesisState<MemoryBlockstore>, GenesisOutput)> {
     let builder = GenesisBuilder::new(
         builtin_actors_bundle,
         custom_actors_bundle,
+        user_actors_bundle,
         ipc_path,
         genesis_params,
     );

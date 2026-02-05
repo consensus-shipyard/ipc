@@ -30,9 +30,12 @@ pub async fn create_test_exec_state(
 )> {
     let artifacts_path = contracts_path();
 
+    let user_actor_car: &[u8] = include_bytes!("../user_actors_bundle.car");
+
     let (state, out) = create_test_genesis_state(
         actors_builtin_car::CAR,
         actors_custom_car::CAR,
+        Some(user_actor_car),
         artifacts_path,
         genesis,
     )
