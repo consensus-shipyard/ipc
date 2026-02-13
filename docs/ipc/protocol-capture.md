@@ -30,7 +30,7 @@ IPC subnets are full, sufficiently **decentralized** blockchains **owning their 
 |---------|-------------|
 | **Recursive scalability** | Subnets can spawn child subnets indefinitely, forming a tree hierarchy |
 | **Cross-net communication** | Secure message passing between parent and child (top-down and bottom-up) |
-| **Flexible consensus** | Each subnet can customize block time, validator requirements, and consensus parameters |
+| **Flexible consensus** | Each subnet can customize block time, validator requirements, and consensus parameters. *Currently only CometBFT is implemented; rollups and sequencer-based subnets are intended.* |
 | **Ethereum compatibility** | Full FEVM support for Solidity smart contracts |
 | **Native FVM support** | Access to Filecoin's actor model and built-in capabilities |
 
@@ -55,6 +55,8 @@ IPC subnets are full, sufficiently **decentralized** blockchains **owning their 
 | [Cross-net messages](#cross-net-message) | Messages between chains; top-down (deposits) and bottom-up (withdrawals) |
 
 > **Note**: Currently, cross-net messages are supported for directly linked chains only (single-hop parent↔subnet). See [Primitives & Definitions](#primitives--definitions) for fuller definitions.
+>
+> **Implementation status**: Only CometBFT-based subnets are implemented today. The protocol is designed to support other consensus mechanisms (e.g., rollups, sequencer-based subnets); these are intended but not yet implemented.
 
 ### How IPC Works (Conceptual)
 
@@ -184,7 +186,7 @@ Information flow from parent to child. Includes [parent finality](#parent-finali
 
 ### VoteTally
 
-Mechanism tracking validator votes on [parent finality](#parent-finality). Detects quorum; informs block proposer which parent block to include.
+*Deprecated — will be removed soon.* Mechanism tracking validator votes on [parent finality](#parent-finality). Detects quorum; informs block proposer which parent block to include.
 
 ### Withdrawal
 
@@ -244,7 +246,7 @@ Moving value/assets between subnets—built on [messaging](#messaging). Uses [Ga
 
 ### Consensus
 
-- **Subnet consensus**: CometBFT (BFT, [quorum](#quorum))
+- **Subnet consensus**: CometBFT (BFT, [quorum](#quorum)) — *currently the only implemented consensus mechanism*. Rollups and sequencer-based subnets are intended future implementations.
 - **[Parent finality](#parent-finality)**: Validators poll parent, vote via GossipSub; [VoteTally](#votetally) detects quorum; proposer includes `ParentFinality` in block
 
 ### On-Chain vs Off-Chain
@@ -428,7 +430,7 @@ Contract-to-contract via `sendContractXnetMessage` (Call kind). [IpcEnvelope](#i
 
 ### CometBFT
 
-Consensus engine for subnet blocks. ABCI++ interface. Critical for block production, P2P, proposal/vote flow.
+Consensus engine for subnet blocks. ABCI++ interface. Critical for block production, P2P, proposal/vote flow. *Currently the only implemented subnet consensus mechanism; rollups and sequencer-based subnets are planned.*
 
 ### Other Key Dependencies
 
