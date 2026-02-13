@@ -70,6 +70,8 @@ IPC combines several mechanisms:
 
 **Flow**: Given a rootnet (root of trust), new subnets obtain a subnet ID and register. Lifecycle management governs activation (e.g., collateral for PoS). Configuration management handles validator set and updates. Subnets operate autonomously; checkpoints periodically bind state to parent. Bridging uses the same cross-net message carrier for deposits (lock+mint) and withdrawals (burn+release).
 
+![IPC Simplified Architecture](./img/ipc-simplified-architecture.png)
+
 ### Key Principles
 
 *Proposed from protocol design goals—to be refined:*
@@ -263,6 +265,8 @@ Moving value/assets between subnets—built on [messaging](#messaging). Uses [Ga
 
 ## Components
 
+![IPC Detailed Architecture](./img/ipc-detailed-architecture.png)
+
 ### Actors (WASM)
 
 IPC subnets run the **FVM**, which executes **WASM-based actors** (Filecoin execution model):
@@ -337,15 +341,19 @@ Wraps ethers library and contract ABIs for parent chain interaction. Used by ipc
 
 ### Joining & Leaving Subnets
 
-**Join**: Call `join` on [Subnet Actor](#subnet-actor) with collateral; creates [StakeChangeRequest](#stakechangerequest); propagated via [top-down](#top-down) [parent finality](#parent-finality); child executes; confirmed in [checkpoint](#checkpoint).
+![IPC Validator Lifecycle](./img/ipc-validator-lifecycle.png)
 
-**Leave**: Call `leave` or `unstake`; same propagation; child removes/reduces; parent releases collateral when [checkpoint](#checkpoint) committed. Claim via `ipc-cli subnet claim`.
+**Join**: Call `join` on [Subnet Actor](#subnet-actor) with collateral; creates [StakeChangeRequest](#stakechangerequest); propagated via [top-down](#top-down) [parent finality](#parent-finality); child executes; confirmed in [checkpoint](#checkpoint). ~5–10 min.
+
+**Leave**: Call `leave` or `unstake`; same propagation; child removes/reduces; parent releases collateral when [checkpoint](#checkpoint) committed. Claim via `ipc-cli subnet claim`. ~5–10 min to leave; claim is immediate once confirmed.
 
 ### Depositing & Withdrawing Assets
 
-**Deposit (fund)**: [Deposit](#deposit)—call `fund` (or `fundWithToken` for ERC20) on parent [Gateway](#gateway); [top-down](#top-down) message; executed in child when [parent finality](#parent-finality) committed.
+![IPC Fund and Release Operations](./img/ipc-fund-release-sequences.png)
 
-**Withdraw (release)**: [Withdrawal](#withdrawal)—call `release` on child [Gateway](#gateway); [bottom-up](#bottom-up) message; batched in [checkpoint](#checkpoint); [Relayer](#relayer) submits; executed on parent.
+**Deposit (fund)**: [Deposit](#deposit)—call `fund` (or `fundWithToken` for ERC20) on parent [Gateway](#gateway); [top-down](#top-down) message; executed in child when [parent finality](#parent-finality) committed. ~2–5 min depending on finality delay.
+
+**Withdraw (release)**: [Withdrawal](#withdrawal)—call `release` on child [Gateway](#gateway); [bottom-up](#bottom-up) message; batched in [checkpoint](#checkpoint); [Relayer](#relayer) submits; executed on parent. ~5–10 min depending on checkpoint period.
 
 ### General Message Passing
 
