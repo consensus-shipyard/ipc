@@ -95,16 +95,28 @@ source scripts/aliases.sh  # Adds anvil-start, anvil-stop, etc.
 
 **We've prepared a [quick start guide](https://docs.ipc.space/quickstarts/deploy-a-subnet) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
 
-For further documentation, see:
+### Architecture Documentation
 
-- [docs/contracts.md](./docs/ipc/contracts.md) for instructions on how to deploy FEVM actors on subnets.
-- [docs/usage.md](./docs/ipc/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets (from managing your identities, to sending funds to a subnet).
-- [docs/deploying-hierarchy.md](./docs/ipc/deploying-hierarchy.md) for instructions on how to deploy your own instance of IPC on a network.
-- [docs/contract-errors.md](./docs/ipc/contract-errors.md) for a comprehensive reference of all possible contract errors and how to resolve them.
+- **[docs/ipc/architecture-overview.md](./docs/ipc/architecture-overview.md)** - Comprehensive architecture guide with detailed diagrams showing:
+  - All system components and their responsibilities
+  - How subnets connect to L1 and each other
+  - Top-down and bottom-up communication flows
+  - Validator lifecycle and operations
+  - Security model and trust assumptions
+  
+- **[docs/ipc/architecture-quick-reference.md](./docs/ipc/architecture-quick-reference.md)** - Quick reference card with CLI commands, concepts, and troubleshooting
 
-If you are a developer, see:
+### User Documentation
 
-- [docs/developers.md](./docs/ipc/developers.md) for useful tips and guides targeted for IPC developers.
+- [docs/ipc/usage.md](./docs/ipc/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets (from managing your identities, to sending funds to a subnet).
+- [docs/ipc/contracts.md](./docs/ipc/contracts.md) for instructions on how to deploy FEVM actors on subnets.
+- [docs/ipc/deploying-hierarchy.md](./docs/ipc/deploying-hierarchy.md) for instructions on how to deploy your own instance of IPC on a network.
+- [docs/ipc/contract-errors.md](./docs/ipc/contract-errors.md) for a comprehensive reference of all possible contract errors and how to resolve them.
+
+### Developer Documentation
+
+- [docs/ipc/developers.md](./docs/ipc/developers.md) for useful tips and guides targeted for IPC developers.
+- [docs/ipc/README.md](./docs/ipc/README.md) for a complete index of all IPC documentation.
 
 ## Connecting to a rootnet
 
