@@ -5,12 +5,12 @@
 ## Table of Contents
 
 1. [Intro / Overview](#intro--overview)
-2. [Concepts (Mechanisms)](#concepts-mechanisms)
-3. [Components](#components)
-4. [Operation](#operation)
-5. [Security Guarantees](#security-guarantees)
-6. [Configuration](#configuration)
-7. [Terms (Glossary)](#terms-glossary)
+2. [Primitives & Definitions](#primitives--definitions)
+3. [Concepts (Mechanisms)](#concepts-mechanisms)
+4. [Components](#components)
+5. [Operation](#operation)
+6. [Security Guarantees](#security-guarantees)
+7. [Configuration](#configuration)
 8. [Dependencies](#dependencies)
 9. [Appendices](#appendices)
 
@@ -47,14 +47,14 @@ IPC subnets are full, sufficiently **decentralized** blockchains **owning their 
 
 | Concept | Definition |
 |---------|------------|
-| **Subnet** | Autonomous blockchain whose state is anchored into a parent chain |
-| **Parent chain** | Blockchain that a subnet anchors into |
-| **Rootnet** | Blockchain with no parent (e.g., Filecoin) |
-| **Subnet ID** | Address identifying the subnet (root chain ID + route of subnet actor addresses) |
-| **Checkpoint** | Periodic commitment of subnet state to parent; cryptographic reference to finalized chain head |
-| **Cross-net messages** | Messages between chains; top-down (parent→child, deposits) and bottom-up (child→parent, withdrawals) |
+| [Subnet](#subnet) | Autonomous blockchain whose state is anchored into a parent chain |
+| [Parent chain](#parent-chain) | Blockchain that a subnet anchors into |
+| [Rootnet](#rootnet) | Blockchain with no parent (e.g., Filecoin) |
+| [Subnet ID](#subnet-id) | Address identifying the subnet (root chain ID + route of subnet actor addresses) |
+| [Checkpoint](#checkpoint) | Periodic commitment of subnet state to parent; cryptographic reference to finalized chain head |
+| [Cross-net messages](#cross-net-message) | Messages between chains; top-down (deposits) and bottom-up (withdrawals) |
 
-> **Note**: Currently, cross-net messages are supported for directly linked chains only (single-hop parent↔subnet).
+> **Note**: Currently, cross-net messages are supported for directly linked chains only (single-hop parent↔subnet). See [Primitives & Definitions](#primitives--definitions) for fuller definitions.
 
 ### How IPC Works (Conceptual)
 
@@ -90,78 +90,172 @@ IPC combines several mechanisms:
 
 ---
 
+## Primitives & Definitions
+
+*Canonical definitions—reference these from [Concepts](#concepts-mechanisms) and [Components](#components) to avoid repetition.*
+
+### ABCI++
+
+Application Blockchain Interface. Protocol for CometBFT to communicate with the application layer. Defines `PrepareProposal`, `ProcessProposal`, and `FinalizeBlock`.
+
+### Bottom-up
+
+Information flow from child subnet to parent. Includes [checkpoints](#checkpoint) and bottom-up messages (e.g., [withdrawals](#withdrawal)). Propagated by the [Relayer](#relayer).
+
+### Checkpoint
+
+Batch of child subnet state and bottom-up messages submitted to the parent with validator signatures. Contains: subnet_id, block_height, block_hash, prev_checkpoint_height, cross_messages, next_configuration_number. Block hash anchors against long-range attacks. Created by validators; submitted by the [Relayer](#relayer); validated by the parent [Gateway](#gateway).
+
+### Configuration ID
+
+Version number for the validator set. Increments when [StakeChangeRequest](#stakechangerequest)s (join, leave, stake, unstake) are applied. Child confirms adoption via `next_configuration_number` in [checkpoints](#checkpoint); parent releases collateral when checkpoint is committed.
+
+### Cross-net message
+
+Message sent between chains. [Top-down](#top-down) (parent→child) or [bottom-up](#bottom-up) (child→parent). Carried in an [IpcEnvelope](#ipcenvelope). Currently single-hop (direct parent↔child) only.
+
+### Deposit
+
+[Top-down](#top-down) message carrying assets. Implemented as `fund` (native) or `fundWithToken` (ERC20) on the [Gateway](#gateway).
+
+### Gateway
+
+Singleton contract in every subnet. Manages collateral, firewall, cross-net routing, and [checkpoint](#checkpoint) validation. Executes top-down and bottom-up messages. Participates in [checkpointing](#checkpointing), [messaging](#messaging), and [bridging](#bridging).
+
+### IpcEnvelope
+
+Structure carrying a cross-net message: kind (Transfer, Call, Result), from/to ([Subnet ID](#subnet-id) + address), value, message bytes, nonces. Used for routing via [postbox](#postbox) and [LCA](#lca-lowest-common-ancestor) determination.
+
+### LCA (Lowest Common Ancestor)
+
+Subnet in the hierarchy that is an ancestor of both source and destination. Used to route [cross-net messages](#cross-net-message) and determine top-down vs bottom-up direction.
+
+### Parent chain
+
+Blockchain that a subnet anchors into. Hosts the [Subnet Actor](#subnet-actor) for each child; receives [checkpoints](#checkpoint) from children.
+
+### Parent finality
+
+Child subnet’s committed view of which parent block is final. Validators vote on parent (height, hash) via GossipSub; VoteTally detects quorum; proposer includes `ParentFinality` in the child block. Triggers execution of top-down messages.
+
+### Postbox
+
+Storage on intermediate subnets for [cross-net messages](#cross-net-message) in transit. Messages are propagated from the postbox to the next hop (parent or child) based on routing.
+
+### Quorum
+
+>2/3 of validator power. Threshold for checkpoint signing, parent finality votes, and BFT consensus.
+
+### Registry
+
+Factory contract for deploying reference [Subnet Actor](#subnet-actor) implementations. One per subnet.
+
+### Relayer
+
+Off-chain process that monitors the child subnet for `QuorumReached` events, retrieves the signed [checkpoint](#checkpoint) and validator signatures, and submits it to the parent [Gateway](#gateway). Performs the submission step of [checkpointing](#checkpointing). Permissionless; requires L1 funds.
+
+### Rootnet
+
+Blockchain with no parent (e.g., Filecoin). Root of trust for the IPC hierarchy.
+
+### StakeChangeRequest
+
+Request for validator set change (join, leave, stake, unstake, setFederatedPower). Identified by [configuration ID](#configuration-id). Propagated via [parent finality](#parent-finality); executed in child; confirmed in [checkpoint](#checkpoint).
+
+### Subnet
+
+Autonomous blockchain whose state is anchored into a [parent chain](#parent-chain). Has its own validators, consensus, and execution. Can spawn child subnets recursively.
+
+### Subnet Actor
+
+Contract governing a specific child subnet. Deployed in the parent. Defines [supply source](#supply-source), genesis, permission mode. One [Subnet Actor](#subnet-actor) per child subnet. Calls `register` on parent [Gateway](#gateway) when bootstrap conditions are met.
+
+### Subnet ID
+
+Address identifying a subnet. Format: root (chain ID) + route (array of [Subnet Actor](#subnet-actor) addresses top-to-bottom). String representation: `/r314159/t410f.../t410f...`. Assigned when [Subnet Actor](#subnet-actor) is deployed.
+
+### Supply Source
+
+Source of subnet native coin. **Native**: parent’s native coin (e.g., FIL). **ERC20**: ERC20 on parent locked, minted in subnet. Set at subnet creation; immutable.
+
+### Top-down
+
+Information flow from parent to child. Includes [parent finality](#parent-finality), top-down messages (e.g., [deposits](#deposit)), and validator set changes. Propagated via parent finality commitment in child blocks.
+
+### VoteTally
+
+Mechanism tracking validator votes on [parent finality](#parent-finality). Detects quorum; informs block proposer which parent block to include.
+
+### Withdrawal
+
+[Bottom-up](#bottom-up) message carrying assets. Implemented as `release` on the [Gateway](#gateway). Batched in [checkpoint](#checkpoint); submitted by [Relayer](#relayer); executed on parent.
+
+---
+
 ## Concepts (Mechanisms)
 
 *Abstract/conceptual level—spans multiple components.*
 
 ### Subnet ID Management
 
-**SubnetID** = `root` (chain ID) + `route` (array of subnet actor addresses top-to-bottom). String format: `/r314159/t410f.../t410f...`
-
-- Assigned when subnet actor is deployed (via Registry or custom)
-- Route grows as child subnets are created; each child gets a new subnet actor in its parent
-- Binary: `keccak256(abi.encode(SubnetID))` for equality checks and storage
+See [Subnet ID](#subnet-id) for definition. Assigned when [Subnet Actor](#subnet-actor) is deployed (via [Registry](#registry) or custom). Route grows as child subnets are created. Binary: `keccak256(abi.encode(SubnetID))` for equality checks and storage.
 
 ### Subnet Lifecycle Management
 
-1. **Creation**: Deploy Subnet Actor in parent (via Registry or custom); configure supply source, permission mode, genesis
-2. **Registration**: Once min validators/collateral met, Subnet Actor calls `register` on parent Gateway
-3. **Active**: Subnet produces blocks, creates checkpoints, processes messages
-4. **Termination**: Subnet can be killed (governance-dependent); collateral released per checkpoint confirmation
+1. **Creation**: Deploy [Subnet Actor](#subnet-actor) in [parent chain](#parent-chain) (via [Registry](#registry) or custom); configure [supply source](#supply-source), permission mode, genesis
+2. **Registration**: Once min validators/collateral met, [Subnet Actor](#subnet-actor) calls `register` on parent [Gateway](#gateway)
+3. **Active**: Subnet produces blocks, creates [checkpoints](#checkpoint), processes messages
+4. **Termination**: Subnet can be killed (governance-dependent); collateral released per [checkpoint](#checkpoint) confirmation
 
 ### Subnet Configuration Management
 
-Validator set and voting power managed on parent, propagated via top-down:
+Validator set and voting power managed on parent, propagated via [top-down](#top-down):
 
-- **StakeChangeRequest** (join, leave, stake, unstake, setFederatedPower) identified by configuration number
-- Propagated via parent finality commitment in child blocks
-- Child executes changes; confirms via `next_configuration_number` in checkpoint
-- Parent confirms collateral release when checkpoint is committed
+- [StakeChangeRequest](#stakechangerequest)s identified by [configuration ID](#configuration-id)
+- Propagated via [parent finality](#parent-finality) commitment in child blocks
+- Child executes changes; confirms via `next_configuration_number` in [checkpoint](#checkpoint)
+- Parent confirms collateral release when [checkpoint](#checkpoint) is committed
 
 ### Checkpointing
 
-Periodically anchors subnet state into parent.
+Periodically anchors subnet state into parent. See [Checkpoint](#checkpoint) for structure.
 
 **Flow**:
-1. Every `bottomup_check_period` blocks (or when `MAX_MSGS_PER_BATCH` hit), validators create checkpoint
-2. Validators call `addCheckpointSignature`; quorum (>2/3) triggers `QuorumReached` event
-3. Relayer submits checkpoint + signatures to parent
-4. Parent verifies against last known validator set, executes bottom-up messages
-
-**Contents**: subnet_id, block_height, block_hash, prev_checkpoint_height, cross_messages, next_configuration_number. Block hash anchors against long-range attacks.
+1. Every `bottomup_check_period` blocks (or when `MAX_MSGS_PER_BATCH` hit), validators create [checkpoint](#checkpoint)
+2. Validators call `addCheckpointSignature`; [quorum](#quorum) triggers `QuorumReached` event
+3. [Relayer](#relayer) submits [checkpoint](#checkpoint) + signatures to parent [Gateway](#gateway)
+4. Parent verifies against last known validator set, executes [bottom-up](#bottom-up) messages
 
 ### Messaging
 
-Transport layer for cross-subnet communication.
+Transport layer for cross-subnet communication. [Bridging](#bridging) uses this as transport.
 
-**Flows**:
-- **Top-down**: Messages indexed by parent block height; propagated via parent finality; executed when finality committed
-- **Bottom-up**: Batched in checkpoints; validators sign; relayer submits; executed on parent
+**Flows**: [Top-down](#top-down) (propagated via [parent finality](#parent-finality)) and [bottom-up](#bottom-up) (batched in [checkpoints](#checkpoint), submitted by [Relayer](#relayer)).
 
-**Types**: Transfer (fund, release), Call (general contract-to-contract), Result (response). Mechanisms: IpcEnvelope, postbox, LCA routing.
+**Types**: Transfer ([deposit](#deposit)/[withdrawal](#withdrawal)), Call (general contract-to-contract), Result (response). Mechanisms: [IpcEnvelope](#ipcenvelope), [postbox](#postbox), [LCA](#lca-lowest-common-ancestor) routing.
 
 ### Bridging
 
-Moving value/assets between subnets—built on messaging.
+Moving value/assets between subnets—built on [messaging](#messaging). Uses [Gateway](#gateway) for native flows.
 
-**Native**: Supply source (Native or ERC20). fund/release for native; lock+mint / burn+release for ERC20.
+**Native**: [Supply source](#supply-source). [Deposit](#deposit)/[withdrawal](#withdrawal) for native; lock+mint / burn+release for ERC20.
 
-**Custom**: Linked Token pattern for arbitrary ERC20s via general cross-net Call messages. Lock on origin, mint on target; burn on target, release on origin.
+**Custom**: Linked Token pattern for arbitrary ERC20s via general [cross-net messages](#cross-net-message). Lock on origin, mint on target; burn on target, release on origin.
 
 ### Consensus
 
-- **Subnet consensus**: CometBFT (BFT, >2/3 honest)
-- **Parent finality**: Validators poll parent, vote on parent block via GossipSub; VoteTally detects quorum; proposer includes `ParentFinality` in block
+- **Subnet consensus**: CometBFT (BFT, [quorum](#quorum))
+- **[Parent finality](#parent-finality)**: Validators poll parent, vote via GossipSub; [VoteTally](#votetally) detects quorum; proposer includes `ParentFinality` in block
 
 ### On-Chain vs Off-Chain
 
 | Aspect | On-Chain | Off-Chain |
 |--------|----------|-----------|
-| Gateway, Subnet Actor, Registry | ✓ | |
-| Message execution, checkpoint validation | ✓ | |
+| [Gateway](#gateway), [Subnet Actor](#subnet-actor), [Registry](#registry) | ✓ | |
+| Message execution, [checkpoint](#checkpoint) validation | ✓ | |
 | Consensus (CometBFT) | Runs on nodes | |
 | Parent Syncer, IPLD Resolver | | Polls/resolves |
-| Relayer, IPC Provider, ipc-cli | | Submits, queries, signs |
+| [Relayer](#relayer), IPC Provider, ipc-cli | | Submits, queries, signs |
 
 ---
 
@@ -181,11 +275,11 @@ IPC subnets run the **FVM**, which executes **WASM-based actors** (Filecoin exec
 
 | Contract | Location | Responsibility |
 |----------|----------|----------------|
-| **Gateway** | Singleton in every subnet | Collateral, firewall, cross-net routing, checkpoint validation |
-| **Subnet Actor** | One per child, deployed in parent | Supply source, genesis, permission mode, validator set |
-| **Registry** | Per subnet | Factory for Subnet Actor implementations |
+| **[Gateway](#gateway)** | Singleton in every subnet | Collateral, firewall, cross-net routing, [checkpoint](#checkpoint) validation |
+| **[Subnet Actor](#subnet-actor)** | One per child, deployed in parent | [Supply source](#supply-source), genesis, permission mode, validator set |
+| **[Registry](#registry)** | Per subnet | Factory for [Subnet Actor](#subnet-actor) implementations |
 
-**Architecture**: Diamond pattern (EIP-2535), AppStorage for shared state.
+**Architecture**: Diamond pattern (EIP-2535), AppStorage for shared state. Participates in [checkpointing](#checkpointing), [messaging](#messaging), [bridging](#bridging).
 
 ### Node (Subnet Validator Node)
 
@@ -196,7 +290,7 @@ IPC subnets run the **FVM**, which executes **WASM-based actors** (Filecoin exec
 | Consensus | CometBFT | BFT consensus, block proposal, voting, P2P |
 | Application | ABCI++ | PrepareProposal, ProcessProposal, FinalizeBlock |
 | Execution | FVM/FEVM | Smart contract execution |
-| Parent Sync | Parent Syncer | Polls parent RPC, VoteTally for finality |
+| Parent Sync | Parent Syncer | Polls parent RPC, [VoteTally](#votetally) for [parent finality](#parent-finality) |
 | Data | IPLD Resolver | CID resolution, data availability |
 
 **Node lifecycle**: Genesis → Bootstrap (register) → Validation → Shutdown (leave/unstake).
@@ -209,18 +303,18 @@ IPC subnets run the **FVM**, which executes **WASM-based actors** (Filecoin exec
 Wraps ethers library and contract ABIs for parent chain interaction. Used by ipc-cli and relayer.
 
 **Responsibilities**:
-- Calling parent contracts (Gateway, Subnet Actor, Registry)
+- Calling parent contracts ([Gateway](#gateway), [Subnet Actor](#subnet-actor), [Registry](#registry))
 - Subnet lifecycle interaction (create, join, leave, list)
-- Fetching subnet genesis and top-down queries (messages, validator changes)
-- Enabling relayer to interact with parent and child
+- Fetching subnet genesis and [top-down](#top-down) queries (messages, validator changes)
+- Enabling [Relayer](#relayer) to interact with parent and child
 
 ### Relayer (Off-Chain)
 
 **Status**: 🟡
 
-**Overview**: Monitors child subnet for `QuorumReached` events; assembles checkpoint + validator signatures; submits to parent Gateway via `submitCheckpoint`.
+**Overview**: Performs the submission step of [checkpointing](#checkpointing). Monitors child subnet for `QuorumReached` events; assembles [checkpoint](#checkpoint) + validator signatures; submits to parent [Gateway](#gateway) via `submitCheckpoint`.
 
-**Flow**: L2 contract event → retrieve signed checkpoint → construct proofs (CometBFT light client) → submit to L1 for execution.
+**Flow**: L2 contract event → retrieve signed [checkpoint](#checkpoint) → construct proofs (CometBFT light client) → submit to L1 for execution.
 
 **Dependencies**: Requires funds on L1 to submit transactions.
 
@@ -235,25 +329,25 @@ Wraps ethers library and contract ABIs for parent chain interaction. Used by ipc
 
 ### Creating & Destroying Subnets
 
-**Create**: Deploy Subnet Actor via Registry or custom; configure min_validators, min_collateral, supply_source; wait for bootstrap (join + collateral). Subnet Actor calls `register` on Gateway when ready.
+**Create**: Deploy [Subnet Actor](#subnet-actor) via [Registry](#registry) or custom; configure min_validators, min_collateral, [supply source](#supply-source); wait for bootstrap (join + collateral). [Subnet Actor](#subnet-actor) calls `register` on [Gateway](#gateway) when ready.
 
-**Destroy**: Governance-dependent; subnet can be killed; validators leave; collateral released as checkpoints confirm.
+**Destroy**: Governance-dependent; subnet can be killed; validators leave; collateral released as [checkpoints](#checkpoint) confirm.
 
 ### Joining & Leaving Subnets
 
-**Join**: Call `join` on Subnet Actor with collateral; creates StakeChangeRequest; propagated via top-down finality; child executes; confirmed in checkpoint.
+**Join**: Call `join` on [Subnet Actor](#subnet-actor) with collateral; creates [StakeChangeRequest](#stakechangerequest); propagated via [top-down](#top-down) [parent finality](#parent-finality); child executes; confirmed in [checkpoint](#checkpoint).
 
-**Leave**: Call `leave` or `unstake`; same propagation; child removes/reduces; parent releases collateral when checkpoint committed. Claim via `ipc-cli subnet claim`.
+**Leave**: Call `leave` or `unstake`; same propagation; child removes/reduces; parent releases collateral when [checkpoint](#checkpoint) committed. Claim via `ipc-cli subnet claim`.
 
 ### Depositing & Withdrawing Assets
 
-**Deposit (fund)**: Call `fund` (or `fundWithToken` for ERC20) on parent Gateway; top-down message; executed in child when parent finality committed.
+**Deposit (fund)**: [Deposit](#deposit)—call `fund` (or `fundWithToken` for ERC20) on parent [Gateway](#gateway); [top-down](#top-down) message; executed in child when [parent finality](#parent-finality) committed.
 
-**Withdraw (release)**: Call `release` on child Gateway; bottom-up message; batched in checkpoint; relayer submits; executed on parent.
+**Withdraw (release)**: [Withdrawal](#withdrawal)—call `release` on child [Gateway](#gateway); [bottom-up](#bottom-up) message; batched in [checkpoint](#checkpoint); [Relayer](#relayer) submits; executed on parent.
 
 ### General Message Passing
 
-Contract-to-contract via `sendContractXnetMessage` (Call kind). IpcEnvelope carries payload; postbox routes at intermediate subnets; destination contract implements `handleIpcMessage`. Result messages propagate back. *Currently single-hop for direct parent-child; multi-hop routing supported in protocol.*
+Contract-to-contract via `sendContractXnetMessage` (Call kind). [IpcEnvelope](#ipcenvelope) carries payload; [postbox](#postbox) routes at intermediate subnets; destination contract implements `handleIpcMessage`. Result messages propagate back. *Currently single-hop for direct parent-child; multi-hop routing supported in protocol.*
 
 ---
 
@@ -330,28 +424,6 @@ Contract-to-contract via `sendContractXnetMessage` (Call kind). IpcEnvelope carr
 
 ---
 
-## Terms (Glossary)
-
-| Term | Definition |
-|------|------------|
-| **ABCI++** | Application Blockchain Interface; CometBFT ↔ application |
-| **Bottom-up** | Child → parent (checkpoints, messages) |
-| **Checkpoint** | Batch of child state + messages with validator signatures |
-| **Configuration ID** | Version for validator set |
-| **Deposit** | Top-down message carrying assets (fund) |
-| **Gateway** | Singleton contract managing IPC in each subnet |
-| **LCA** | Lowest common ancestor (routing) |
-| **Quorum** | >2/3 validator power |
-| **Relayer** | Off-chain process submitting checkpoints |
-| **Rootnet** | Chain with no parent |
-| **Subnet Actor** | Contract governing a child subnet (in parent) |
-| **Supply Source** | Source of subnet native coin (Native or ERC20) |
-| **Top-down** | Parent → child (finality, messages) |
-| **VoteTally** | Tracks validator votes on parent finality |
-| **Withdrawal** | Bottom-up message carrying assets (release) |
-
----
-
 ## Dependencies
 
 ### CometBFT
@@ -397,7 +469,7 @@ Consensus engine for subnet blocks. ABCI++ interface. Critical for block product
 | **Relayer** | Enriched with status 🟡, dependencies, known issues |
 | **Operation** (was new) | Added new section: Creating/Destroying, Join/Leave, Deposit/Withdraw, General Message Passing |
 | **Security & Economics** | [Security Guarantees](#security-guarantees) + new [Economic Incentives](#economic-incentives) subsection |
-| **Glossary** | Merged into [Terms (Glossary)](#terms-glossary) |
+| **Glossary** | Expanded into [Primitives & Definitions](#primitives--definitions) |
 | **Appendices** | Added with links to specs and architecture docs |
 
 ---
