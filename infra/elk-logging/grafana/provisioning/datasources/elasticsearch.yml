@@ -1,0 +1,23 @@
+# Grafana Datasource - Elasticsearch
+apiVersion: 1
+
+datasources:
+  - name: Elasticsearch-IPC-Logs
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    database: "ipc-logs-*"
+    basicAuth: true
+    basicAuthUser: elastic
+    secureJsonData:
+      basicAuthPassword: ${ELASTIC_PASSWORD}
+    jsonData:
+      timeField: "@timestamp"
+      esVersion: "8.11.0"
+      logMessageField: message
+      logLevelField: log_level
+      maxConcurrentShardRequests: 5
+      includeFrozen: false
+    editable: true
+    version: 1
+

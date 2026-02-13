@@ -40,7 +40,7 @@ jobs:
           version: v0.3.0
 
       - name: Install aderyn
-        run: cargo install aderyn --locked
+        run: npm install -g @cyfrin/aderyn
 
       - name: Make deps
         run: cd contracts && make deps

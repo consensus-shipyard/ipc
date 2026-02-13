@@ -71,6 +71,7 @@ fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
+fendermint_vm_topdown_proof_service = { path = "../vm/topdown/proof-service" }
 
 ipc_actors_abis = { path = "../../contract-bindings" }
 ethers = {workspace =  true}

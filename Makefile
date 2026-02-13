@@ -15,6 +15,15 @@ build-with-ui:
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
 
+install: default
+	@echo "Installing binaries to ~/.cargo/bin..."
+	@mkdir -p ~/.cargo/bin
+	@cp ./target/release/ipc-cli ~/.cargo/bin/ipc-cli
+	@cp ./target/release/fendermint ~/.cargo/bin/fendermint
+	@chmod +x ~/.cargo/bin/ipc-cli ~/.cargo/bin/fendermint
+	@echo "Installation complete! Make sure ~/.cargo/bin is in your PATH."
+	@echo "Installed: ipc-cli and fendermint"
+
 SUBTREES_RUST := fendermint ipc ipld/resolver
 SUBTREES_CONTRACTS := contracts
 SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
