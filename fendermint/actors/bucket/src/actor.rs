@@ -77,6 +77,9 @@ impl Actor {
                             id: sub_id,
                             size: params.size,
                             ttl: params.ttl,
+                            // TODO: pass from bucket AddParams
+                            data_shards: 4,
+                            parity_shards: 2,
                         },
                     },
                 )?
@@ -99,6 +102,9 @@ impl Actor {
                     id: sub_id,
                     size: params.size,
                     ttl: params.ttl,
+                    // TODO: pass from bucket AddParams
+                    data_shards: 4,
+                    parity_shards: 2,
                 },
             )?
         };

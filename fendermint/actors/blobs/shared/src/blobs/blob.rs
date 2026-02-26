@@ -21,4 +21,8 @@ pub struct Blob {
     pub subscribers: HashMap<SubscriptionId, ChainEpoch>,
     /// Blob status.
     pub status: BlobStatus,
+    /// Number of data shards per chunk for erasure encoding (k).
+    pub data_shards: u16,
+    /// Number of parity shards per chunk for erasure encoding (m).
+    pub parity_shards: u16,
 }

@@ -147,6 +147,8 @@ impl AbiCallRuntime for sol::addBlobCall {
             size,
             ttl,
             from,
+            data_shards: self.dataShards,
+            parity_shards: self.parityShards,
         })
     }
     fn returns(&self, returns: Self::Returns) -> Self::Output {
@@ -264,6 +266,8 @@ impl AbiCallRuntime for sol::overwriteBlobCall {
                 size,
                 ttl,
                 from,
+                data_shards: self.dataShards,
+                parity_shards: self.parityShards,
             },
         })
     }

@@ -72,10 +72,10 @@ export function FileExplorer({
   const formatSize = (size?: bigint) => {
     if (!size) return '-';
     const bytes = Number(size);
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    if (bytes < 1000) return `${bytes} B`;
+    if (bytes < 1000 * 1000) return `${(bytes / 1000).toFixed(1)} KB`;
+    if (bytes < 1000 * 1000 * 1000) return `${(bytes / (1000 * 1000)).toFixed(1)} MB`;
+    return `${(bytes / (1000 * 1000 * 1000)).toFixed(1)} GB`;
   };
 
   const getBreadcrumbs = () => {

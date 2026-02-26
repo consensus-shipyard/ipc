@@ -10,18 +10,22 @@
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use std::str::FromStr;
 
 use anyhow::Result;
+use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
+use erasure_encoding::BlobId;
 use fendermint_actor_blobs_shared::bytes::B256;
 use fendermint_rpc::message::GasParams;
-use fendermint_rpc::QueryClient;
+use fendermint_rpc::{FendermintClient, QueryClient};
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::econ::TokenAmount;
 use iroh_blobs::Hash;
 use iroh_manager::IrohNode;
-use tracing::info;
+use tracing::{info, warn};
 use warp::Filter;
 
+use crate::distribution::ShardPullRequest;
 use super::{SharedFendermintClient, SignatureStorage};
 
 /// Start the RPC server for signature queries and blob queries
@@ -30,11 +34,13 @@ pub async fn start_rpc_server(
     signatures: SignatureStorage,
     client: SharedFendermintClient,
     iroh: IrohNode,
+    bls_private_key: BlsPrivateKey,
+    rpc_url: tendermint_rpc::Url,
 ) -> Result<()> {
     // GET /signature/{hash}
     let get_signature = warp::path!("signature" / String)
         .and(warp::get())
-        .and(with_signatures(signatures))
+        .and(with_signatures(signatures.clone()))
         .and_then(handle_get_signature);
 
     // GET /health
@@ -50,13 +56,39 @@ pub async fn start_rpc_server(
         .and(with_client(client_for_meta))
         .and_then(handle_get_blob);
 
-    // GET /v1/blobs/{hash}/content - returns blob content as binary stream
+    // GET /v1/blobs/{hash}/content - returns blob content via shard retrieval
+    let iroh_for_content = iroh.clone();
+    let rpc_url_for_content = rpc_url;
     let get_blob_content = warp::path!("v1" / "blobs" / String / "content")
         .and(warp::get())
-        .and(warp::query::<HeightQuery>())
         .and(with_client(client))
-        .and(with_iroh(iroh))
+        .and(with_iroh(iroh_for_content))
+        .and(warp::any().map(move || rpc_url_for_content.clone()))
         .and_then(handle_get_blob_content);
+
+    // GET /v1/node - returns this node's Iroh NodeAddr for P2P connectivity
+    let iroh_for_node = iroh.clone();
+    let get_node_addr = warp::path!("v1" / "node")
+        .and(warp::get())
+        .and(with_iroh(iroh_for_node))
+        .and_then(handle_get_node_addr);
+
+    // GET /v1/shards/{blob_id}/{chunk_index}/{shard_index}/hash - lookup shard Iroh hash
+    let iroh_for_shard_hash = iroh.clone();
+    let get_shard_hash = warp::path!("v1" / "shards" / String / usize / usize / "hash")
+        .and(warp::get())
+        .and(with_iroh(iroh_for_shard_hash))
+        .and_then(handle_get_shard_hash);
+
+    // POST /v1/shards/pull - accept a shard pull request from a distributor
+    let signatures_for_pull = signatures.clone();
+    let pull_shard = warp::path!("v1" / "shards" / "pull")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_iroh(iroh))
+        .and(with_signatures(signatures_for_pull))
+        .and(with_bls_key(bls_private_key))
+        .and_then(handle_shard_pull);
 
     // CORS configuration - allow all origins for development
     let cors = warp::cors()
@@ -66,8 +98,11 @@ pub async fn start_rpc_server(
 
     let routes = get_signature
         .or(health)
+        .or(get_node_addr)
+        .or(get_shard_hash)
         .or(get_blob_content)
         .or(get_blob)
+        .or(pull_shard)
         .with(cors);
 
     info!("RPC server starting on {}", bind_addr);
@@ -80,6 +115,23 @@ fn with_signatures(
     signatures: SignatureStorage,
 ) -> impl Filter<Extract = (SignatureStorage,), Error = Infallible> + Clone {
     warp::any().map(move || signatures.clone())
+}
+
+/// Warp filter to inject BLS private key
+fn with_bls_key(
+    key: BlsPrivateKey,
+) -> impl Filter<Extract = (BlsPrivateKey,), Error = Infallible> + Clone {
+    warp::any().map(move || key)
+}
+
+/// Handle GET /v1/node - returns this node's Iroh NodeAddr
+async fn handle_get_node_addr(iroh: IrohNode) -> Result<impl warp::Reply, warp::Rejection> {
+    let node_addr = iroh.endpoint().node_addr().await.map_err(|e| {
+        warp::reject::custom(RpcBadRequest {
+            message: format!("failed to get node address: {}", e),
+        })
+    })?;
+    Ok(warp::reply::json(&node_addr))
 }
 
 /// Response for signature query
@@ -251,15 +303,18 @@ fn with_iroh(iroh: IrohNode) -> impl Filter<Extract = (IrohNode,), Error = Infal
     warp::any().map(move || iroh.clone())
 }
 
-/// Handle GET /v1/blobs/{hash}/content - returns the actual blob content
+/// Handle GET /v1/blobs/{hash}/content - returns blob content via shard retrieval
+///
+/// Reconstructs the blob by fetching shards from assigned operators and RS-decoding.
 async fn handle_get_blob_content(
     hash_str: String,
-    height_query: HeightQuery,
     client: SharedFendermintClient,
     iroh: IrohNode,
+    rpc_url: tendermint_rpc::Url,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    use futures::TryStreamExt;
-    use iroh_blobs::hashseq::HashSeq;
+    use crate::gateway::BlobGateway;
+    use crate::objects::build_node_directories;
+    use crate::retrieval::{retrieve, BlobRetrievalParams};
     use warp::hyper::Body;
 
     // Parse blob hash - strip 0x prefix if present
@@ -296,12 +351,6 @@ async fn handle_get_blob_content(
     hash_array.copy_from_slice(&blob_hash_bytes);
     let blob_hash = B256(hash_array);
 
-    // Set query height
-    let height = height_query
-        .height
-        .map(FvmQueryHeight::from)
-        .unwrap_or(FvmQueryHeight::Committed);
-
     // Gas params for the query call
     let gas_params = GasParams {
         gas_limit: Default::default(),
@@ -309,87 +358,61 @@ async fn handle_get_blob_content(
         gas_premium: Default::default(),
     };
 
-    // First query the blobs actor to verify the blob exists
+    // Query the blobs actor to get blob info (size, k, m)
     let maybe_blob = {
         let mut client_guard = client.lock().await;
         client_guard
-            .blob_get_call(blob_hash, TokenAmount::default(), gas_params, height)
+            .blob_get_call(
+                blob_hash,
+                TokenAmount::default(),
+                gas_params,
+                FvmQueryHeight::Committed,
+            )
             .await
     };
 
     match maybe_blob {
         Ok(Some(blob)) => {
-            // The blob hash is actually a hash sequence hash
-            let hash_seq_hash = Hash::from_bytes(blob_hash.0);
             let size = blob.size;
+            let data_shards = blob.data_shards as usize;
+            let parity_shards = blob.parity_shards as usize;
 
-            // Read the hash sequence from Iroh to get the original content hash
-            let hash_seq_bytes = match iroh.blobs_client().read_to_bytes(hash_seq_hash).await {
-                Ok(bytes) => bytes,
-                Err(e) => {
-                    return Ok(warp::reply::with_status(
-                        warp::reply::Response::new(Body::from(
-                            serde_json::to_string(&ErrorResponse {
-                                error: format!("failed to read hash sequence: {}", e),
-                            })
-                            .unwrap(),
-                        )),
-                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    ));
-                }
-            };
+            // Build node directories from on-chain operator state
+            let retrieval_client = FendermintClient::new_http(rpc_url, None).map_err(|e| {
+                warp::reject::custom(RpcBadRequest {
+                    message: format!("failed to create client: {}", e),
+                })
+            })?;
+            let gateway =
+                BlobGateway::new(retrieval_client, 10, std::time::Duration::from_secs(5));
+            let (nodes, node_directory, node_rpc_directory) =
+                build_node_directories(&gateway).await.map_err(|e| {
+                    warp::reject::custom(RpcBadRequest {
+                        message: format!("failed to build node directories: {}", e),
+                    })
+                })?;
 
-            let hash_seq = match HashSeq::try_from(hash_seq_bytes) {
-                Ok(seq) => seq,
-                Err(e) => {
-                    return Ok(warp::reply::with_status(
-                        warp::reply::Response::new(Body::from(
-                            serde_json::to_string(&ErrorResponse {
-                                error: format!("failed to parse hash sequence: {}", e),
-                            })
-                            .unwrap(),
-                        )),
-                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    ));
-                }
-            };
+            let blob_id = BlobId(blob_hash.0);
+            let retrieved_data = retrieve(
+                &BlobRetrievalParams {
+                    blob_id,
+                    original_len: size as usize,
+                    data_shards,
+                    parity_shards,
+                    nodes,
+                    node_directory,
+                    node_rpc_directory,
+                },
+                iroh.blobs_client(),
+            )
+            .await
+            .map_err(|e| {
+                warp::reject::custom(RpcBadRequest {
+                    message: format!("failed to retrieve blob: {}", e),
+                })
+            })?;
 
-            // First hash in the sequence is the original content
-            let orig_hash = match hash_seq.iter().next() {
-                Some(hash) => hash,
-                None => {
-                    return Ok(warp::reply::with_status(
-                        warp::reply::Response::new(Body::from(
-                            serde_json::to_string(&ErrorResponse {
-                                error: "hash sequence is empty".to_string(),
-                            })
-                            .unwrap(),
-                        )),
-                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    ));
-                }
-            };
-
-            // Read the actual content from Iroh
-            let reader = match iroh.blobs_client().read(orig_hash).await {
-                Ok(reader) => reader,
-                Err(e) => {
-                    return Ok(warp::reply::with_status(
-                        warp::reply::Response::new(Body::from(
-                            serde_json::to_string(&ErrorResponse {
-                                error: format!("failed to read blob content: {}", e),
-                            })
-                            .unwrap(),
-                        )),
-                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    ));
-                }
-            };
-
-            // Stream the content as the response body
-            let bytes_stream =
-                reader.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
-            let body = Body::wrap_stream(bytes_stream);
+            let body = Body::from(retrieved_data);
 
             let mut response = warp::reply::Response::new(body);
             response.headers_mut().insert(
@@ -425,3 +448,225 @@ async fn handle_get_blob_content(
         )),
     }
 }
+
+/// Response for shard hash lookup
+#[derive(serde::Serialize)]
+struct ShardHashResponse {
+    hash: String,
+    node_addr: iroh::NodeAddr,
+}
+
+/// Handle GET /v1/shards/{blob_id}/{chunk_index}/{shard_index}/hash
+///
+/// Returns the Iroh content hash for a locally-stored shard, allowing other
+/// nodes to download it via Iroh P2P.
+async fn handle_get_shard_hash(
+    blob_id_hex: String,
+    chunk_index: usize,
+    shard_index: usize,
+    iroh: IrohNode,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    let blob_id_bytes = hex::decode(&blob_id_hex).map_err(|_| {
+        warp::reject::custom(RpcBadRequest {
+            message: "invalid blob_id hex".to_string(),
+        })
+    })?;
+    if blob_id_bytes.len() != 32 {
+        return Err(warp::reject::custom(RpcBadRequest {
+            message: format!("blob_id must be 32 bytes, got {}", blob_id_bytes.len()),
+        }));
+    }
+    let mut blob_id_array = [0u8; 32];
+    blob_id_array.copy_from_slice(&blob_id_bytes);
+    let blob_id = BlobId(blob_id_array);
+
+    let tag = crate::distribution::shard_key(&blob_id, chunk_index, shard_index);
+
+    // Look up the Iroh hash for this shard tag
+    let iroh_tag = iroh_blobs::Tag(tag.into());
+    let hash = {
+        use futures::StreamExt;
+        let mut tags = iroh.blobs_client().tags().list().await.map_err(|e| {
+            warp::reject::custom(RpcBadRequest {
+                message: format!("failed to list tags: {}", e),
+            })
+        })?;
+        let mut found = None;
+        while let Some(Ok(tag_info)) = tags.next().await {
+            if tag_info.name == iroh_tag {
+                found = Some(tag_info.hash);
+                break;
+            }
+        }
+        found
+    };
+
+    match hash {
+        Some(hash) => {
+            let node_addr = iroh.endpoint().node_addr().await.map_err(|e| {
+                warp::reject::custom(RpcBadRequest {
+                    message: format!("failed to get node address: {}", e),
+                })
+            })?;
+            Ok(warp::reply::with_status(
+                warp::reply::json(&ShardHashResponse {
+                    hash: hash.to_string(),
+                    node_addr,
+                }),
+                warp::http::StatusCode::OK,
+            ))
+        }
+        None => Ok(warp::reply::with_status(
+            warp::reply::json(&ErrorResponse {
+                error: "shard not found".to_string(),
+            }),
+            warp::http::StatusCode::NOT_FOUND,
+        )),
+    }
+}
+
+/// Response for shard pull request
+#[derive(serde::Serialize)]
+struct ShardPullResponse {
+    status: String,
+    shard_key: String,
+}
+
+/// Handle POST /v1/shards/pull
+///
+/// A distributor calls this to tell us to download a shard from them.
+/// We verify the shard is assigned to us, download from the gateway via Iroh,
+/// and generate a BLS signature once the download completes.
+async fn handle_shard_pull(
+    request: ShardPullRequest,
+    iroh: IrohNode,
+    signatures: SignatureStorage,
+    bls_private_key: BlsPrivateKey,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    // Parse blob_id
+    let blob_id_bytes = hex::decode(&request.blob_id).map_err(|_| {
+        warp::reject::custom(RpcBadRequest {
+            message: "invalid blob_id hex".to_string(),
+        })
+    })?;
+    if blob_id_bytes.len() != 32 {
+        return Err(warp::reject::custom(RpcBadRequest {
+            message: format!("blob_id must be 32 bytes, got {}", blob_id_bytes.len()),
+        }));
+    }
+    let mut blob_id_array = [0u8; 32];
+    blob_id_array.copy_from_slice(&blob_id_bytes);
+    let blob_id = BlobId(blob_id_array);
+
+    // Parse the shard's Iroh content hash
+    let hash = Hash::from_str(&request.hash).map_err(|_| {
+        warp::reject::custom(RpcBadRequest {
+            message: "invalid hash".to_string(),
+        })
+    })?;
+
+    // Verify this shard is assigned to us
+    // TODO: get the node list from on-chain state at encoding epoch.
+    // For now, we skip full assignment verification and accept the pull request.
+    // Once on-chain integration is in place, we'd call:
+    //   shard_verifier::verify_shard_assignment(
+    //       &blob_id, request.chunk_index, request.shard_index,
+    //       request.shards_per_chunk, &nodes, &our_node_id
+    //   )?;
+
+    let shard_key = crate::distribution::shard_key(
+        &blob_id,
+        request.chunk_index,
+        request.shard_index,
+    );
+
+    info!(
+        "Received shard pull request: {} (hash={})",
+        shard_key, hash
+    );
+
+    // Spawn a task to download from the gateway and sign on completion
+    let shard_key_clone = shard_key.clone();
+    tokio::spawn(async move {
+        let download_result = iroh
+            .blobs_client()
+            .download_with_opts(
+                hash,
+                iroh_blobs::rpc::client::blobs::DownloadOptions {
+                    format: iroh_blobs::BlobFormat::Raw,
+                    nodes: vec![request.source],
+                    tag: iroh_blobs::util::SetTagOption::Named(iroh_blobs::Tag(
+                        shard_key_clone.clone().into(),
+                    )),
+                    mode: iroh_blobs::rpc::client::blobs::DownloadMode::Queued,
+                },
+            )
+            .await;
+
+        match download_result {
+            Ok(progress) => match progress.finish().await {
+                Ok(outcome) => {
+                    info!(
+                        "Downloaded shard {} (downloaded: {} bytes, local: {} bytes, total: {} bytes)",
+                        shard_key_clone, outcome.downloaded_size, outcome.local_size,
+                        outcome.downloaded_size + outcome.local_size
+                    );
+
+                    // Verify shard content size
+                    match iroh.blobs_client().read_to_bytes(hash).await {
+                        Ok(bytes) => {
+                            info!(
+                                "Verified shard {} content: {} bytes",
+                                shard_key_clone, bytes.len()
+                            );
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to verify shard {} content: {}",
+                                shard_key_clone, e
+                            );
+                        }
+                    }
+
+                    // Generate BLS signature over the blob hash (not the shard hash)
+                    // The contract verifies signatures over the blob hash
+                    let blob_hash = Hash::from_bytes(blob_id.0);
+                    let signature = bls_private_key.sign(blob_hash.as_bytes());
+                    let signature_bytes = signature.as_bytes();
+
+                    // Store signature keyed by blob hash for gateway collection
+                    {
+                        let mut sigs = signatures.write().unwrap();
+                        sigs.insert(blob_hash, signature_bytes.clone());
+                    }
+
+                    info!(
+                        "Generated BLS signature for shard {} (blob_hash={})",
+                        shard_key_clone, blob_hash
+                    );
+                }
+                Err(e) => {
+                    warn!("Failed to complete shard {} download: {}", shard_key_clone, e);
+                }
+            },
+            Err(e) => {
+                warn!("Failed to start shard {} download: {}", shard_key_clone, e);
+            }
+        }
+    });
+
+    Ok(warp::reply::with_status(
+        warp::reply::json(&ShardPullResponse {
+            status: "accepted".to_string(),
+            shard_key,
+        }),
+        warp::http::StatusCode::ACCEPTED,
+    ))
+}
+
+#[derive(Debug)]
+struct RpcBadRequest {
+    message: String,
+}
+
+impl warp::reject::Reject for RpcBadRequest {}

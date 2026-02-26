@@ -1317,7 +1317,7 @@ dependencies = [
  "ff 0.13.1",
  "group 0.13.0",
  "log",
- "memmap2",
+ "memmap2 0.5.10",
  "pairing 0.23.0",
  "rand 0.8.5",
  "rand_core 0.6.4",
@@ -3386,6 +3386,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "erasure-encoding"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "memmap2 0.9.10",
+ "rand 0.8.5",
+ "reed-solomon-simd",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5243,7 +5255,7 @@ dependencies = [
  "iowrap",
  "lazy_static",
  "log",
- "memmap2",
+ "memmap2 0.5.10",
  "merkletree",
  "once_cell",
  "rand 0.8.5",
@@ -5309,6 +5321,12 @@ name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+
+[[package]]
+name = "fixedbitset"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flate2"
@@ -7315,9 +7333,11 @@ dependencies = [
  "anyhow",
  "async-trait",
  "blake2b_simd",
+ "blake3",
  "bls-signatures 0.13.1",
  "bytes",
  "clap 4.5.54",
+ "erasure-encoding",
  "ethers",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_bucket",
@@ -7340,8 +7360,6 @@ dependencies = [
  "prometheus",
  "prometheus_exporter",
  "rand 0.8.5",
- "recall_entangler",
- "recall_entangler_storage",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
@@ -9219,6 +9237,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memmap2"
+version = "0.9.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "714098028fe011992e1c3962653c96b2d578c4b4bce9036e15ff220319b1e0e3"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "merkle-tree-rs"
 version = "0.1.0"
 dependencies = [
@@ -9239,7 +9266,7 @@ dependencies = [
  "anyhow",
  "arrayref",
  "log",
- "memmap2",
+ "memmap2 0.5.10",
  "positioned-io",
  "rayon",
  "serde",
@@ -10418,7 +10445,7 @@ version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
 dependencies = [
- "fixedbitset",
+ "fixedbitset 0.4.2",
  "indexmap 2.13.0",
 ]
 
@@ -11590,44 +11617,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "recall_entangler"
-version = "0.1.0"
-source = "git+https://github.com/recallnet/entanglement.git?rev=aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc#aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytes",
- "cid 0.10.1",
- "futures",
- "iroh",
- "iroh-blobs",
- "recall_entangler_storage",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
-name = "recall_entangler_storage"
-version = "0.1.0"
-source = "git+https://github.com/recallnet/entanglement.git?rev=aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc#aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytes",
- "cid 0.10.1",
- "futures",
- "futures-lite 2.6.1",
- "iroh",
- "iroh-blobs",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "uuid 1.19.0",
-]
+name = "readme-rustdocifier"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08ad765b21a08b1a8e5cdce052719188a23772bcbefb3c439f0baaf62c56ceac"
 
 [[package]]
 name = "redb"
@@ -11665,6 +11658,18 @@ dependencies = [
  "getrandom 0.2.17",
  "libredox",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "reed-solomon-simd"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cffef0520d30fbd4151fb20e262947ae47fb0ab276a744a19b6398438105a072"
+dependencies = [
+ "cpufeatures",
+ "fixedbitset 0.5.7",
+ "once_cell",
+ "readme-rustdocifier",
 ]
 
 [[package]]
@@ -13393,7 +13398,7 @@ dependencies = [
  "itertools 0.13.0",
  "lazy_static",
  "log",
- "memmap2",
+ "memmap2 0.5.10",
  "merkletree",
  "num_cpus",
  "rand 0.8.5",
@@ -13431,7 +13436,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "memmap2",
+ "memmap2 0.5.10",
  "merkletree",
  "neptune",
  "num-bigint",
@@ -13483,7 +13488,7 @@ dependencies = [
  "generic-array 0.14.7",
  "lazy_static",
  "log",
- "memmap2",
+ "memmap2 0.5.10",
  "merkletree",
  "neptune",
  "rayon",

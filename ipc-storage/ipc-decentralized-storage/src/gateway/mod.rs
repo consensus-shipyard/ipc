@@ -104,6 +104,49 @@ impl BlobSignatureCollection {
     }
 }
 
+/// Default encoding parameters (must match actor defaults).
+const DEFAULT_DATA_SHARDS: usize = 4;
+const DEFAULT_PARITY_SHARDS: usize = 2;
+/// Must match erasure-encoding DEFAULT_MAX_CHUNK_SIZE.
+const MAX_CHUNK_SIZE: u64 = 16 * 1024 * 1024;
+
+/// Compute the set of unique assigned operator indices for a blob using the
+/// deterministic assignment formula from erasure-encoding.
+fn assigned_operator_indices(
+    blob_hash: &B256,
+    blob_size: u64,
+    data_shards: usize,
+    parity_shards: usize,
+    num_operators: usize,
+) -> HashSet<usize> {
+    if num_operators == 0 {
+        return HashSet::new();
+    }
+    let shards_per_chunk = data_shards + parity_shards;
+    let num_chunks = if blob_size == 0 {
+        1
+    } else {
+        ((blob_size + MAX_CHUNK_SIZE - 1) / MAX_CHUNK_SIZE) as usize
+    };
+    // rotation_offset = blob_hash (big-endian) % num_operators
+    let rotation_offset = {
+        let mut remainder: u64 = 0;
+        for &byte in &blob_hash.0 {
+            remainder = (remainder * 256 + byte as u64) % num_operators as u64;
+        }
+        remainder as usize
+    };
+    let mut indices = HashSet::new();
+    for chunk_idx in 0..num_chunks {
+        for shard_idx in 0..shards_per_chunk {
+            let shard_global = chunk_idx * shards_per_chunk + shard_idx;
+            let node_index = (shard_global + rotation_offset) % num_operators;
+            indices.insert(node_index);
+        }
+    }
+    indices
+}
+
 /// Default gas parameters for transactions
 fn default_gas_params() -> GasParams {
     GasParams {
@@ -337,14 +380,28 @@ where
                 continue;
             }
 
-            let threshold = (total_operators * 2 + 2) / 3; // Ceiling of 2/3
+            // Compute the set of assigned operator indices for this blob
+            let assigned = assigned_operator_indices(
+                &hash,
+                collection.blob_metadata.size,
+                DEFAULT_DATA_SHARDS,
+                DEFAULT_PARITY_SHARDS,
+                total_operators,
+            );
+            let assigned_count = assigned.len();
+            let threshold = (assigned_count * 2 + 2) / 3; // Ceiling of 2/3
 
             // Collect signatures that aren't already attempted
             let attempted_operators = collection.attempted_operators.clone();
 
-            // Build list of (index, operator_addr, rpc_url) for operators we need to query
+            // Build list of (index, operator_addr, rpc_url) for assigned operators we need to query
             let mut fetch_tasks = Vec::new();
             for (index, operator_addr) in operators.iter().enumerate() {
+                // Only query operators assigned to this blob
+                if !assigned.contains(&index) {
+                    continue;
+                }
+
                 // Skip if already collected
                 if attempted_operators.contains(&index) {
                     continue;
@@ -417,8 +474,8 @@ where
                 }
 
                 info!(
-                    "Collected {}/{} signatures for blob {} (threshold: {})",
-                    num_collected, total_operators, hash, threshold
+                    "Collected {}/{} signatures for blob {} (threshold: {}, total operators: {})",
+                    num_collected, assigned_count, hash, threshold, total_operators
                 );
 
                 // Get metadata before calling finalize_blob
@@ -469,7 +526,7 @@ where
                 } else {
                     debug!(
                         "Blob {} progress: {}/{} signatures (threshold: {})",
-                        hash, num_collected, total_operators, threshold
+                        hash, num_collected, assigned_count, threshold
                     );
                 }
             }

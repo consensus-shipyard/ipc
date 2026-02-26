@@ -28,6 +28,10 @@ pub struct AddBlobStateParams {
     pub epoch: ChainEpoch,
     /// Token amount sent with the transaction.
     pub token_amount: TokenAmount,
+    /// Number of data shards per chunk for erasure encoding (k).
+    pub data_shards: u16,
+    /// Number of parity shards per chunk for erasure encoding (m).
+    pub parity_shards: u16,
 }
 
 impl AddBlobStateParams {
@@ -45,6 +49,8 @@ impl AddBlobStateParams {
             ttl: params.ttl,
             epoch,
             token_amount,
+            data_shards: params.data_shards,
+            parity_shards: params.parity_shards,
         }
     }
 }

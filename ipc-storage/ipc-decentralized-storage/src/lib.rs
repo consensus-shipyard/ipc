@@ -6,6 +6,8 @@
 //! This crate provides decentralized storage abstractions and implementations
 //! for the IPC (Inter-Planetary Consensus) system.
 
+pub mod distribution;
 pub mod gateway;
 pub mod node;
 pub mod objects;
+pub mod retrieval;
