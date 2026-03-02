@@ -129,6 +129,8 @@ impl AbiCall for sol::addObject_0Call {
             ttl: None,
             metadata: HashMap::default(),
             overwrite: false,
+            data_shards: self.dataShards,
+            parity_shards: self.parityShards,
         }
     }
 
@@ -166,6 +168,8 @@ impl AbiCall for sol::addObject_1Call {
             ttl,
             metadata,
             overwrite,
+            data_shards: self.dataShards,
+            parity_shards: self.parityShards,
         }
     }
     fn returns(&self, returns: Self::Returns) -> Self::Output {

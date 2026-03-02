@@ -319,6 +319,39 @@ body {
   max-width: 300px;
 }
 
+/* Upload Config */
+.upload-config {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+}
+
+.upload-config-header {
+  margin-bottom: 0.75rem;
+}
+
+.upload-config-fields {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.upload-config-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.upload-config-label .input {
+  width: 70px;
+}
+
+.upload-config-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 /* File List */
 .file-list {
   overflow-x: auto;

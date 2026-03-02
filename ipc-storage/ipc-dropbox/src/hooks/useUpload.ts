@@ -48,7 +48,7 @@ export function useUpload(signer: ethers.Signer | null, bucketAddress: string | 
     return false;
   }, [signer]);
 
-  const uploadFile = useCallback(async (file: File, targetPath: string) => {
+  const uploadFile = useCallback(async (file: File, targetPath: string, dataShards: number = 4, parityShards: number = 2) => {
     if (!signer || !bucketAddress) {
       setError('Wallet or bucket not connected');
       return false;
@@ -109,7 +109,9 @@ export function useUpload(signer: ethers.Signer | null, bucketAddress: string | 
         fullPath,
         blobHash,
         metadataHash,
-        BigInt(file.size)
+        BigInt(file.size),
+        dataShards,
+        parityShards
       );
 
       setUploadProgress('Waiting for transaction confirmation...');
