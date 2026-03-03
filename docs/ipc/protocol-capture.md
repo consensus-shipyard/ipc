@@ -52,7 +52,7 @@ IPC subnets are full, sufficiently **decentralized** blockchains **owning their 
 | [Rootnet](#rootnet) | Blockchain with no parent (e.g., Filecoin) |
 | [Subnet ID](#subnet-id) | Address identifying the subnet (root chain ID + route of subnet actor addresses) |
 | [Checkpoint](#checkpoint) | Periodic commitment of subnet state to parent; cryptographic reference to finalized chain head |
-| [Cross-net messages](#cross-net-message) | Messages between chains; top-down (deposits) and bottom-up (withdrawals) |
+| [Cross-net messages](#cross-net-message) | Messages between chains; top-down (e.g., deposits) and bottom-up (e.g., withdrawals) |
 
 > **Note**: Currently, cross-net messages are supported for directly linked chains only (single-hop parent↔subnet). See [Primitives & Definitions](#primitives--definitions) for fuller definitions.
 >
