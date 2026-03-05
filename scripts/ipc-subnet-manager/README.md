@@ -37,11 +37,10 @@ alias ipc-manager='/usr/local/bin/bash /path/to/ipc-subnet-manager.sh'
 
 ### Remote Validators
 - Ubuntu/Debian-based Linux
-- `ipc-cli` binary installed
-- `cometbft` binary in PATH
-- User with sudo access (default: `philip`)
-- IPC user (default: `ipc`)
+- User with passwordless sudo access (default: `philip`)
 - SSH key-based authentication configured
+- **Option A**: Run `bootstrap` command to install everything (Rust, Foundry, Node.js, IPC)
+- **Option B**: Manually install `ipc-cli` and ensure `cometbft` is in PATH
 
 ## Installation
 

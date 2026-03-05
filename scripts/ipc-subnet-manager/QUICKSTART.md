@@ -49,7 +49,17 @@ If you have existing nodes running, check their health:
 ./ipc-subnet-manager.sh check
 ```
 
-## 5. Initialize Subnet
+## 5. Bootstrap Hosts (Fresh VMs Only)
+
+If your validator hosts are fresh (no IPC installed), run bootstrap first:
+
+```bash
+./ipc-subnet-manager.sh bootstrap --branch main
+```
+
+This installs Rust, Foundry, Node.js, and builds IPC on each host. Takes ~15-30 min per host.
+
+## 6. Initialize Subnet
 
 ⚠️ **WARNING**: This will destroy all existing data!
 
@@ -61,7 +71,7 @@ If you have existing nodes running, check their health:
 ./ipc-subnet-manager.sh init
 ```
 
-## 6. Monitor Progress
+## 7. Monitor Progress
 
 ```bash
 # Check health
@@ -74,6 +84,9 @@ If you have existing nodes running, check their health:
 ## Common Commands
 
 ```bash
+# Bootstrap fresh hosts (run first on new VMs)
+./ipc-subnet-manager.sh bootstrap --branch main
+
 # Initialize subnet from scratch
 ./ipc-subnet-manager.sh init
 
