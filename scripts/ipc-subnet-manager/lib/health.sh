@@ -62,12 +62,39 @@ start_validator_node() {
     local name="${VALIDATORS[$validator_idx]}"
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local node_home=$(get_node_home "$validator_idx")
+    local resolver_port=$(get_resolver_port_for_validator "$validator_idx")
+    local subnet_id=$(get_config_value "subnet.id")
 
     log_info "Starting $name..."
 
-    # Start node in background
-    exec_on_host "$validator_idx" \
-        "nohup $ipc_binary node start --home $node_home > $node_home/node.log 2>&1 &"
+    # Use wrapper script to set env vars reliably (avoids SSH quoting issues with sudo su -c '...').
+    # resolver_enabled() requires: !listen_addr.is_empty() && subnet_id != UNDEF
+    local resolver_listen="/ip4/0.0.0.0/tcp/$resolver_port"
+    local start_script="$node_home/start-node.sh"
+
+    if is_local_mode; then
+        # Local: run directly with env vars
+        (
+            export FM_RESOLVER__CONNECTION__LISTEN_ADDR="$resolver_listen"
+            [ -n "$subnet_id" ] && export FM_IPC__SUBNET_ID="$subnet_id"
+            nohup "$ipc_binary" node start --home "$node_home" > "$node_home/node.log" 2>&1 &
+        )
+    else
+        # Remote: create script, copy, run (avoids ssh -c quoting of multiaddr/subnet_id)
+        local tmp_script=$(mktemp)
+        cat > "$tmp_script" << EOF
+#!/bin/bash
+export FM_RESOLVER__CONNECTION__LISTEN_ADDR="$resolver_listen"
+EOF
+        [ -n "$subnet_id" ] && echo "export FM_IPC__SUBNET_ID=\"$subnet_id\"" >> "$tmp_script"
+        cat >> "$tmp_script" << EOF
+
+nohup $ipc_binary node start --home $node_home > $node_home/node.log 2>&1 &
+EOF
+        copy_to_host "$validator_idx" "$tmp_script" "$start_script"
+        rm -f "$tmp_script"
+        exec_on_host "$validator_idx" "chmod +x $start_script && $start_script"
+    fi
 }
 
 initialize_primary_node() {
@@ -983,7 +1010,8 @@ show_subnet_info() {
 
     # Check critical infrastructure for parent finality voting
     log_info "Libp2p Infrastructure (required for voting):"
-    local libp2p_port=$(get_config_value "network.libp2p_port")
+    # Use get_resolver_port_for_validator - node init uses libp2p_port-1 for resolver (port_offset pattern)
+    local libp2p_port=$(get_resolver_port_for_validator 0)
 
     # Check if libp2p port is listening and on correct address
     local libp2p_listening=$(exec_on_host 0 \
@@ -1049,19 +1077,21 @@ show_subnet_info() {
     for idx in "${!VALIDATORS[@]}"; do
         local v_name="${VALIDATORS[$idx]}"
         local v_ip=$(get_config_value "validators[$idx].ip")
+        local v_peer_ip=$(get_peer_ip "$idx")
+        local v_resolver_port=$(get_resolver_port_for_validator "$idx")
         local v_node_home=$(get_node_home "$idx")
 
         log_info "  $v_name ($v_ip):"
 
-        # Get external_addresses
+        # Get external_addresses (config uses peer_ip/internal_ip for VPC, resolver_port for actual port)
         local ext_addrs=$(exec_on_host "$idx" \
             "grep external_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null" 2>/dev/null)
 
-        if [ -n "$ext_addrs" ] && echo "$ext_addrs" | grep -q "/ip4/$v_ip/tcp/$libp2p_port"; then
-            log_info "    ✓ external_addresses: Contains own IP ($v_ip)"
+        if [ -n "$ext_addrs" ] && echo "$ext_addrs" | grep -q "/ip4/$v_peer_ip/tcp/$v_resolver_port"; then
+            log_info "    ✓ external_addresses: Contains peer address ($v_peer_ip:$v_resolver_port)"
         elif [ -n "$ext_addrs" ]; then
             log_warn "    ✗ external_addresses: $(echo "$ext_addrs" | cut -c1-80)"
-            log_warn "      Expected to contain: /ip4/$v_ip/tcp/$libp2p_port"
+            log_warn "      Expected to contain: /ip4/$v_peer_ip/tcp/$v_resolver_port"
         else
             log_warn "    ✗ external_addresses: Not set or empty"
         fi
@@ -1071,12 +1101,12 @@ show_subnet_info() {
             "grep static_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null" 2>/dev/null)
 
         if [ -n "$static_addrs" ]; then
-            # Count how many peer IPs are in static_addresses
+            # Count how many peer IPs are in static_addresses (use get_peer_ip for VPC internal IPs)
             local peer_count=0
             for peer_idx in "${!VALIDATORS[@]}"; do
                 if [ "$peer_idx" != "$idx" ]; then
-                    local peer_ip=$(get_config_value "validators[$peer_idx].ip")
-                    if echo "$static_addrs" | grep -q "/ip4/$peer_ip/tcp/$libp2p_port"; then
+                    local peer_ip=$(get_peer_ip "$peer_idx")
+                    if echo "$static_addrs" | grep -q "/ip4/$peer_ip/tcp/$v_resolver_port"; then
                         peer_count=$((peer_count + 1))
                     fi
                 fi
@@ -1096,12 +1126,12 @@ show_subnet_info() {
 
         # Check if libp2p connections are actually established
         local libp2p_connections=$(exec_on_host "$idx" \
-            "ss -tn | grep :$libp2p_port | grep ESTAB | wc -l" 2>/dev/null | tr -d ' \n\r')
+            "ss -tn | grep :$v_resolver_port | grep ESTAB | wc -l" 2>/dev/null | tr -d ' \n\r')
 
         if [ -n "$libp2p_connections" ] && [ "$libp2p_connections" -gt 0 ] 2>/dev/null; then
             log_info "    ✓ Active libp2p connections: $libp2p_connections"
         else
-            log_warn "    ✗ No active libp2p connections (firewall blocking port $libp2p_port?)"
+            log_warn "    ✗ No active libp2p connections (firewall blocking port $v_resolver_port?)"
         fi
     done
     echo
@@ -1748,6 +1778,7 @@ update_validator_binaries() {
         git fetch origin && \
         git checkout $branch && \
         git pull origin $branch && \
+        cargo clean && \
         make"
 
     log_info "[$name] Pulling latest changes and building..."
