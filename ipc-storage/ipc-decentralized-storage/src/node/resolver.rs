@@ -276,6 +276,7 @@ struct ShardHashLookupResponse {
 /// 2. Checks which are already stored locally
 /// 3. For missing shards, queries other operators for the shard hash and downloads via Iroh P2P
 /// 4. Signs the blob hash with BLS key once all assigned shards are present
+#[allow(clippy::too_many_arguments)]
 pub async fn resolve_blob_shards(
     iroh: IrohNode,
     blob_hash: fendermint_actor_blobs_shared::bytes::B256,

@@ -126,7 +126,7 @@ fn assigned_operator_indices(
     let num_chunks = if blob_size == 0 {
         1
     } else {
-        ((blob_size + MAX_CHUNK_SIZE - 1) / MAX_CHUNK_SIZE) as usize
+        blob_size.div_ceil(MAX_CHUNK_SIZE) as usize
     };
     // rotation_offset = blob_hash (big-endian) % num_operators
     let rotation_offset = {

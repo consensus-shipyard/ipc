@@ -214,7 +214,7 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
     });
 
     // Determine this node's NodeId from its Iroh identity
-    let our_node_id = NodeId(node_addr.node_id.as_bytes().clone());
+    let our_node_id = NodeId(*node_addr.node_id.as_bytes());
     info!("Our NodeId: {:?}", hex::encode(our_node_id.0));
 
     // Operator directory cache (refreshed periodically)
@@ -265,7 +265,7 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
         // Refresh operator directory cache if stale or missing
         let cache_stale = op_cache
             .as_ref()
-            .map_or(true, |c| c.last_refresh.elapsed() > cache_refresh_interval);
+            .is_none_or(|c| c.last_refresh.elapsed() > cache_refresh_interval);
 
         if cache_stale {
             match build_node_directories(&gateway).await {

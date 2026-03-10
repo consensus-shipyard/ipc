@@ -658,9 +658,9 @@ async fn handle_shard_pull(
     ))
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct RpcBadRequest {
-    #[warn(dead_code)]
     message: String,
 }
 
