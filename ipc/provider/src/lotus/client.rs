@@ -8,7 +8,6 @@ use std::sync::{Arc, RwLock};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use base64::Engine;
-use cid::multihash::MultihashDigest;
 use cid::Cid;
 use fvm_ipld_encoding::{to_vec, RawBytes};
 use fvm_shared::address::Address;
@@ -18,12 +17,14 @@ use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
 use ipc_wallet::Wallet;
+use multihash_codetable::{Code, MultihashDigest};
 use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 use crate::lotus::message::chain::{ChainHeadResponse, GetTipSetByHeightResponse};
+use crate::lotus::message::f3::{F3CertificateResponse, F3PowerTableResponse};
 use crate::lotus::message::mpool::{
     EstimateGasResponse, MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
 };
@@ -51,6 +52,8 @@ mod methods {
     pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
     pub const GET_TIPSET_BY_HEIGHT: &str = "Filecoin.ChainGetTipSetByHeight";
     pub const ESTIMATE_MESSAGE_GAS: &str = "Filecoin.GasEstimateMessageGas";
+    pub const F3_GET_LATEST_CERTIFICATE: &str = "Filecoin.F3GetLatestCertificate";
+    pub const F3_GET_POWER_TABLE_BY_INSTANCE: &str = "Filecoin.F3GetPowerTableByInstance";
 }
 
 /// The default state wait confidence value
@@ -348,6 +351,29 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         tracing::debug!("received get_tipset_by_height response: {r:?}");
         Ok(r)
     }
+
+    async fn f3_get_certificate(&self) -> Result<Option<F3CertificateResponse>> {
+        // refer to: Filecoin.F3GetLatestCertificate
+        let r = self
+            .client
+            .request::<Option<F3CertificateResponse>>(methods::F3_GET_LATEST_CERTIFICATE, NO_PARAMS)
+            .await?;
+        tracing::debug!("received f3_get_latest_certificate response: {r:?}");
+        Ok(r)
+    }
+
+    async fn f3_get_power_table(&self, instance_id: u64) -> Result<F3PowerTableResponse> {
+        // refer to: Filecoin.F3GetPowerTableByInstance
+        let r = self
+            .client
+            .request::<F3PowerTableResponse>(
+                methods::F3_GET_POWER_TABLE_BY_INSTANCE,
+                json!([instance_id]),
+            )
+            .await?;
+        tracing::debug!("received f3_get_power_table_by_instance response: {r:?}");
+        Ok(r)
+    }
 }
 
 impl<T: JsonRpcClient + Send + Sync> LotusJsonRPCClient<T> {
@@ -387,7 +413,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusJsonRPCClient<T> {
                 .clone(),
         };
 
-        let hash = cid::multihash::Code::Blake2b256.digest(&to_vec(&message)?);
+        let hash = Code::Blake2b256.digest(&to_vec(&message)?);
         let msg_cid = Cid::new_v1(fvm_ipld_encoding::DAG_CBOR, hash).to_bytes();
 
         let mut wallet_store = self.wallet_store.as_ref().unwrap().write().unwrap();

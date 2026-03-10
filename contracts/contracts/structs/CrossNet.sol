@@ -12,26 +12,6 @@ struct ParentFinality {
     bytes32 blockHash;
 }
 
-/// @notice A bottom-up checkpoint type.
-struct BottomUpCheckpoint {
-    /// @dev Child subnet ID, for replay protection from other subnets where the exact same validators operate.
-    /// Alternatively it can be appended to the hash before signing, similar to how we use the chain ID.
-    SubnetID subnetID;
-    /// @dev The height of the child subnet at which this checkpoint was cut.
-    /// Has to follow the previous checkpoint by checkpoint period.
-    uint256 blockHeight;
-    /// @dev The hash of the block.
-    bytes32 blockHash;
-    /// @dev The number of the membership (validator set) which is going to sign the next checkpoint.
-    /// This one expected to be signed by the validators from the membership reported in the previous checkpoint.
-    /// 0 could mean "no change".
-    uint64 nextConfigurationNumber;
-    /// @dev Batch of messages to execute.
-    BottomUpBatch.Commitment msgs;
-    /// @dev The activity rollup from child subnet to parent subnet.
-    CompressedActivityRollup activity;
-}
-
 /// @notice A batch of bottom-up messages for execution.
 struct BottomUpMsgBatch {
     /// @dev Child subnet ID, for replay protection from other subnets where the exact same validators operate.

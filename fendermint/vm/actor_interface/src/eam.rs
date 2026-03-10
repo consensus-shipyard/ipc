@@ -3,7 +3,6 @@
 
 use std::fmt::{Debug, Display};
 
-use cid::multihash::MultihashDigest;
 use fendermint_crypto::PublicKey;
 use fvm_ipld_encoding::{
     strict_bytes,
@@ -13,6 +12,7 @@ use fvm_shared::{
     address::{Address, Error, SECP_PUB_LEN},
     ActorID, METHOD_CONSTRUCTOR,
 };
+use multihash_codetable::{Code, MultihashDigest};
 
 define_singleton!(EAM {
     id: 10,
@@ -54,7 +54,7 @@ impl EthAddress {
         }
         let mut hash20 = [0u8; 20];
         // Based on [ethers_core::utils::secret_key_to_address]
-        let hash32 = cid::multihash::Code::Keccak256.digest(&pubkey[1..]);
+        let hash32 = Code::Keccak256.digest(&pubkey[1..]);
         hash20.copy_from_slice(&hash32.digest()[12..]);
         Ok(Self(hash20))
     }

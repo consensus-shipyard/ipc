@@ -19,6 +19,7 @@ integer-encoding = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
 cid = { workspace = true }
+multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
 num-traits = { workspace = true }
 num_enum = { workspace = true }
 serde = { workspace = true }

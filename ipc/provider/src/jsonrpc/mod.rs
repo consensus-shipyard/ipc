@@ -86,7 +86,7 @@ impl JsonRpcClient for JsonRpcClientImpl {
                 anyhow!(
                     "cannot parse json rpc response: {:} due to {:}",
                     response_body,
-                    e.to_string()
+                    e
                 )
             })?;
 

@@ -6,7 +6,7 @@ import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActo
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {SubnetID, Subnet, AssetKind, Asset} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
-import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, ParentFinality} from "../structs/CrossNet.sol";
 import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -29,6 +29,7 @@ library LibGateway {
 
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
+    // Keep in sync with the event signature in the proof-service: fendermint/vm/topdown/proof-service/src/assembler.rs:NEW_TOPDOWN_MESSAGE_SIGNATURE
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id);
     /// @dev event emitted when there is a new bottom-up message added to the batch.
     /// @dev there is no need to emit the message itself, as the message is included in batch.
@@ -40,31 +41,6 @@ library LibGateway {
     /// @dev event emmitted when a message is propagated further from the postbox.
     event MessagePropagatedFromPostbox(bytes32 id);
 
-    /// @notice returns the current bottom-up checkpoint
-    /// @return exists - whether the checkpoint exists
-    /// @return epoch - the epoch of the checkpoint
-    /// @return checkpoint - the checkpoint struct
-    function getCurrentBottomUpCheckpoint()
-        internal
-        view
-        returns (bool exists, uint256 epoch, BottomUpCheckpoint memory checkpoint)
-    {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        epoch = LibGateway.getNextEpoch(block.number, s.bottomUpCheckPeriod);
-        checkpoint = s.bottomUpCheckpoints[epoch];
-        exists = !checkpoint.subnetID.isEmpty();
-    }
-
-    /// @notice returns the bottom-up checkpoint
-    function getBottomUpCheckpoint(
-        uint256 epoch
-    ) internal view returns (bool exists, BottomUpCheckpoint storage checkpoint) {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-
-        checkpoint = s.bottomUpCheckpoints[epoch];
-        exists = checkpoint.blockHeight != 0;
-    }
-
     /// @notice returns the bottom-up batch
     function getBottomUpMsgBatch(uint256 epoch) internal view returns (bool exists, BottomUpMsgBatch storage batch) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
@@ -74,28 +50,9 @@ library LibGateway {
     }
 
     /// @notice checks if the bottom-up checkpoint already exists at the target epoch
-    function bottomUpCheckpointExists(uint256 epoch) internal view returns (bool) {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        return s.bottomUpCheckpoints[epoch].blockHeight != 0;
-    }
-
-    /// @notice checks if the bottom-up checkpoint already exists at the target epoch
     function bottomUpBatchMsgsExists(uint256 epoch) internal view returns (bool) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         return s.bottomUpMsgBatches[epoch].blockHeight != 0;
-    }
-
-    /// @notice stores checkpoint
-    function storeBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint) internal {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-
-        BottomUpCheckpoint storage b = s.bottomUpCheckpoints[checkpoint.blockHeight];
-        b.blockHash = checkpoint.blockHash;
-        b.subnetID = checkpoint.subnetID;
-        b.nextConfigurationNumber = checkpoint.nextConfigurationNumber;
-        b.blockHeight = checkpoint.blockHeight;
-        b.activity = checkpoint.activity;
-        b.msgs = checkpoint.msgs;
     }
 
     /// @notice stores bottom-up batch

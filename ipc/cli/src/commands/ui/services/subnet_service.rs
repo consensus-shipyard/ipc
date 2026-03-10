@@ -12,39 +12,6 @@ use ipc_api::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
 use std::str::FromStr;
 
-/// Subnet information for UI display
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SubnetInfo {
-    pub id: String,
-    pub parent_id: String,
-    pub name: Option<String>,
-    pub permission_mode: String,
-    pub min_validators: u64,
-    pub validators: Vec<ValidatorInfo>,
-    pub total_collateral: String,
-    pub circulating_supply: String,
-    pub is_active: bool,
-    pub block_height: u64,
-    pub checkpoint_period: u64,
-}
-
-/// Validator information for UI display
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ValidatorInfo {
-    pub address: String,
-    pub stake: String,
-    pub is_active: bool,
-    pub federated_power: Option<u64>,
-    pub metadata: Option<ValidatorMetadata>,
-}
-
-/// Validator metadata
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ValidatorMetadata {
-    pub network_address: Option<String>,
-    pub public_key: Option<String>,
-}
-
 /// Service for subnet management operations
 pub struct SubnetService {
     global: GlobalArguments,
@@ -2136,8 +2103,9 @@ impl SubnetService {
             join: join_config,
             p2p: Some(P2pConfig {
                 external_ip: Some("127.0.0.1".to_string()), // Default external IP for user to modify
-                ports: None,                                // Let user configure ports
-                peers: None,                                // Let user configure peers
+                listen_ip: Some("0.0.0.0".to_string()), // Default listen IP (binds to all interfaces)
+                ports: None,                            // Let user configure ports
+                peers: None,                            // Let user configure peers
             }),
             cometbft_overrides: None,
             fendermint_overrides: None,

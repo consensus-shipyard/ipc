@@ -25,6 +25,9 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+tokio-stream = { workspace = true }
+unsigned-varint = "0.7"
+multihash-codetable = { version = "0.1.4", features = ["sha2"] }
 
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
@@ -39,13 +42,18 @@ fvm_shared = { workspace = true, optional = true, features = ["arb"] }
 
 fendermint_vm_interpreter = { path = "../interpreter" }
 fendermint_vm_core = { path = "../core", optional = true }
-fendermint_testing = { path = "../../testing", features = ["arb"], optional = true }
+fendermint_testing = { path = "../../testing", features = [
+  "arb",
+], optional = true }
 
 
 [dev-dependencies]
 fvm = { workspace = true }
 fendermint_testing = { path = "../../testing", features = ["golden"] }
-fendermint_vm_interpreter = { path = "../interpreter", features = ["bundle", "test-util"] }
+fendermint_vm_interpreter = { path = "../interpreter", features = [
+  "bundle",
+  "test-util",
+] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
 fendermint_vm_snapshot = { path = ".", features = ["arb"] }
 actors-custom-car = { path = "../../actors-custom-car" }

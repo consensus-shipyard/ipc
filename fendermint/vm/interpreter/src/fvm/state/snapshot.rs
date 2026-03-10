@@ -1,24 +1,24 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::fvm::end_block_hook::LightClientCommitments;
 use crate::fvm::state::FvmStateParams;
 use crate::fvm::store::ReadOnlyBlockstore;
 use anyhow::anyhow;
-use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use futures_core::Stream;
 use fvm::state_tree::StateTree;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::{load_car, load_car_unchecked, CarHeader};
-use fvm_ipld_encoding::{from_slice, CborStore, DAG_CBOR};
+use fvm_ipld_encoding::{CborStore, DAG_CBOR};
 use libipld::Ipld;
+use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio_stream::StreamExt;
-use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 pub type BlockHeight = u64;
 pub type SnapshotVersion = u32;
@@ -44,7 +44,7 @@ where
 {
     pub fn new(
         store: BS,
-        state_params: FvmStateParams,
+        state_params: SnapshotPayload,
         block_height: BlockHeight,
     ) -> anyhow::Result<Self> {
         Ok(Self::V1(V1Snapshot::new(
@@ -66,12 +66,13 @@ where
         store: BS,
         validate: bool,
     ) -> anyhow::Result<Self> {
-        let file = tokio::fs::File::open(path).await?;
+        // In FVM 4.7, load_car is synchronous, read file into memory first
+        let bytes = tokio::fs::read(path).await?;
 
         let roots = if validate {
-            load_car(&store, file.compat()).await?
+            load_car(&store, std::io::Cursor::new(&bytes))?
         } else {
-            load_car_unchecked(&store, file.compat()).await?
+            load_car_unchecked(&store, std::io::Cursor::new(&bytes))?
         };
 
         if roots.len() != 1 {
@@ -100,7 +101,8 @@ where
     /// one can query the version and root data cid. Based on the version, one can parse the underlying
     /// data of the snapshot from the root cid.
     pub async fn write_car(self, path: impl AsRef<Path>) -> anyhow::Result<()> {
-        let file = tokio::fs::File::create(path).await?;
+        // Clone path early since we need it for the blocking task
+        let path_clone = path.as_ref().to_path_buf();
 
         // derive the metadata for the car file, so that the snapshot version can be recorded.
         let (metadata, snapshot_streamer) = self.into_streamer()?;
@@ -109,14 +111,26 @@ where
         // create the target car header with the metadata cid as the only root
         let car = CarHeader::new(vec![metadata_cid], 1);
 
-        // create the stream to stream all the data into the car file
+        // In FVM 4.7, CAR API is synchronous, collect stream first
         let mut streamer =
             tokio_stream::iter(vec![(metadata_cid, metadata_bytes)]).merge(snapshot_streamer);
 
-        let write_task = tokio::spawn(async move {
-            let mut write = file.compat_write();
-            car.write_stream_async(&mut Pin::new(&mut write), &mut streamer)
-                .await
+        // Collect all blocks from the stream
+        use tokio_stream::StreamExt;
+        let mut blocks = Vec::new();
+        while let Some((cid, data)) = streamer.next().await {
+            blocks.push((cid, data));
+        }
+
+        // Write synchronously in a blocking task
+        let write_task = tokio::task::spawn_blocking(move || {
+            use fvm_ipld_car::{Block, CarWriter};
+            let file_std = std::fs::File::create(path_clone)?;
+            let mut writer = CarWriter::new(car, file_std)?;
+            for (cid, data) in blocks {
+                writer.write(Block { cid, data })?;
+            }
+            Ok::<_, anyhow::Error>(())
         });
 
         write_task.await??;
@@ -143,11 +157,17 @@ where
 pub struct V1Snapshot<BS> {
     /// The state tree of the current blockchain
     state_tree: StateTree<ReadOnlyBlockstore<BS>>,
-    state_params: FvmStateParams,
+    payload: SnapshotPayload,
     block_height: BlockHeight,
 }
 
-pub type BlockStateParams = (FvmStateParams, BlockHeight);
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct SnapshotPayload {
+    pub state: FvmStateParams,
+    pub light_client_commitments: Option<LightClientCommitments>,
+}
+
+pub type BlockStateParams = (SnapshotPayload, BlockHeight);
 
 impl<BS> V1Snapshot<BS>
 where
@@ -156,28 +176,28 @@ where
     /// Creates a new V2Snapshot struct. Caller ensure store
     pub fn new(
         store: BS,
-        state_params: FvmStateParams,
+        payload: SnapshotPayload,
         block_height: BlockHeight,
     ) -> anyhow::Result<Self> {
         let state_tree =
-            StateTree::new_from_root(ReadOnlyBlockstore::new(store), &state_params.state_root)?;
+            StateTree::new_from_root(ReadOnlyBlockstore::new(store), &payload.state.state_root)?;
 
         Ok(Self {
             state_tree,
-            state_params,
+            payload,
             block_height,
         })
     }
 
     fn from_root(store: BS, root_cid: Cid) -> anyhow::Result<Self> {
-        if let Some((state_params, block_height)) = store.get_cbor::<BlockStateParams>(&root_cid)? {
-            let state_tree_root = state_params.state_root;
+        if let Some((payload, block_height)) = store.get_cbor::<BlockStateParams>(&root_cid)? {
+            let state_tree_root = payload.state.state_root;
             Ok(Self {
                 state_tree: StateTree::new_from_root(
                     ReadOnlyBlockstore::new(store),
                     &state_tree_root,
                 )?,
-                state_params,
+                payload,
                 block_height,
             })
         } else {
@@ -189,9 +209,9 @@ where
     }
 
     fn into_streamer(self) -> anyhow::Result<(Cid, SnapshotStreamer)> {
-        let state_tree_root = self.state_params.state_root;
+        let state_tree_root = self.payload.state.state_root;
 
-        let block_state_params = (self.state_params, self.block_height);
+        let block_state_params = (self.payload, self.block_height);
         let bytes = fvm_ipld_encoding::to_vec(&block_state_params)?;
         let root_cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes));
 
@@ -207,8 +227,8 @@ where
         self.block_height
     }
 
-    pub fn state_params(&self) -> &FvmStateParams {
-        &self.state_params
+    pub fn state_params(&self) -> &SnapshotPayload {
+        &self.payload
     }
 }
 
@@ -247,11 +267,22 @@ impl<BS: Blockstore> Stream for StateTreeStreamer<BS> {
                     // Not all data in the blockstore is traversable, e.g.
                     // Wasm bytecode is inserted as IPLD_RAW here: https://github.com/filecoin-project/builtin-actors-bundler/blob/bf6847b2276ee8e4e17f8336f2eb5ab2fce1d853/src/lib.rs#L54C71-L54C79
                     if cid.codec() == DAG_CBOR {
-                        // XXX: Is it okay to panic?
-                        let ipld =
-                            from_slice::<Ipld>(&bytes).expect("blocktore stores IPLD encoded data");
+                        // libipld has its own codec, use that instead of fvm_ipld_encoding
+                        use libipld::cbor::DagCborCodec;
+                        use libipld::codec::Codec;
 
-                        walk_ipld_cids(ipld, &mut this.dfs);
+                        let codec = DagCborCodec;
+                        match codec.decode::<Ipld>(&bytes) {
+                            Ok(ipld) => {
+                                walk_ipld_cids(ipld, &mut this.dfs);
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Failed to decode DAG-CBOR at {}: {}. This may result in incomplete snapshot traversal.",
+                                    cid, e
+                                );
+                            }
+                        }
                     }
                     return Poll::Ready(Some((cid, bytes)));
                 }
@@ -281,7 +312,20 @@ fn walk_ipld_cids(ipld: Ipld, dfs: &mut VecDeque<Cid>) {
                 walk_ipld_cids(v, dfs);
             }
         }
-        Ipld::Link(cid) => dfs.push_back(cid),
+        Ipld::Link(libipld_cid) => {
+            // Convert libipld::Cid (cid 0.10) to Cid (cid 0.11)
+            let bytes = libipld_cid.to_bytes();
+            match Cid::try_from(bytes.as_slice()) {
+                Ok(fvm_cid) => dfs.push_back(fvm_cid),
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to convert libipld CID to FVM CID during traversal: {}. CID: {}",
+                        e,
+                        libipld_cid
+                    );
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -294,6 +338,7 @@ pub(crate) fn derive_cid<T: Serialize>(t: &T) -> anyhow::Result<(Cid, Vec<u8>)> 
 
 #[cfg(test)]
 mod tests {
+    use crate::fvm::state::snapshot::SnapshotPayload;
     use crate::fvm::state::snapshot::{Snapshot, StateTreeStreamer};
     use crate::fvm::state::FvmStateParams;
     use crate::fvm::store::memory::MemoryBlockstore;
@@ -377,11 +422,16 @@ mod tests {
             app_version: 0,
             consensus_params: None,
         };
+        let payload = SnapshotPayload {
+            state: state_params,
+            light_client_commitments: None,
+        };
+
         let block_height = 2048;
 
         let bs = state_tree.into_store();
         let db = ReadOnlyBlockstore::new(bs.clone());
-        let snapshot = Snapshot::new(db, state_params.clone(), block_height).unwrap();
+        let snapshot = Snapshot::new(db, payload.clone(), block_height).unwrap();
 
         let tmp_file = tempfile::NamedTempFile::new().unwrap();
         let r = snapshot.write_car(tmp_file.path()).await;
@@ -392,10 +442,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(state_params, loaded_snapshot.state_params);
+        assert_eq!(payload, loaded_snapshot.payload);
         assert_eq!(block_height, loaded_snapshot.block_height);
         assert_tree2_contains_tree1(
-            &StateTree::new_from_root(bs, &loaded_snapshot.state_params.state_root).unwrap(),
+            &StateTree::new_from_root(bs, &loaded_snapshot.payload.state.state_root).unwrap(),
             &loaded_snapshot.state_tree,
         );
     }

@@ -1,8 +1,8 @@
 use ethers::providers::{Http, Provider};
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::materials::IpcContractsOwner;
-use multihash::MultihashDigest;
+use crate::materials::{IpcContractsOwner, WithNodeName};
+use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::{
@@ -232,6 +232,12 @@ resource_name!(NodeName: Testnet);
 resource_name!(RelayerName: Testnet);
 resource_name!(CliName: Testnet);
 
+impl WithNodeName for NodeName {
+    fn node_name(&self) -> &NodeName {
+        self
+    }
+}
+
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {
         // Not including a leading slash (ie. "/testnets") so that we can join with directory paths.
@@ -350,7 +356,7 @@ pub struct ResourceHash([u8; 32]);
 impl ResourceHash {
     /// Digest some general unique but unwieldy label for a more compact form.
     pub fn digest<T: AsRef<[u8]>>(value: T) -> Self {
-        let d = multihash::Code::Blake2b256.digest(value.as_ref());
+        let d = Code::Blake2b256.digest(value.as_ref());
         let mut bz = [0u8; 32];
         bz.copy_from_slice(d.digest());
         Self(bz)

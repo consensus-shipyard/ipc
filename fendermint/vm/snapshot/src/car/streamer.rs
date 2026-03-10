@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use futures::{AsyncRead, Future, Stream};
+use futures::Stream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -10,105 +10,64 @@ use fvm_ipld_car::CarReader;
 use fvm_ipld_car::Error as CarError;
 
 type BlockStreamerItem = Result<(Cid, Vec<u8>), CarError>;
-type BlockStreamerRead<R> = (CarReader<R>, Option<BlockStreamerItem>);
-type BlockStreamerReadFuture<R> = Pin<Box<dyn Future<Output = BlockStreamerRead<R>> + Send>>;
-
-enum BlockStreamerState<R> {
-    Idle(CarReader<R>),
-    Reading(BlockStreamerReadFuture<R>),
-}
 
 /// Stream the content blocks from a CAR reader.
+/// In FVM 4.7, CarReader is a synchronous iterator, so we wrap it for async use
 pub struct BlockStreamer<R> {
-    state: Option<BlockStreamerState<R>>,
+    reader: Option<CarReader<R>>,
 }
 
 impl<R> BlockStreamer<R>
 where
-    R: AsyncRead + Send + Unpin,
+    R: std::io::Read + Send,
 {
     pub fn new(reader: CarReader<R>) -> Self {
         Self {
-            state: Some(BlockStreamerState::Idle(reader)),
-        }
-    }
-
-    async fn next_block(mut reader: CarReader<R>) -> BlockStreamerRead<R> {
-        let res = reader.next_block().await;
-        let out = match res {
-            Err(e) => Some(Err(e)),
-            Ok(Some(b)) => Some(Ok((b.cid, b.data))),
-            Ok(None) => None,
-        };
-        (reader, out)
-    }
-
-    fn poll_next_block(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        mut next_block: BlockStreamerReadFuture<R>,
-    ) -> Poll<Option<BlockStreamerItem>> {
-        use BlockStreamerState::*;
-
-        match next_block.as_mut().poll(cx) {
-            Poll::Pending => {
-                self.state = Some(Reading(next_block));
-                Poll::Pending
-            }
-            Poll::Ready((reader, out)) => {
-                self.state = Some(Idle(reader));
-                Poll::Ready(out)
-            }
+            reader: Some(reader),
         }
     }
 }
 
 impl<R> Stream for BlockStreamer<R>
 where
-    R: AsyncRead + Send + Unpin + 'static,
+    R: std::io::Read + Send + Unpin + 'static,
 {
     type Item = BlockStreamerItem;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        use BlockStreamerState::*;
-
-        match self.state.take() {
-            None => Poll::Ready(None),
-            Some(Idle(reader)) => {
-                let next_block = Self::next_block(reader);
-                let next_block = Box::pin(next_block);
-                self.poll_next_block(cx, next_block)
+    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // In FVM 4.7, CarReader is a synchronous iterator
+        if let Some(ref mut reader) = self.reader {
+            match reader.next() {
+                Some(Ok(block)) => Poll::Ready(Some(Ok((block.cid, block.data)))),
+                Some(Err(e)) => Poll::Ready(Some(Err(e))),
+                None => {
+                    self.reader = None;
+                    Poll::Ready(None)
+                }
             }
-            Some(Reading(next_block)) => self.poll_next_block(cx, next_block),
+        } else {
+            Poll::Ready(None)
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use futures::{AsyncRead, StreamExt};
+    use futures::StreamExt;
     use fvm_ipld_blockstore::MemoryBlockstore;
     use fvm_ipld_car::{load_car, CarReader};
 
     use super::BlockStreamer;
 
     /// Check that a CAR file can be loaded from a byte reader.
-    async fn check_load_car<R>(reader: R)
-    where
-        R: AsyncRead + Send + Unpin,
-    {
+    fn check_load_car(reader: impl std::io::Read) {
         let store = MemoryBlockstore::new();
-        load_car(&store, reader).await.expect("failed to load CAR");
+        load_car(&store, reader).expect("failed to load CAR");
     }
 
     /// Check that a CAR file can be streamed without errors.
-    async fn check_block_streamer<R>(reader: R)
-    where
-        R: AsyncRead + Send + Unpin + 'static,
-    {
-        let reader = CarReader::new_unchecked(reader)
-            .await
-            .expect("failed to open CAR reader");
+    async fn check_block_streamer(reader: impl std::io::Read + Send + Unpin + 'static) {
+        let reader = CarReader::new(reader).expect("failed to open CAR reader");
 
         let streamer = BlockStreamer::new(reader);
 
@@ -122,8 +81,8 @@ mod tests {
     /// Sanity check that the test bundle can be loaded with the normal facilities from a file.
     #[tokio::test]
     async fn load_bundle_from_file() {
-        let mut car_bundle = actors_custom_car::CAR;
-        check_load_car(&mut car_bundle).await;
+        let car_bundle = actors_custom_car::CAR;
+        check_load_car(car_bundle);
     }
 
     #[tokio::test]

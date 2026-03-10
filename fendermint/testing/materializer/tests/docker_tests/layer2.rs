@@ -14,6 +14,7 @@ use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_message::conv::from_fvm::to_eth_address;
 use ipc_actors_abis::gateway_getter_facet::{GatewayGetterFacet, ParentFinality};
 use ipc_actors_abis::gateway_manager_facet::{FvmAddress, GatewayManagerFacet};
+use ipc_actors_abis::subnet_actor_checkpoint_facet_mock::SubnetActorCheckpointFacetMock;
 use ipc_actors_abis::subnet_actor_getter_facet::SubnetActorGetterFacet;
 
 const MANIFEST: &str = "layer2.yaml";
@@ -60,12 +61,11 @@ async fn test_topdown_and_bottomup() -> Result<(), anyhow::Error> {
         );
 
         // Subnet actor on the parent
-        let england_subnet = SubnetActorGetterFacet::new(
+        let england_subnet_checkpointer = SubnetActorCheckpointFacetMock::new(
             to_eth_address(&england.subnet_id.subnet_actor())
                 .and_then(|a| a.ok_or_else(|| anyhow!("not an eth address")))?,
             brussels_provider.clone(),
         );
-
         // Query the latest committed parent finality and compare to the parent.
         {
             let mut retry = 0;
@@ -116,7 +116,7 @@ async fn test_topdown_and_bottomup() -> Result<(), anyhow::Error> {
                 //     .call()
                 //     .await
                 //     .context("failed to get current bottomup checkpoint")?;
-                let ckpt_height: et::U256 = england_subnet
+                let ckpt_height: et::U256 = england_subnet_checkpointer
                     .last_bottom_up_checkpoint_height()
                     .call()
                     .await
@@ -180,7 +180,11 @@ async fn test_bottomup_batch_execution() -> Result<(), anyhow::Error> {
                 .and_then(|a| a.ok_or_else(|| anyhow!("not an eth address")))?,
             brussels_provider.clone(),
         );
-
+        let england_subnet_checkpointer = SubnetActorCheckpointFacetMock::new(
+            to_eth_address(&england.subnet_id.subnet_actor())
+                .and_then(|a| a.ok_or_else(|| anyhow!("not an eth address")))?,
+            brussels_provider.clone(),
+        );
         // Prepare account 1.
         let sender1 = testnet.account_mod_nth(1);
         let middleware_sender1 = make_middleware(london_provider.clone(), sender1, None)
@@ -242,7 +246,7 @@ async fn test_bottomup_batch_execution() -> Result<(), anyhow::Error> {
         {
             let mut retry = 0;
             loop {
-                let ckpt_height: et::U256 = england_subnet
+                let ckpt_height: et::U256 = england_subnet_checkpointer
                     .last_bottom_up_checkpoint_height()
                     .call()
                     .await

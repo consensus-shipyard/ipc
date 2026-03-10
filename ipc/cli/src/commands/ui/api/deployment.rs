@@ -115,6 +115,10 @@ async fn handle_deploy_request(
                 .await;
             }
             Err(e) => {
+                // Log the full error with context
+                log::error!("❌ Deployment {} failed with error: {:?}", deploy_id, e);
+                log::error!("Error details: {}", e);
+
                 // Broadcast failure
                 broadcast_progress(
                     &deploy_state,
