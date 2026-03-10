@@ -5,34 +5,29 @@
 //! Objects API service for handling object upload and download
 //!
 //! This module provides HTTP endpoints for:
-//! - Uploading objects to Iroh storage with entanglement
+//! - Uploading objects to Iroh storage with erasure encoding + distribution
 //! - Downloading objects from buckets
 //! - Downloading blobs directly
 
-use std::{
-    convert::Infallible, net::SocketAddr, num::ParseIntError, path::Path, str::FromStr,
-    time::Instant,
-};
+use std::{convert::Infallible, net::SocketAddr, path::Path, str::FromStr, time::Instant};
 
 use anyhow::{anyhow, Context, Result};
 use bytes::Buf;
-use entangler::{ChunkRange, Config, EntanglementResult, Entangler};
-use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
+use erasure_encoding::{BlobId, NodeId};
 use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_rpc::{client::FendermintClient, message::GasParams, QueryClient};
 use fendermint_vm_message::query::FvmQueryHeight;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::StreamExt;
 use fvm_shared::address::{Address, Error as NetworkError, Network};
 use fvm_shared::econ::TokenAmount;
 use ipc_api::ethers_address_to_fil_address;
 use iroh::NodeAddr;
-use iroh_blobs::{hashseq::HashSeq, rpc::client::blobs::BlobStatus, util::SetTagOption, Hash};
-use iroh_manager::{get_blob_hash_and_size, BlobsClient, IrohNode};
+use iroh_blobs::Hash;
+use iroh_manager::{BlobsClient, IrohNode};
 use lazy_static::lazy_static;
 use mime_guess::get_mime_extensions_str;
 use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use tracing::{debug, info};
 use uuid::Uuid;
 use warp::path::Tail;
@@ -43,13 +38,14 @@ use warp::{
     Filter, Rejection, Reply,
 };
 
-/// The alpha parameter for alpha entanglement determines the number of parity blobs to generate
-/// for the original blob.
-const ENTANGLER_ALPHA: u8 = 3;
-/// The s parameter for alpha entanglement determines the number of horizontal strands in the grid.
-const ENTANGLER_S: u8 = 5;
-/// Chunk size used by the entangler.
-const CHUNK_SIZE: u64 = 1024;
+use crate::distribution::{distribute, DistributeParams, NodeDirectory, NodeRpcDirectory};
+use crate::gateway::BlobGateway;
+use crate::retrieval::{retrieve, BlobRetrievalParams};
+
+/// Number of data shards per chunk for erasure encoding (k).
+const DEFAULT_DATA_SHARDS: usize = 4;
+/// Number of parity shards per chunk for erasure encoding (m).
+const DEFAULT_PARITY_SHARDS: usize = 2;
 
 /// Configuration for the objects service
 #[derive(Clone, Debug)]
@@ -113,6 +109,7 @@ pub async fn run_objects_service(
         .and(with_iroh(iroh_node.clone()))
         .and(warp::multipart::form().max_length(config.max_object_size + 1024 * 1024))
         .and(with_max_size(config.max_object_size))
+        .and(with_client(client.clone()))
         .and_then(handle_object_upload);
 
     let objects_download = warp::path!("v1" / "objects" / String / ..)
@@ -123,7 +120,6 @@ pub async fn run_objects_service(
                 .or(warp::head().map(|| "HEAD".to_string()))
                 .unify(),
         )
-        .and(warp::header::optional::<String>("Range"))
         .and(warp::query::<HeightQuery>())
         .and(with_client(client.clone()))
         .and(with_iroh_blobs(iroh_resolver_blobs.clone()))
@@ -136,7 +132,6 @@ pub async fn run_objects_service(
                 .or(warp::head().map(|| "HEAD".to_string()))
                 .unify(),
         )
-        .and(warp::header::optional::<String>("Range"))
         .and(warp::query::<HeightQuery>())
         .and(with_client(client.clone()))
         .and(with_iroh_blobs(iroh_resolver_blobs.clone()))
@@ -181,6 +176,7 @@ pub fn objects_routes(
         .and(with_iroh(iroh_node.clone()))
         .and(warp::multipart::form().max_length(max_object_size + 1024 * 1024))
         .and(with_max_size(max_object_size))
+        .and(with_client(client.clone()))
         .and_then(handle_object_upload);
 
     let objects_download = warp::path!("v1" / "objects" / String / ..)
@@ -191,7 +187,6 @@ pub fn objects_routes(
                 .or(warp::head().map(|| "HEAD".to_string()))
                 .unify(),
         )
-        .and(warp::header::optional::<String>("Range"))
         .and(warp::query::<HeightQuery>())
         .and(with_client(client.clone()))
         .and(with_iroh_blobs(iroh_resolver_blobs.clone()))
@@ -204,7 +199,6 @@ pub fn objects_routes(
                 .or(warp::head().map(|| "HEAD".to_string()))
                 .unify(),
         )
-        .and(warp::header::optional::<String>("Range"))
         .and(warp::query::<HeightQuery>())
         .and(with_client(client.clone()))
         .and(with_iroh_blobs(iroh_resolver_blobs.clone()))
@@ -242,25 +236,9 @@ struct HeightQuery {
     pub height: Option<u64>,
 }
 
-#[derive(Debug, Error)]
-enum ObjectsError {
-    #[error("error parsing range header: `{0}`")]
-    RangeHeaderParseError(ParseIntError),
-    #[error("invalid range header")]
-    RangeHeaderInvalid,
-}
-
-impl From<ParseIntError> for ObjectsError {
-    fn from(err: ParseIntError) -> Self {
-        ObjectsError::RangeHeaderParseError(err)
-    }
-}
-
 #[derive(Default)]
 struct ObjectParser {
-    hash: Option<Hash>,
     size: Option<u64>,
-    source: Option<NodeAddr>,
     data_part: Option<Part>,
 }
 
@@ -278,14 +256,6 @@ impl ObjectParser {
         Ok(value)
     }
 
-    async fn read_hash(&mut self, form_part: Part) -> anyhow::Result<()> {
-        let value = self.read_part(form_part).await?;
-        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse hash"))?;
-        let hash: Hash = text.parse().map_err(|_| anyhow!("cannot parse hash"))?;
-        self.hash = Some(hash);
-        Ok(())
-    }
-
     async fn read_size(&mut self, form_part: Part) -> anyhow::Result<()> {
         let value = self.read_part(form_part).await?;
         let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse size"))?;
@@ -294,28 +264,13 @@ impl ObjectParser {
         Ok(())
     }
 
-    async fn read_source(&mut self, form_part: Part) -> anyhow::Result<()> {
-        let value = self.read_part(form_part).await?;
-        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse source"))?;
-        let source: NodeAddr =
-            serde_json::from_str(&text).map_err(|_| anyhow!("cannot parse source"))?;
-        self.source = Some(source);
-        Ok(())
-    }
-
     async fn read_form(mut form_data: warp::multipart::FormData) -> anyhow::Result<Self> {
         let mut object_parser = ObjectParser::default();
         while let Some(part) = form_data.next().await {
             let part = part.map_err(|e| anyhow!("cannot read form data: {}", e))?;
             match part.name() {
-                "hash" => {
-                    object_parser.read_hash(part).await?;
-                }
                 "size" => {
                     object_parser.read_size(part).await?;
-                }
-                "source" => {
-                    object_parser.read_source(part).await?;
                 }
                 "data" => {
                     object_parser.data_part = Some(part);
@@ -323,13 +278,9 @@ impl ObjectParser {
                     // It implies that the data field must be the last one sent in the multipart form.
                     return Ok(object_parser);
                 }
-                // Ignore but accept signature-related fields for backward compatibility
-                "chain_id" | "msg" => {
-                    // Read and discard the data
-                    let _ = object_parser.read_part(part).await?;
-                }
                 _ => {
-                    return Err(anyhow!("unknown form field"));
+                    // Ignore unknown fields for forward compatibility
+                    let _ = object_parser.read_part(part).await?;
                 }
             }
         }
@@ -385,15 +336,23 @@ async fn handle_node_addr(iroh: IrohNode) -> Result<impl Reply, Rejection> {
 
 #[derive(Serialize)]
 struct UploadResponse {
-    hash: String,      // Hash sequence hash (for bucket storage)
-    orig_hash: String, // Original blob content hash (for addBlob)
-    metadata_hash: String,
+    /// Original blob content hash.
+    hash: String,
+    /// Number of chunks the data was split into.
+    num_chunks: usize,
+    /// Number of data shards per chunk (k).
+    data_shards: usize,
+    /// Number of parity shards per chunk (m).
+    parity_shards: usize,
+    /// Original data length in bytes.
+    original_len: usize,
 }
 
 async fn handle_object_upload(
     iroh: IrohNode,
     form_data: warp::multipart::FormData,
     max_size: u64,
+    client: FendermintClient,
 ) -> Result<impl Reply, Rejection> {
     let start_time = Instant::now();
     let parser = ObjectParser::read_form(form_data).await.map_err(|e| {
@@ -416,281 +375,172 @@ async fn handle_object_upload(
         }));
     }
 
-    let upload_id = Uuid::new_v4();
+    let _upload_id = Uuid::new_v4();
 
-    // Handle the two upload cases
-    let hash = match (parser.source, parser.data_part) {
-        // Case 1: Source node provided - download from the source
-        (Some(source), None) => {
-            let hash = match parser.hash {
-                Some(hash) => hash,
-                None => {
-                    return Err(Rejection::from(BadRequest {
-                        message: "missing hash in form".to_string(),
-                    }))
-                }
-            };
-
-            let tag = iroh_blobs::Tag(format!("temp-{hash}-{upload_id}").into());
-            let progress = iroh
-                .blobs_client()
-                .download_with_opts(
-                    hash,
-                    iroh_blobs::rpc::client::blobs::DownloadOptions {
-                        format: iroh_blobs::BlobFormat::Raw,
-                        nodes: vec![source],
-                        tag: SetTagOption::Named(tag),
-                        mode: iroh_blobs::rpc::client::blobs::DownloadMode::Queued,
-                    },
-                )
-                .await
-                .map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: format!("failed to fetch blob {}: {}", hash, e),
-                    })
-                })?;
-            let outcome = progress.finish().await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to fetch blob {}: {}", hash, e),
-                })
-            })?;
-            let outcome_size = outcome.local_size + outcome.downloaded_size;
-            if outcome_size != size {
-                return Err(Rejection::from(BadRequest {
-                    message: format!(
-                        "blob size and given size do not match (expected {}, got {})",
-                        size, outcome_size
-                    ),
-                }));
-            }
-
-            debug!(
-                "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {})",
-                hash, outcome.stats.elapsed, size, outcome.local_size, outcome.downloaded_size,
-            );
-            COUNTER_BYTES_UPLOADED.inc_by(outcome.downloaded_size);
-            hash
-        }
-
-        // Case 2: Direct upload - store the provided data
-        (None, Some(data_part)) => {
-            let stream = data_part.stream().map(|result| {
-                result
-                    .map(|mut buf| buf.copy_to_bytes(buf.remaining()))
-                    .map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::Other, format!("Warp error: {}", e))
-                    })
-            });
-
-            let batch = iroh.blobs_client().batch().await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to store blob: {}", e),
-                })
-            })?;
-            let temp_tag = batch.add_stream(stream).await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to store blob: {}", e),
-                })
-            })?;
-
-            let hash = *temp_tag.hash();
-            let new_tag = iroh_blobs::Tag(format!("temp-{hash}-{upload_id}").into());
-            batch.persist_to(temp_tag, new_tag).await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to persist blob: {}", e),
-                })
-            })?;
-
-            drop(batch);
-
-            let status = iroh.blobs_client().status(hash).await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to check blob status: {}", e),
-                })
-            })?;
-            let BlobStatus::Complete { size } = status else {
-                return Err(Rejection::from(BadRequest {
-                    message: "failed to store data".to_string(),
-                }));
-            };
-            COUNTER_BYTES_UPLOADED.inc_by(size);
-            debug!("stored uploaded blob {} (size: {})", hash, size);
-
-            hash
-        }
-
-        (Some(_), Some(_)) => {
+    // Collect upload data into memory
+    let data_part = match parser.data_part {
+        Some(part) => part,
+        None => {
             return Err(Rejection::from(BadRequest {
-                message: "cannot provide both source and data".to_string(),
-            }));
-        }
-
-        (None, None) => {
-            return Err(Rejection::from(BadRequest {
-                message: "must provide either source or data".to_string(),
-            }));
+                message: "missing data in form".to_string(),
+            }))
         }
     };
 
-    debug!("raw uploaded hash: {}", hash);
-
-    let ent = new_entangler(iroh.blobs_client()).map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to create entangler: {}", e),
-        })
-    })?;
-    let ent_result = ent.entangle_uploaded(hash.to_string()).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to entangle uploaded data: {}", e),
-        })
-    })?;
-
-    debug!(
-        "entanglement result: orig_hash={}, metadata_hash={}, upload_results_count={}",
-        ent_result.orig_hash,
-        ent_result.metadata_hash,
-        ent_result.upload_results.len()
-    );
-
-    let hash_seq_hash = tag_entangled_data(&iroh, &ent_result, upload_id)
-        .await
-        .map_err(|e| {
+    let mut data = Vec::new();
+    let mut stream = data_part.stream();
+    while let Some(result) = stream.next().await {
+        let mut buf = result.map_err(|e| {
             Rejection::from(BadRequest {
-                message: format!("failed to tag entangled data: {}", e),
+                message: format!("failed to read upload stream: {}", e),
+            })
+        })?;
+        data.extend_from_slice(&buf.copy_to_bytes(buf.remaining()));
+    }
+
+    if data.len() as u64 != size {
+        return Err(Rejection::from(BadRequest {
+            message: format!(
+                "data size and given size do not match (expected {}, got {})",
+                size,
+                data.len()
+            ),
+        }));
+    }
+
+    // Compute content hash (blake3) from the uploaded data
+    let hash = Hash::from(*blake3::hash(&data).as_bytes());
+
+    COUNTER_BYTES_UPLOADED.inc_by(data.len() as u64);
+    debug!("uploaded blob {} (size: {})", hash, data.len());
+
+    // Build node directories from on-chain state
+    let gateway = BlobGateway::new(client, 10, std::time::Duration::from_secs(5));
+    let (nodes, node_directory, node_rpc_directory) =
+        build_node_directories(&gateway).await.map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to build node directories: {}", e),
             })
         })?;
 
-    debug!("hash_seq_hash: {}", hash_seq_hash);
+    // Get local node address for P2P shard distribution
+    let local_node_addr = iroh.endpoint().node_addr().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to get local node address: {}", e),
+        })
+    })?;
+
+    // Erasure-encode and distribute shards to assigned nodes
+    let blob_id = BlobId(*hash.as_bytes());
+    info!(
+        "Distributing blob: hash={}, data_len={}, blob_id={}, nodes={}",
+        hash, data.len(), hex::encode(blob_id.0), nodes.len()
+    );
+    let dist_result = distribute(
+        DistributeParams {
+            blob_id,
+            data,
+            data_shards: DEFAULT_DATA_SHARDS,
+            parity_shards: DEFAULT_PARITY_SHARDS,
+            nodes,
+            node_directory,
+            node_rpc_directory,
+        },
+        iroh.blobs_client(),
+        &local_node_addr,
+    )
+    .await
+    .map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to distribute shards: {}", e),
+        })
+    })?;
+
+    info!(
+        "Distribution complete: num_chunks={}, k={}, m={}, original_len={}, failures={}, total_shards={}",
+        dist_result.metadata.num_chunks,
+        dist_result.metadata.data_shards,
+        dist_result.metadata.parity_shards,
+        dist_result.metadata.original_len,
+        dist_result.failure_count(),
+        dist_result.shard_results.len()
+    );
+    for sr in &dist_result.shard_results {
+        info!(
+            "  Shard result {}/{}: hash={:?}, success={}, error={:?}",
+            sr.chunk_index, sr.shard_index, sr.iroh_hash, sr.success, sr.error
+        );
+    }
 
     COUNTER_BLOBS_UPLOADED.inc();
     HISTOGRAM_UPLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
     let response = UploadResponse {
-        hash: hash_seq_hash.to_string(),
-        orig_hash: ent_result.orig_hash.clone(),
-        metadata_hash: ent_result.metadata_hash,
+        hash: hash.to_string(),
+        num_chunks: dist_result.metadata.num_chunks,
+        data_shards: dist_result.metadata.data_shards,
+        parity_shards: dist_result.metadata.parity_shards,
+        original_len: dist_result.metadata.original_len,
     };
     Ok(warp::reply::json(&response))
 }
 
-async fn tag_entangled_data(
-    iroh: &IrohNode,
-    ent_result: &EntanglementResult,
-    upload_id: Uuid,
-) -> Result<Hash, anyhow::Error> {
-    let orig_hash = Hash::from_str(ent_result.orig_hash.as_str())?;
-    let metadata_hash = Hash::from_str(ent_result.metadata_hash.as_str())?;
+/// Query on-chain operator state and build node directories for shard distribution.
+pub async fn build_node_directories<C: QueryClient + Send + Sync>(
+    gateway: &BlobGateway<C>,
+) -> Result<(Vec<NodeId>, NodeDirectory, NodeRpcDirectory)> {
+    let operators = gateway
+        .query_active_operators()
+        .await
+        .context("failed to query active operators")?;
 
-    // collect all hashes related to the blob, but ignore the metadata hash, as we want to make
-    // sure that the metadata hash is the second hash in the sequence after the original hash
-    let upload_hashes = ent_result
-        .upload_results
-        .iter()
-        .map(|r| Hash::from_str(&r.hash))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .filter(|h| h != &metadata_hash)
-        .collect::<Vec<_>>();
-
-    let mut hashes = vec![orig_hash, metadata_hash];
-    hashes.extend(upload_hashes);
-
-    let hashes_str = hashes
-        .iter()
-        .map(|h| h.to_string())
-        .collect::<Vec<_>>()
-        .join(", ");
-
-    let batch = iroh.blobs_client().batch().await?;
-
-    // make a hash sequence object from the hashes and upload it to iroh
-    let hash_seq = hashes.into_iter().collect::<HashSeq>();
-
-    let temp_tag = batch
-        .add_bytes_with_opts(hash_seq, iroh_blobs::BlobFormat::HashSeq)
-        .await?;
-    let hash_seq_hash = *temp_tag.hash();
-
-    debug!(
-        "storing hash sequence: {} ({})",
-        hash_seq_hash.to_string(),
-        hashes_str
-    );
-
-    // this tag will be replaced later by the validator to "stored-seq-{hash_seq_hash}"
-    let hash_seq_tag = iroh_blobs::Tag(format!("temp-seq-{hash_seq_hash}").into());
-    batch.persist_to(temp_tag, hash_seq_tag).await?;
-
-    drop(batch);
-
-    // delete all tags returned by the entangler
-    for ent_upload_result in &ent_result.upload_results {
-        let tag_value = ent_upload_result
-            .info
-            .get("tag")
-            .ok_or_else(|| anyhow!("Missing tag in entanglement upload result"))?;
-        let tag = iroh_blobs::Tag::from(tag_value.clone());
-        iroh.blobs_client().tags().delete(tag).await?;
+    if operators.is_empty() {
+        anyhow::bail!("no active operators found");
     }
 
-    // remove upload tags
-    let orig_tag = iroh_blobs::Tag(format!("temp-{orig_hash}-{upload_id}").into());
-    iroh.blobs_client().tags().delete(orig_tag).await?;
+    let mut nodes = Vec::new();
+    let mut node_directory = NodeDirectory::new();
+    let mut node_rpc_directory = NodeRpcDirectory::new();
 
-    Ok(hash_seq_hash)
-}
+    let http_client = reqwest::Client::new();
 
-fn new_entangler(iroh: &BlobsClient) -> Result<Entangler<EntanglerIrohStorage>, entangler::Error> {
-    Entangler::new(
-        EntanglerIrohStorage::from_client(iroh.clone()),
-        Config::new(ENTANGLER_ALPHA, ENTANGLER_S),
-    )
-}
+    for operator_addr in &operators {
+        let info = gateway
+            .get_operator_info(*operator_addr)
+            .await
+            .context("failed to get operator info")?;
 
-fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError> {
-    let range: Vec<String> = range
-        .replace("bytes=", "")
-        .split('-')
-        .map(|n| n.to_string())
-        .collect();
-    if range.len() != 2 {
-        return Err(ObjectsError::RangeHeaderInvalid);
-    }
-    let (first, mut last): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
-        (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
-        (true, false) => (range[0].parse::<u64>()?, size - 1),
-        (false, true) => {
-            let last = range[1].parse::<u64>()?;
-            if last > size {
-                (0, size - 1)
-            } else {
-                (size - last, size - 1)
-            }
+        // Query the operator's RPC endpoint to get their Iroh NodeAddr
+        let url = format!("{}/v1/node", info.rpc_url.trim_end_matches('/'));
+        let resp = http_client
+            .get(&url)
+            .send()
+            .await
+            .with_context(|| format!("failed to query node addr from {}", url))?;
+
+        if !resp.status().is_success() {
+            anyhow::bail!("node {} returned {}", url, resp.status());
         }
-        (false, false) => (0, size - 1),
-    };
-    if first > last || first >= size {
-        return Err(ObjectsError::RangeHeaderInvalid);
+
+        let node_addr: NodeAddr = resp
+            .json()
+            .await
+            .with_context(|| format!("failed to parse node addr from {}", url))?;
+
+        let node_id = NodeId(node_addr.node_id.as_bytes().clone());
+
+        nodes.push(node_id);
+        node_directory.insert(node_id, node_addr);
+        node_rpc_directory.insert(node_id, info.rpc_url.clone());
     }
-    if last >= size {
-        last = size - 1;
-    }
-    Ok((first, last))
+
+    Ok((nodes, node_directory, node_rpc_directory))
 }
 
-struct ObjectRange {
-    start: u64,
-    end: u64,
-    len: u64,
-    size: u64,
-    body: Body,
-}
-
-async fn handle_object_download<F: QueryClient + Send + Sync>(
+async fn handle_object_download<F: QueryClient + Send + Sync + Clone>(
     address: String,
     tail: Tail,
     method: String,
-    range: Option<String>,
     height_query: HeightQuery,
     client: F,
     iroh: BlobsClient,
@@ -714,7 +564,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
     let key: Vec<u8> = path.into();
     let start_time = Instant::now();
-    let maybe_object = os_get(client, address, GetParams(key.clone()), height)
+    let maybe_object = os_get(client.clone(), address, GetParams(key.clone()), height)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -724,122 +574,50 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
     match maybe_object {
         Some(object) => {
-            let seq_hash = Hash::from_bytes(object.hash.0);
-            let (hash, size) = get_blob_hash_and_size(&iroh, seq_hash).await.map_err(|e| {
+            let size = object.size;
+
+            // Retrieve blob by fetching shards from assigned nodes and RS-decoding
+            let gateway = BlobGateway::new(client, 10, std::time::Duration::from_secs(5));
+            let (nodes, node_directory, node_rpc_directory) =
+                build_node_directories(&gateway).await.map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to build node directories: {}", e),
+                    })
+                })?;
+
+            let blob_id = BlobId(object.hash.0);
+            let retrieved_data = retrieve(
+                &BlobRetrievalParams {
+                    blob_id,
+                    original_len: size as usize,
+                    data_shards: DEFAULT_DATA_SHARDS,
+                    parity_shards: DEFAULT_PARITY_SHARDS,
+                    nodes,
+                    node_directory,
+                    node_rpc_directory,
+                },
+                &iroh,
+            )
+            .await
+            .map_err(|e| {
                 Rejection::from(BadRequest {
-                    message: e.to_string(),
+                    message: format!("failed to retrieve blob: {}", e),
                 })
             })?;
 
-            let ent = new_entangler(&iroh).map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to create entangler: {}", e),
-                })
-            })?;
-            let recovery_hash = Hash::from_bytes(object.recovery_hash.0);
-
-            let object_range = match range {
-                Some(range) => {
-                    let (first_byte, last_byte) = get_range_params(range, size).map_err(|e| {
-                        Rejection::from(BadRequest {
-                            message: e.to_string(),
-                        })
-                    })?;
-                    let len = (last_byte - first_byte) + 1;
-
-                    let first_chunk = first_byte / CHUNK_SIZE;
-                    let last_chunk = last_byte / CHUNK_SIZE;
-
-                    let bytes_stream = ent
-                        .download_range(
-                            &hash.to_string(),
-                            ChunkRange::Between(first_chunk, last_chunk),
-                            Some(recovery_hash.to_string()),
-                        )
-                        .await
-                        .map_err(|e| {
-                            Rejection::from(BadRequest {
-                                message: format!("failed to download object: {} {}", hash, e),
-                            })
-                        })?;
-
-                    let offset = (first_byte % CHUNK_SIZE) as usize;
-                    let end_offset = (last_byte % CHUNK_SIZE + 1) as usize;
-
-                    let bytes_stream = bytes_stream.enumerate().map(move |(i, chunk)| {
-                        let chunk = chunk?;
-                        let result = if first_chunk == last_chunk {
-                            // Single chunk case - slice with both offsets
-                            chunk.slice(offset..end_offset)
-                        } else if i == 0 {
-                            // First of multiple chunks
-                            chunk.slice(offset..)
-                        } else if i == (last_chunk - first_chunk) as usize {
-                            // Last of multiple chunks
-                            chunk.slice(..end_offset)
-                        } else {
-                            // Middle chunks
-                            chunk
-                        };
-                        Ok::<_, anyhow::Error>(result)
-                    });
-
-                    let body = Body::wrap_stream(bytes_stream);
-                    ObjectRange {
-                        start: first_byte,
-                        end: last_byte,
-                        len,
-                        size,
-                        body,
-                    }
-                }
-                None => {
-                    let bytes_stream = ent
-                        .download(&hash.to_string(), Some(&recovery_hash.to_string()))
-                        .await
-                        .map_err(|e| {
-                            Rejection::from(BadRequest {
-                                message: format!("failed to download object: {} {}", hash, e),
-                            })
-                        })?;
-                    let body = Body::wrap_stream(bytes_stream.map_err(|e| anyhow::anyhow!(e)));
-                    ObjectRange {
-                        start: 0,
-                        end: size - 1,
-                        len: size,
-                        size,
-                        body,
-                    }
-                }
-            };
-
-            // If it is a HEAD request, we don't need to send the body,
-            // but we still need to send the Content-Length header
+            // HEAD request: return headers only
             if method == "HEAD" {
                 let mut response = warp::reply::Response::new(Body::empty());
                 let mut header_map = HeaderMap::new();
-                header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+                header_map.insert("Content-Length", HeaderValue::from(size));
                 let headers = response.headers_mut();
                 headers.extend(header_map);
                 return Ok(response);
             }
 
-            let mut response = warp::reply::Response::new(object_range.body);
+            let mut response = warp::reply::Response::new(Body::from(retrieved_data));
             let mut header_map = HeaderMap::new();
-            if object_range.len < object_range.size {
-                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-                header_map.insert(
-                    "Content-Range",
-                    HeaderValue::from_str(&format!(
-                        "bytes {}-{}/{}",
-                        object_range.start, object_range.end, object_range.size
-                    ))
-                    .unwrap(),
-                );
-            } else {
-                header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
-            }
-            header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+            header_map.insert("Content-Length", HeaderValue::from(size));
 
             let content_type = object
                 .metadata
@@ -864,7 +642,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
             headers.extend(header_map);
 
             COUNTER_BLOBS_DOWNLOADED.inc();
-            COUNTER_BYTES_DOWNLOADED.inc_by(object_range.len);
+            COUNTER_BYTES_DOWNLOADED.inc_by(size);
             HISTOGRAM_DOWNLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
             Ok(response)
@@ -874,10 +652,9 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 }
 
 /// Handle direct blob download by querying the blobs actor.
-async fn handle_blob_download<F: QueryClient + Send + Sync>(
+async fn handle_blob_download<F: QueryClient + Send + Sync + Clone>(
     blob_hash_str: String,
     method: String,
-    range: Option<String>,
     height_query: HeightQuery,
     client: F,
     iroh: BlobsClient,
@@ -908,7 +685,7 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
     let start_time = Instant::now();
 
     // Query the blobs actor to get blob info
-    let maybe_blob = blob_get(client, blob_hash, height).await.map_err(|e| {
+    let maybe_blob = blob_get(client.clone(), blob_hash, height).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("blobs actor query error: {}", e),
         })
@@ -916,122 +693,52 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
 
     match maybe_blob {
         Some(blob) => {
-            // The blob hash from blobs actor is the hash sequence hash
-            // We need to parse it to get the original content hash
-            let hash_seq_hash = Hash::from_bytes(blob_hash.0);
             let size = blob.size;
 
-            debug!(
-                "blob download: hash_seq_hash={}, size={}",
-                hash_seq_hash, size
-            );
+            debug!("blob download: hash={}, size={}", blob_hash, size);
 
-            // Read the hash sequence to get the original content hash
-            let hash_seq_bytes = iroh.read_to_bytes(hash_seq_hash).await.map_err(|e| {
+            // Retrieve blob by fetching shards from assigned nodes and RS-decoding
+            let gateway = BlobGateway::new(client, 10, std::time::Duration::from_secs(5));
+            let (nodes, node_directory, node_rpc_directory) =
+                build_node_directories(&gateway).await.map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to build node directories: {}", e),
+                    })
+                })?;
+
+            let blob_id = BlobId(blob_hash.0);
+            let retrieved_data = retrieve(
+                &BlobRetrievalParams {
+                    blob_id,
+                    original_len: size as usize,
+                    data_shards: DEFAULT_DATA_SHARDS,
+                    parity_shards: DEFAULT_PARITY_SHARDS,
+                    nodes,
+                    node_directory,
+                    node_rpc_directory,
+                },
+                &iroh,
+            )
+            .await
+            .map_err(|e| {
                 Rejection::from(BadRequest {
-                    message: format!("failed to read hash sequence: {} {}", hash_seq_hash, e),
+                    message: format!("failed to retrieve blob: {}", e),
                 })
             })?;
 
-            let hash_seq = HashSeq::try_from(hash_seq_bytes).map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to parse hash sequence: {}", e),
-                })
-            })?;
-
-            // First hash in the sequence is the original content
-            let orig_hash = hash_seq.iter().next().ok_or_else(|| {
-                Rejection::from(BadRequest {
-                    message: "hash sequence is empty".to_string(),
-                })
-            })?;
-
-            debug!("parsed orig_hash from hash sequence: {}", orig_hash);
-
-            let object_range = match range {
-                Some(range) => {
-                    let (first_byte, last_byte) = get_range_params(range, size).map_err(|e| {
-                        Rejection::from(BadRequest {
-                            message: e.to_string(),
-                        })
-                    })?;
-                    let len = (last_byte - first_byte) + 1;
-
-                    // Use read_at for range requests on the original content
-                    use iroh_blobs::rpc::client::blobs::ReadAtLen;
-                    let read_len = ReadAtLen::AtMost(len);
-                    let bytes = iroh
-                        .read_at_to_bytes(orig_hash, first_byte, read_len)
-                        .await
-                        .map_err(|e| {
-                            Rejection::from(BadRequest {
-                                message: format!(
-                                    "failed to read blob at range: {} {}",
-                                    orig_hash, e
-                                ),
-                            })
-                        })?;
-
-                    let body = Body::from(bytes);
-                    ObjectRange {
-                        start: first_byte,
-                        end: last_byte,
-                        len,
-                        size,
-                        body,
-                    }
-                }
-                None => {
-                    // Read the entire original content blob directly from Iroh
-                    debug!("reading original content with hash: {}", orig_hash);
-
-                    let reader = iroh.read(orig_hash).await.map_err(|e| {
-                        Rejection::from(BadRequest {
-                            message: format!("failed to read blob: {} {}", orig_hash, e),
-                        })
-                    })?;
-
-                    let bytes_stream = reader.map(move |chunk_result: Result<bytes::Bytes, _>| {
-                        chunk_result.map_err(|e: std::io::Error| anyhow::anyhow!(e))
-                    });
-
-                    let body = Body::wrap_stream(bytes_stream);
-                    ObjectRange {
-                        start: 0,
-                        end: size - 1,
-                        len: size,
-                        size,
-                        body,
-                    }
-                }
-            };
-
-            // If it is a HEAD request, we don't need to send the body
+            // HEAD request: return headers only
             if method == "HEAD" {
                 let mut response = warp::reply::Response::new(Body::empty());
                 let mut header_map = HeaderMap::new();
-                header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+                header_map.insert("Content-Length", HeaderValue::from(size));
                 let headers = response.headers_mut();
                 headers.extend(header_map);
                 return Ok(response);
             }
 
-            let mut response = warp::reply::Response::new(object_range.body);
+            let mut response = warp::reply::Response::new(Body::from(retrieved_data));
             let mut header_map = HeaderMap::new();
-            if object_range.len < object_range.size {
-                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-                header_map.insert(
-                    "Content-Range",
-                    HeaderValue::from_str(&format!(
-                        "bytes {}-{}/{}",
-                        object_range.start, object_range.end, object_range.size
-                    ))
-                    .unwrap(),
-                );
-            } else {
-                header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
-            }
-            header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+            header_map.insert("Content-Length", HeaderValue::from(size));
             header_map.insert(
                 "Content-Type",
                 HeaderValue::from_str("application/octet-stream").unwrap(),
@@ -1041,7 +748,7 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
             headers.extend(header_map);
 
             COUNTER_BLOBS_DOWNLOADED.inc();
-            COUNTER_BYTES_DOWNLOADED.inc_by(object_range.len);
+            COUNTER_BYTES_DOWNLOADED.inc_by(size);
             HISTOGRAM_DOWNLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
             Ok(response)
@@ -1162,43 +869,3 @@ fn get_filename_with_extension(filename: &str, content_type: &str) -> Option<Str
         .map(|ext| format!("{}.{}", filename, ext))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_range_params() {
-        // bad formats
-        let _ = get_range_params("bytes=0,50".into(), 100).is_err();
-        let _ = get_range_params("bytes=-0-50".into(), 100).is_err();
-        let _ = get_range_params("bytes=-50-".into(), 100).is_err();
-        // first > last
-        let _ = get_range_params("bytes=50-0".into(), 100).is_err();
-        // first >= size
-        let _ = get_range_params("bytes=100-".into(), 100).is_err();
-        // first == last
-        let (first, last) = get_range_params("bytes=0-0".into(), 100).unwrap();
-        assert_eq!(first, 0);
-        assert_eq!(last, 0);
-        // exact range given
-        let (first, last) = get_range_params("bytes=0-50".into(), 100).unwrap();
-        assert_eq!(first, 0);
-        assert_eq!(last, 50);
-        // only end given, this means "give me last 50 bytes"
-        let (first, last) = get_range_params("bytes=-50".into(), 100).unwrap();
-        assert_eq!(first, 50);
-        assert_eq!(last, 99);
-        // only start given, this means "give me everything but the first 50 bytes"
-        let (first, last) = get_range_params("bytes=50-".into(), 100).unwrap();
-        assert_eq!(first, 50);
-        assert_eq!(last, 99);
-        // neither given, this means "give me everything"
-        let (first, last) = get_range_params("bytes=-".into(), 100).unwrap();
-        assert_eq!(first, 0);
-        assert_eq!(last, 99);
-        // last >= size
-        let (first, last) = get_range_params("bytes=50-100".into(), 100).unwrap();
-        assert_eq!(first, 50);
-        assert_eq!(last, 99);
-    }
-}

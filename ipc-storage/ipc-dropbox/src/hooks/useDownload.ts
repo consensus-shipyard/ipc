@@ -15,9 +15,9 @@ export function useDownload() {
 
       // Remove 0x prefix if present
       const hash = blobHash.startsWith('0x') ? blobHash.slice(2) : blobHash;
-      console.log('Fetching from:', `${config.nodeOperationObjectApi}/v1/blobs/${hash}/content`);
+      console.log('Fetching from:', `${config.objectsListenAddr}/v1/blobs/${hash}`);
 
-      const response = await fetch(`${config.nodeOperationObjectApi}/v1/blobs/${hash}/content`);
+      const response = await fetch(`${config.objectsListenAddr}/v1/blobs/${hash}`);
 
       if (!response.ok) {
         throw new Error(`Download failed: ${response.statusText}`);

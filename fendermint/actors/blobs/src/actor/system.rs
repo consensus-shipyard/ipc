@@ -212,7 +212,12 @@ impl BlobsActor {
         )
     }
 
-    /// Verify aggregated BLS signatures for blob finalization
+    /// Verify aggregated BLS signatures for blob finalization.
+    ///
+    /// Only operators assigned to store shards of this blob are required to sign.
+    /// The set of assigned operators is computed deterministically from the blob hash,
+    /// blob size, encoding parameters (data_shards, parity_shards), and the active
+    /// operator list. The quorum threshold is 2/3+ of the assigned operators.
     fn verify_blob_signatures(
         rt: &impl Runtime,
         params: &FinalizeBlobParams,
@@ -237,7 +242,52 @@ impl BlobsActor {
             ));
         }
 
-        // Extract signer indices from bitmap and collect their public keys
+        // Look up blob to get encoding parameters
+        let blob = state
+            .get_blob(rt.store(), params.hash)?
+            .ok_or_else(|| ActorError::not_found(format!("Blob {} not found", params.hash)))?;
+
+        let data_shards = blob.data_shards as usize;
+        let parity_shards = blob.parity_shards as usize;
+        let shards_per_chunk = data_shards + parity_shards;
+
+        // Compute number of chunks from blob size
+        const MAX_CHUNK_SIZE: u64 = 16 * 1024 * 1024; // 16 MiB, matches erasure-encoding
+        let num_chunks = if params.size == 0 {
+            1
+        } else {
+            ((params.size + MAX_CHUNK_SIZE - 1) / MAX_CHUNK_SIZE) as usize
+        };
+
+        // Compute the set of unique assigned operator indices using the deterministic
+        // assignment formula from erasure-encoding:
+        //   rotation_offset = blob_hash (big-endian) % num_nodes
+        //   node_index = (chunk_index * shards_per_chunk + shard_index + rotation_offset) % num_nodes
+        let rotation_offset = {
+            let mut remainder: u64 = 0;
+            for &byte in &params.hash.0 {
+                remainder = (remainder * 256 + byte as u64) % total_operators as u64;
+            }
+            remainder as usize
+        };
+
+        let mut assigned_indices = std::collections::BTreeSet::new();
+        for chunk_idx in 0..num_chunks {
+            for shard_idx in 0..shards_per_chunk {
+                let shard_global = chunk_idx * shards_per_chunk + shard_idx;
+                let node_index = (shard_global + rotation_offset) % total_operators;
+                assigned_indices.insert(node_index);
+            }
+        }
+
+        let assigned_count = assigned_indices.len();
+        if assigned_count == 0 {
+            return Err(ActorError::illegal_state(
+                "No operators assigned to blob".into(),
+            ));
+        }
+
+        // Extract signer indices from bitmap, only counting assigned operators
         let mut signer_pubkeys = Vec::new();
         let mut signer_count = 0;
 
@@ -248,6 +298,11 @@ impl BlobsActor {
 
             // Check if this operator signed (bit is set in bitmap)
             if (params.signer_bitmap & (1u128 << index)) != 0 {
+                // Only count signers that are in the assigned set
+                if !assigned_indices.contains(&index) {
+                    continue;
+                }
+
                 signer_count += 1;
 
                 // Get operator info to retrieve BLS public key
@@ -274,12 +329,12 @@ impl BlobsActor {
             }
         }
 
-        // Check threshold: need at least 2/3+ of operators
-        let threshold = (total_operators * 2 + 2) / 3; // Ceiling of 2/3
+        // Check threshold: need at least 2/3+ of assigned operators
+        let threshold = (assigned_count * 2 + 2) / 3; // Ceiling of 2/3
         if signer_count < threshold {
             return Err(ActorError::illegal_argument(format!(
-                "Insufficient signatures: got {}, need {} out of {}",
-                signer_count, threshold, total_operators
+                "Insufficient signatures: got {}, need {} out of {} assigned operators",
+                signer_count, threshold, assigned_count
             )));
         }
 
@@ -294,7 +349,6 @@ impl BlobsActor {
         let messages: Vec<&[u8]> = vec![hash_bytes; signer_count];
 
         // Verify the aggregated signature using verify_messages
-        // This verifies that the aggregated signature corresponds to the individual signatures
         let verification_result = verify_messages(&aggregated_sig, &messages, &signer_pubkeys);
 
         if !verification_result {
@@ -304,8 +358,9 @@ impl BlobsActor {
         }
 
         log::info!(
-            "BLS signature verified: {} operators signed (threshold: {}/{})",
+            "BLS signature verified: {}/{} assigned operators signed (threshold: {}, total operators: {})",
             signer_count,
+            assigned_count,
             threshold,
             total_operators
         );

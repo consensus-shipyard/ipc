@@ -47,6 +47,10 @@ pub struct Blob {
     pub subscribers: Subscribers,
     /// Blob status.
     pub status: BlobStatus,
+    /// Number of data shards per chunk for erasure encoding (k).
+    pub data_shards: u16,
+    /// Number of parity shards per chunk for erasure encoding (m).
+    pub parity_shards: u16,
 }
 
 impl Blob {
@@ -55,12 +59,16 @@ impl Blob {
         store: &BS,
         size: u64,
         metadata_hash: B256,
+        data_shards: u16,
+        parity_shards: u16,
     ) -> Result<Self, ActorError> {
         Ok(Self {
             size,
             metadata_hash,
             subscribers: Subscribers::new(store)?,
             status: BlobStatus::Added,
+            data_shards,
+            parity_shards,
         })
     }
 
@@ -81,6 +89,8 @@ impl Blob {
             metadata_hash: self.metadata_hash,
             subscribers,
             status: self.status.clone(),
+            data_shards: self.data_shards,
+            parity_shards: self.parity_shards,
         })
     }
 }
@@ -249,7 +259,7 @@ impl Blobs {
         let (mut blob, blob_added) = if let Some(blob) = blobs.get(&params.hash)? {
             (blob, false)
         } else {
-            (Blob::new(store, params.size, params.metadata_hash)?, true)
+            (Blob::new(store, params.size, params.metadata_hash, params.data_shards, params.parity_shards)?, true)
         };
 
         // Add/update subscriber and the subscription

@@ -41,11 +41,11 @@ interface IBlobsFacade {
     event BlobFinalized(address indexed subscriber, bytes32 hash, bool resolved);
     event BlobPending(address indexed subscriber, bytes32 hash, bytes32 sourceId);
 
-    function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl) external;
+    function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl, uint16 dataShards, uint16 parityShards) external;
     function deleteBlob(address subscriber, bytes32 blobHash, string memory subscriptionId) external;
     function getBlob(bytes32 blobHash) external view returns (Blob memory blob);
     function getStats() external view returns (SubnetStats memory stats);
-    function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl) external;
+    function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl, uint16 dataShards, uint16 parityShards) external;
     function trimBlobExpiries(address subscriber, bytes32 startingHash, uint32 limit) external returns (TrimBlobExpiries memory);
 }
 ```
@@ -91,6 +91,16 @@ interface IBlobsFacade {
         "name": "ttl",
         "type": "uint64",
         "internalType": "uint64"
+      },
+      {
+        "name": "dataShards",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "parityShards",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "outputs": [],
@@ -295,6 +305,16 @@ interface IBlobsFacade {
         "name": "ttl",
         "type": "uint64",
         "internalType": "uint64"
+      },
+      {
+        "name": "dataShards",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "parityShards",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "outputs": [],
@@ -2208,9 +2228,9 @@ pub mod IBlobsFacade {
             }
         }
     };
-    /**Function with signature `addBlob(address,bytes32,bytes32,bytes32,string,uint64,uint64)` and selector `0x5b5cc14f`.
+    /**Function with signature `addBlob(address,bytes32,bytes32,bytes32,string,uint64,uint64,uint16,uint16)` and selector `0xac106e38`.
     ```solidity
-    function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl) external;
+    function addBlob(address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl, uint16 dataShards, uint16 parityShards) external;
     ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2229,8 +2249,12 @@ pub mod IBlobsFacade {
         pub size: u64,
         #[allow(missing_docs)]
         pub ttl: u64,
+        #[allow(missing_docs)]
+        pub dataShards: u16,
+        #[allow(missing_docs)]
+        pub parityShards: u16,
     }
-    ///Container type for the return parameters of the [`addBlob(address,bytes32,bytes32,bytes32,string,uint64,uint64)`](addBlobCall) function.
+    ///Container type for the return parameters of the [`addBlob(address,bytes32,bytes32,bytes32,string,uint64,uint64,uint16,uint16)`](addBlobCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct addBlobReturn {}
@@ -2252,6 +2276,8 @@ pub mod IBlobsFacade {
                 ::alloy_sol_types::sol_data::String,
                 ::alloy_sol_types::sol_data::Uint<64>,
                 ::alloy_sol_types::sol_data::Uint<64>,
+                ::alloy_sol_types::sol_data::Uint<16>,
+                ::alloy_sol_types::sol_data::Uint<16>,
             );
             #[doc(hidden)]
             type UnderlyingRustTuple<'a> = (
@@ -2262,6 +2288,8 @@ pub mod IBlobsFacade {
                 ::alloy_sol_types::private::String,
                 u64,
                 u64,
+                u16,
+                u16,
             );
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
@@ -2284,6 +2312,8 @@ pub mod IBlobsFacade {
                         value.subscriptionId,
                         value.size,
                         value.ttl,
+                        value.dataShards,
+                        value.parityShards,
                     )
                 }
             }
@@ -2299,6 +2329,8 @@ pub mod IBlobsFacade {
                         subscriptionId: tuple.4,
                         size: tuple.5,
                         ttl: tuple.6,
+                        dataShards: tuple.7,
+                        parityShards: tuple.8,
                     }
                 }
             }
@@ -2342,14 +2374,16 @@ pub mod IBlobsFacade {
                 ::alloy_sol_types::sol_data::String,
                 ::alloy_sol_types::sol_data::Uint<64>,
                 ::alloy_sol_types::sol_data::Uint<64>,
+                ::alloy_sol_types::sol_data::Uint<16>,
+                ::alloy_sol_types::sol_data::Uint<16>,
             );
             type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = addBlobReturn;
             type ReturnTuple<'a> = ();
             type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str =
-                "addBlob(address,bytes32,bytes32,bytes32,string,uint64,uint64)";
-            const SELECTOR: [u8; 4] = [91u8, 92u8, 193u8, 79u8];
+                "addBlob(address,bytes32,bytes32,bytes32,string,uint64,uint64,uint16,uint16)";
+            const SELECTOR: [u8; 4] = [172u8, 16u8, 110u8, 56u8];
             #[inline]
             fn new<'a>(
                 tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType,
@@ -2380,6 +2414,12 @@ pub mod IBlobsFacade {
                     <::alloy_sol_types::sol_data::Uint<
                         64,
                     > as alloy_sol_types::SolType>::tokenize(&self.ttl),
+                    <::alloy_sol_types::sol_data::Uint<
+                        16,
+                    > as alloy_sol_types::SolType>::tokenize(&self.dataShards),
+                    <::alloy_sol_types::sol_data::Uint<
+                        16,
+                    > as alloy_sol_types::SolType>::tokenize(&self.parityShards),
                 )
             }
             #[inline]
@@ -2764,9 +2804,9 @@ pub mod IBlobsFacade {
             }
         }
     };
-    /**Function with signature `overwriteBlob(bytes32,address,bytes32,bytes32,bytes32,string,uint64,uint64)` and selector `0x434fc5a4`.
+    /**Function with signature `overwriteBlob(bytes32,address,bytes32,bytes32,bytes32,string,uint64,uint64,uint16,uint16)` and selector `0x67132023`.
     ```solidity
-    function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl) external;
+    function overwriteBlob(bytes32 oldHash, address sponsor, bytes32 source, bytes32 blobHash, bytes32 metadataHash, string memory subscriptionId, uint64 size, uint64 ttl, uint16 dataShards, uint16 parityShards) external;
     ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2787,8 +2827,12 @@ pub mod IBlobsFacade {
         pub size: u64,
         #[allow(missing_docs)]
         pub ttl: u64,
+        #[allow(missing_docs)]
+        pub dataShards: u16,
+        #[allow(missing_docs)]
+        pub parityShards: u16,
     }
-    ///Container type for the return parameters of the [`overwriteBlob(bytes32,address,bytes32,bytes32,bytes32,string,uint64,uint64)`](overwriteBlobCall) function.
+    ///Container type for the return parameters of the [`overwriteBlob(bytes32,address,bytes32,bytes32,bytes32,string,uint64,uint64,uint16,uint16)`](overwriteBlobCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct overwriteBlobReturn {}
@@ -2811,6 +2855,8 @@ pub mod IBlobsFacade {
                 ::alloy_sol_types::sol_data::String,
                 ::alloy_sol_types::sol_data::Uint<64>,
                 ::alloy_sol_types::sol_data::Uint<64>,
+                ::alloy_sol_types::sol_data::Uint<16>,
+                ::alloy_sol_types::sol_data::Uint<16>,
             );
             #[doc(hidden)]
             type UnderlyingRustTuple<'a> = (
@@ -2822,6 +2868,8 @@ pub mod IBlobsFacade {
                 ::alloy_sol_types::private::String,
                 u64,
                 u64,
+                u16,
+                u16,
             );
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
@@ -2845,6 +2893,8 @@ pub mod IBlobsFacade {
                         value.subscriptionId,
                         value.size,
                         value.ttl,
+                        value.dataShards,
+                        value.parityShards,
                     )
                 }
             }
@@ -2861,6 +2911,8 @@ pub mod IBlobsFacade {
                         subscriptionId: tuple.5,
                         size: tuple.6,
                         ttl: tuple.7,
+                        dataShards: tuple.8,
+                        parityShards: tuple.9,
                     }
                 }
             }
@@ -2905,14 +2957,16 @@ pub mod IBlobsFacade {
                 ::alloy_sol_types::sol_data::String,
                 ::alloy_sol_types::sol_data::Uint<64>,
                 ::alloy_sol_types::sol_data::Uint<64>,
+                ::alloy_sol_types::sol_data::Uint<16>,
+                ::alloy_sol_types::sol_data::Uint<16>,
             );
             type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = overwriteBlobReturn;
             type ReturnTuple<'a> = ();
             type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str =
-                "overwriteBlob(bytes32,address,bytes32,bytes32,bytes32,string,uint64,uint64)";
-            const SELECTOR: [u8; 4] = [67u8, 79u8, 197u8, 164u8];
+                "overwriteBlob(bytes32,address,bytes32,bytes32,bytes32,string,uint64,uint64,uint16,uint16)";
+            const SELECTOR: [u8; 4] = [103u8, 19u8, 32u8, 35u8];
             #[inline]
             fn new<'a>(
                 tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType,
@@ -2946,6 +3000,12 @@ pub mod IBlobsFacade {
                     <::alloy_sol_types::sol_data::Uint<
                         64,
                     > as alloy_sol_types::SolType>::tokenize(&self.ttl),
+                    <::alloy_sol_types::sol_data::Uint<
+                        16,
+                    > as alloy_sol_types::SolType>::tokenize(&self.dataShards),
+                    <::alloy_sol_types::sol_data::Uint<
+                        16,
+                    > as alloy_sol_types::SolType>::tokenize(&self.parityShards),
                 )
             }
             #[inline]
@@ -3129,10 +3189,10 @@ pub mod IBlobsFacade {
         ///
         /// Prefer using `SolInterface` methods instead.
         pub const SELECTORS: &'static [[u8; 4usize]] = &[
-            [67u8, 79u8, 197u8, 164u8],
-            [91u8, 92u8, 193u8, 79u8],
+            [103u8, 19u8, 32u8, 35u8],
             [120u8, 248u8, 175u8, 133u8],
             [138u8, 77u8, 26u8, 212u8],
+            [172u8, 16u8, 110u8, 56u8],
             [190u8, 169u8, 1u8, 106u8],
             [197u8, 157u8, 72u8, 71u8],
         ];
@@ -3188,16 +3248,6 @@ pub mod IBlobsFacade {
                     overwriteBlob
                 },
                 {
-                    fn addBlob(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<IBlobsFacadeCalls> {
-                        <addBlobCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
-                            .map(IBlobsFacadeCalls::addBlob)
-                    }
-                    addBlob
-                },
-                {
                     fn trimBlobExpiries(
                         data: &[u8],
                         validate: bool,
@@ -3218,6 +3268,16 @@ pub mod IBlobsFacade {
                             .map(IBlobsFacadeCalls::getBlob)
                     }
                     getBlob
+                },
+                {
+                    fn addBlob(
+                        data: &[u8],
+                        validate: bool,
+                    ) -> alloy_sol_types::Result<IBlobsFacadeCalls> {
+                        <addBlobCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
+                            .map(IBlobsFacadeCalls::addBlob)
+                    }
+                    addBlob
                 },
                 {
                     fn deleteBlob(

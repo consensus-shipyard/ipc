@@ -57,6 +57,10 @@ pub struct AddParams {
     pub metadata: HashMap<String, String>,
     /// Whether to overwrite a key if it already exists.
     pub overwrite: bool,
+    /// Number of data shards per chunk for erasure encoding (k).
+    pub data_shards: u16,
+    /// Number of parity shards per chunk for erasure encoding (m).
+    pub parity_shards: u16,
 }
 
 /// Key of the object to delete from a bucket.

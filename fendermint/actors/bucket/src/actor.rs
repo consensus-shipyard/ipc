@@ -77,6 +77,8 @@ impl Actor {
                             id: sub_id,
                             size: params.size,
                             ttl: params.ttl,
+                            data_shards: params.data_shards,
+                            parity_shards: params.parity_shards,
                         },
                     },
                 )?
@@ -99,6 +101,8 @@ impl Actor {
                     id: sub_id,
                     size: params.size,
                     ttl: params.ttl,
+                    data_shards: params.data_shards,
+                    parity_shards: params.parity_shards,
                 },
             )?
         };

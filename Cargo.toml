@@ -66,6 +66,7 @@ members = [
   "fendermint/actors/ipc_storage_config/shared",
 
   # storage components (netwatch patched for socket2 0.5 compatibility!)
+  "ipc-storage/erasure-encoding",
   "ipc-storage/iroh_manager",
   "ipc-storage/ipld",
   "ipc-storage/actor_sdk",
@@ -165,6 +166,7 @@ libp2p-bitswap = { path = "ext/libp2p-bitswap" }
 libsecp256k1 = "0.7"
 literally = "0.1.3"
 log = "0.4"
+memmap2 = "0.9"
 lru_time_cache = "0.11"
 multiaddr = "0.18"
 multihash = { version = "0.18.1", default-features = false, features = [
@@ -184,14 +186,12 @@ quickcheck = "1"
 quickcheck_async = "0.1"
 quickcheck_macros = "1"
 rand = "0.8"
+reed-solomon-simd = "3"
 rand_chacha = "0.3"
 regex = "1"
 replace_with = "0.1.7"
 statrs = "0.18.0"
 reqwest = { version = "0.11.13", features = ["json"] }
-# entanglement library
-entangler = { package = "recall_entangler", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
-entangler_storage = { package = "recall_entangler_storage", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
 # Objects HTTP API dependencies
 warp = "0.3"
 uuid = { version = "1.0", features = ["v4"] }

@@ -23,7 +23,7 @@ export const ADM_ABI = [
 
 // ABI for Bucket Actor
 export const BUCKET_ABI = [
-  'function addObject(bytes32 source, string key, bytes32 hash, bytes32 recoveryHash, uint64 size)',
+  'function addObject(bytes32 source, string key, bytes32 hash, bytes32 recoveryHash, uint64 size, uint16 dataShards, uint16 parityShards)',
   'function getObject(string key) view returns (tuple(bytes32 blobHash, bytes32 recoveryHash, uint64 size, uint64 expiry, tuple(string key, string value)[] metadata))',
   'function deleteObject(string key)',
   'function updateObjectMetadata(string key, tuple(string key, string value)[] metadata)',

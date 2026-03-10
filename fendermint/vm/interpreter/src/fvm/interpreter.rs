@@ -267,8 +267,8 @@ where
             })
             .collect::<Vec<_>>();
 
-        let signed_msgs =
-            select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
+        // let signed_msgs =
+        //     select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
 
         let total_gas_limit = state.block_gas_tracker().available();
         let signed_msgs_iter = select_messages_by_gas_limit(signed_msgs, total_gas_limit)

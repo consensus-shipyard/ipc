@@ -12,12 +12,17 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
+use erasure_encoding::{shards_for_node, shard_node, BlobId, NodeId, DEFAULT_MAX_CHUNK_SIZE};
 use ethers::prelude::*;
 use ethers::providers::{Http, Provider};
+use futures::StreamExt;
+use iroh::NodeAddr;
 use iroh_blobs::Hash;
 use iroh_manager::IrohNode;
+use std::str::FromStr;
 use tracing::{debug, error, info, warn};
 
+use crate::distribution::{shard_key, NodeRpcDirectory};
 use super::store::Store;
 use super::SignatureStorage;
 
@@ -235,226 +240,216 @@ async fn handle_blob_event(event: BlobEvent, signatures: &SignatureStorage, iroh
     }
 }
 
-/// Delete a blob and its associated content from Iroh storage
+/// Delete a blob's shard data from Iroh storage.
+///
+/// Iterates all Iroh tags and deletes any whose name starts with the blob's
+/// hex prefix, covering all `{blob_hex}/{chunk}/{shard}` tags.
 async fn delete_blob_from_iroh(iroh: &IrohNode, hash: Hash) -> Result<bool> {
-    use iroh_blobs::hashseq::HashSeq;
+    let blob_hex = hex::encode(hash.as_bytes());
+    let prefix = format!("{}/", blob_hex);
 
-    // First, try to read the hash sequence to get all associated hashes
-    let hash_seq_bytes = match iroh.blobs_client().read_to_bytes(hash).await {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            // Blob not found, nothing to delete
-            return Ok(false);
+    let mut tags = iroh.blobs_client().tags().list().await?;
+    let mut deleted_any = false;
+
+    while let Some(Ok(tag_info)) = tags.next().await {
+        let tag_name = std::str::from_utf8(tag_info.name.0.as_ref()).unwrap_or("");
+        if tag_name.starts_with(&prefix) {
+            debug!("Deleting shard tag: {}", tag_name);
+            let _ = iroh.blobs_client().tags().delete(tag_info.name).await;
+            deleted_any = true;
         }
-    };
-
-    // Parse the hash sequence
-    let content_hashes: Vec<Hash> = match HashSeq::try_from(hash_seq_bytes) {
-        Ok(seq) => seq.iter().collect(),
-        Err(e) => {
-            warn!("Failed to parse hash sequence for {}: {}", hash, e);
-            // Still try to delete the main hash
-            vec![]
-        }
-    };
-
-    // Delete the hash sequence blob tag
-    let seq_tag = iroh_blobs::Tag(format!("blob-seq-{}", hash).into());
-    let _ = iroh.blobs_client().tags().delete(seq_tag).await;
-
-    // Delete content blob tags
-    for content_hash in &content_hashes {
-        let content_tag = iroh_blobs::Tag(format!("blob-{}-{}", hash, content_hash).into());
-        let _ = iroh.blobs_client().tags().delete(content_tag).await;
     }
 
-    Ok(true)
+    Ok(deleted_any)
 }
 
-/// Resolve a blob by downloading it from one of its sources
+/// Response from the shard hash lookup endpoint.
+#[derive(serde::Deserialize)]
+struct ShardHashLookupResponse {
+    hash: String,
+    node_addr: NodeAddr,
+}
+
+/// Resolve a blob by downloading assigned shards from other operators.
 ///
-/// Downloads the hash sequence and all blobs referenced within it (including original content).
-/// Returns Ok(()) if the blob was successfully downloaded, Err otherwise.
-pub async fn resolve_blob(
+/// 1. Computes which shards are assigned to this node
+/// 2. Checks which are already stored locally
+/// 3. For missing shards, queries other operators for the shard hash and downloads via Iroh P2P
+/// 4. Signs the blob hash with BLS key once all assigned shards are present
+pub async fn resolve_blob_shards(
     iroh: IrohNode,
-    hash: Hash,
+    blob_hash: fendermint_actor_blobs_shared::bytes::B256,
     size: u64,
-    sources: std::collections::HashSet<(
-        fvm_shared::address::Address,
-        fendermint_actor_blobs_shared::blobs::SubscriptionId,
-        iroh::NodeId,
-    )>,
+    data_shards: usize,
+    parity_shards: usize,
+    nodes: Vec<NodeId>,
+    node_rpc_directory: NodeRpcDirectory,
+    our_node_id: NodeId,
     bls_private_key: BlsPrivateKey,
     signatures: SignatureStorage,
 ) -> Result<()> {
-    use iroh_blobs::hashseq::HashSeq;
+    let blob_id = BlobId(blob_hash.0);
+    let blob_iroh_hash = Hash::from_bytes(blob_hash.0);
+    let num_chunks = (size as usize).div_ceil(DEFAULT_MAX_CHUNK_SIZE);
+    let shards_per_chunk = data_shards + parity_shards;
 
-    info!("Resolving blob: {} (size: {})", hash, size);
-    debug!("Sources: {} available", sources.len());
+    info!(
+        "Resolving blob {} shards: {} chunks, k={}, m={}, size={}",
+        blob_hash, num_chunks, data_shards, parity_shards, size
+    );
 
-    // Try each source until one succeeds
-    for (_subscriber, _id, source_node_id) in sources {
-        debug!("Attempting download from source: {}", source_node_id);
+    // Compute which shards are assigned to this node
+    let assigned = shards_for_node(
+        &blob_id,
+        num_chunks,
+        data_shards,
+        parity_shards,
+        &nodes,
+        &our_node_id,
+    );
 
-        // Create a NodeAddr from the source
-        let source_addr = iroh::NodeAddr::new(source_node_id);
+    info!(
+        "Node has {} assigned shards for blob {}",
+        assigned.len(),
+        blob_hash
+    );
 
-        // Step 1: Download the hash sequence blob
-        match iroh
-            .blobs_client()
-            .download_with_opts(
-                hash,
-                iroh_blobs::rpc::client::blobs::DownloadOptions {
-                    format: iroh_blobs::BlobFormat::Raw,
-                    nodes: vec![source_addr.clone()],
-                    tag: iroh_blobs::util::SetTagOption::Named(iroh_blobs::Tag(
-                        format!("blob-seq-{}", hash).into(),
-                    )),
-                    mode: iroh_blobs::rpc::client::blobs::DownloadMode::Queued,
-                },
-            )
-            .await
-        {
-            Ok(progress) => {
-                match progress.finish().await {
-                    Ok(outcome) => {
-                        let downloaded_size = outcome.local_size + outcome.downloaded_size;
-                        info!(
-                            "Downloaded hash sequence {} (downloaded: {} bytes, local: {} bytes)",
-                            hash, outcome.downloaded_size, outcome.local_size
-                        );
+    let mut missing_shards = Vec::new();
 
-                        // Step 2: Read and parse the hash sequence to get all referenced blobs
-                        let hash_seq_bytes = match iroh.blobs_client().read_to_bytes(hash).await {
-                            Ok(bytes) => bytes,
-                            Err(e) => {
-                                warn!("Failed to read hash sequence {}: {}", hash, e);
-                                continue;
-                            }
-                        };
+    // Check which assigned shards are already stored locally
+    for &(chunk_idx, shard_idx) in &assigned {
+        let tag = shard_key(&blob_id, chunk_idx, shard_idx);
+        let iroh_tag = iroh_blobs::Tag(tag.clone().into());
 
-                        let hash_seq = match HashSeq::try_from(hash_seq_bytes) {
-                            Ok(seq) => seq,
-                            Err(e) => {
-                                warn!("Failed to parse hash sequence {}: {}", hash, e);
-                                continue;
-                            }
-                        };
-
-                        let content_hashes: Vec<Hash> = hash_seq.iter().collect();
-                        info!(
-                            "Hash sequence {} contains {} blobs to download",
-                            hash,
-                            content_hashes.len()
-                        );
-
-                        // Step 3: Download all blobs in the hash sequence
-                        let mut all_downloaded = true;
-                        for (idx, content_hash) in content_hashes.iter().enumerate() {
-                            let blob_type = if idx == 0 {
-                                "original content"
-                            } else if idx == 1 {
-                                "metadata"
-                            } else {
-                                "parity"
-                            };
-
-                            debug!(
-                                "Downloading {} blob {} ({}/{}): {}",
-                                blob_type,
-                                content_hash,
-                                idx + 1,
-                                content_hashes.len(),
-                                content_hash
-                            );
-
-                            match iroh
-                                .blobs_client()
-                                .download_with_opts(
-                                    *content_hash,
-                                    iroh_blobs::rpc::client::blobs::DownloadOptions {
-                                        format: iroh_blobs::BlobFormat::Raw,
-                                        nodes: vec![source_addr.clone()],
-                                        tag: iroh_blobs::util::SetTagOption::Named(
-                                            iroh_blobs::Tag(
-                                                format!("blob-{}-{}", hash, content_hash).into(),
-                                            ),
-                                        ),
-                                        mode: iroh_blobs::rpc::client::blobs::DownloadMode::Queued,
-                                    },
-                                )
-                                .await
-                            {
-                                Ok(content_progress) => match content_progress.finish().await {
-                                    Ok(content_outcome) => {
-                                        debug!(
-                                                "Downloaded {} blob {} (downloaded: {} bytes, local: {} bytes)",
-                                                blob_type,
-                                                content_hash,
-                                                content_outcome.downloaded_size,
-                                                content_outcome.local_size
-                                            );
-                                    }
-                                    Err(e) => {
-                                        warn!(
-                                            "Failed to complete {} blob {} download: {}",
-                                            blob_type, content_hash, e
-                                        );
-                                        all_downloaded = false;
-                                    }
-                                },
-                                Err(e) => {
-                                    warn!(
-                                        "Failed to start {} blob {} download: {}",
-                                        blob_type, content_hash, e
-                                    );
-                                    all_downloaded = false;
-                                }
-                            }
-                        }
-
-                        if !all_downloaded {
-                            warn!(
-                                "Not all content blobs downloaded for {}, trying next source",
-                                hash
-                            );
-                            continue;
-                        }
-
-                        info!(
-                            "Successfully resolved blob {} with all {} content blobs (expected original size: {} bytes)",
-                            hash, content_hashes.len(), size
-                        );
-
-                        // Generate BLS signature for the blob hash
-                        let hash_bytes = hash.as_bytes();
-                        let signature = bls_private_key.sign(hash_bytes);
-                        let signature_bytes = signature.as_bytes();
-
-                        // Store signature in memory
-                        {
-                            let mut sigs = signatures.write().unwrap();
-                            sigs.insert(hash, signature_bytes.clone());
-                        }
-
-                        info!("Generated BLS signature for blob {}", hash);
-                        debug!("Signature: {}", hex::encode(&signature_bytes));
-                        debug!("Hash sequence blob size: {} bytes", downloaded_size);
-
-                        // Blob downloaded successfully
-                        // It will now wait for validator signatures before finalization
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        warn!("Failed to complete download from {}: {}", source_node_id, e);
-                    }
+        let found = {
+            let mut tags = iroh.blobs_client().tags().list().await?;
+            let mut found = false;
+            while let Some(Ok(tag_info)) = tags.next().await {
+                if tag_info.name == iroh_tag {
+                    found = true;
+                    break;
                 }
             }
-            Err(e) => {
-                warn!("Failed to start download from {}: {}", source_node_id, e);
-            }
+            found
+        };
+
+        if found {
+            debug!("Shard {}/{} already stored locally", chunk_idx, shard_idx);
+        } else {
+            missing_shards.push((chunk_idx, shard_idx));
         }
     }
 
-    anyhow::bail!("Failed to resolve blob {} from any source", hash)
+    if missing_shards.is_empty() {
+        info!("All assigned shards already present for blob {}", blob_hash);
+    } else {
+        info!(
+            "Need to fetch {} missing shards for blob {}",
+            missing_shards.len(),
+            blob_hash
+        );
+
+        let http_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .context("failed to create HTTP client")?;
+
+        for (chunk_idx, shard_idx) in missing_shards {
+            // Find which operator holds this shard
+            let holder = shard_node(&blob_id, chunk_idx, shard_idx, shards_per_chunk, &nodes);
+
+            let rpc_url = node_rpc_directory.get(&holder).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "No RPC URL for node {:?} holding shard {}/{}",
+                    holder,
+                    chunk_idx,
+                    shard_idx
+                )
+            })?;
+
+            let blob_id_hex = hex::encode(blob_id.0);
+            let url = format!(
+                "{}/v1/shards/{}/{}/{}/hash",
+                rpc_url.trim_end_matches('/'),
+                blob_id_hex,
+                chunk_idx,
+                shard_idx
+            );
+
+            debug!("Querying shard hash from {}", url);
+
+            let resp = http_client
+                .get(&url)
+                .send()
+                .await
+                .with_context(|| format!("failed to query shard hash from {}", url))?;
+
+            if !resp.status().is_success() {
+                anyhow::bail!(
+                    "Shard hash lookup failed for {}/{}: HTTP {}",
+                    chunk_idx,
+                    shard_idx,
+                    resp.status()
+                );
+            }
+
+            let lookup: ShardHashLookupResponse = resp
+                .json()
+                .await
+                .context("failed to parse shard hash response")?;
+
+            let shard_hash = Hash::from_str(&lookup.hash)
+                .map_err(|_| anyhow::anyhow!("invalid hash in shard lookup response"))?;
+
+            let tag = shard_key(&blob_id, chunk_idx, shard_idx);
+
+            // Download shard via Iroh P2P
+            info!(
+                "Downloading shard {}/{} (hash={}) from node",
+                chunk_idx, shard_idx, shard_hash
+            );
+
+            let progress = iroh
+                .blobs_client()
+                .download_with_opts(
+                    shard_hash,
+                    iroh_blobs::rpc::client::blobs::DownloadOptions {
+                        format: iroh_blobs::BlobFormat::Raw,
+                        nodes: vec![lookup.node_addr],
+                        tag: iroh_blobs::util::SetTagOption::Named(iroh_blobs::Tag(tag.into())),
+                        mode: iroh_blobs::rpc::client::blobs::DownloadMode::Queued,
+                    },
+                )
+                .await
+                .with_context(|| {
+                    format!("failed to start shard {}/{} download", chunk_idx, shard_idx)
+                })?;
+
+            let outcome = progress.finish().await.with_context(|| {
+                format!("shard {}/{} download did not complete", chunk_idx, shard_idx)
+            })?;
+
+            info!(
+                "Downloaded shard {}/{} (downloaded: {} bytes, local: {} bytes)",
+                chunk_idx, shard_idx, outcome.downloaded_size, outcome.local_size
+            );
+        }
+    }
+
+    // All assigned shards are now present — sign the blob hash
+    let signature = bls_private_key.sign(blob_iroh_hash.as_bytes());
+    let signature_bytes = signature.as_bytes();
+
+    {
+        let mut sigs = signatures.write().unwrap();
+        sigs.insert(blob_iroh_hash, signature_bytes.clone());
+    }
+
+    info!(
+        "Generated BLS signature for blob {} (all {} assigned shards present)",
+        blob_hash,
+        assigned.len()
+    );
+
+    Ok(())
 }

@@ -30,6 +30,10 @@ pub struct AddBlobParams {
     /// Blob time-to-live epochs.
     /// If not specified, the current default TTL from the config actor is used.
     pub ttl: Option<ChainEpoch>,
+    /// Number of data shards per chunk for erasure encoding (k).
+    pub data_shards: u16,
+    /// Number of parity shards per chunk for erasure encoding (m).
+    pub parity_shards: u16,
 }
 
 /// Params for getting a blob.

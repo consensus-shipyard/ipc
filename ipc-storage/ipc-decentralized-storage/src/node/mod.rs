@@ -10,10 +10,12 @@
 
 mod resolver;
 mod rpc;
+pub mod shard_verifier;
 pub mod store;
 
 use anyhow::{Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
+use erasure_encoding::NodeId;
 use ethers::types::Address;
 use fendermint_actor_blobs_shared::bytes::B256;
 use fendermint_rpc::FendermintClient;
@@ -23,15 +25,28 @@ use std::collections::HashMap;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tendermint_rpc::Url;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
+use crate::distribution::NodeRpcDirectory;
 use crate::gateway::BlobGateway;
+use crate::objects::build_node_directories;
 use resolver::EventPollerConfig;
 use store::InMemoryStore;
+
+/// Default encoding parameters (must match actor defaults).
+const DEFAULT_DATA_SHARDS: usize = 4;
+const DEFAULT_PARITY_SHARDS: usize = 2;
+
+/// Cached operator directory info for the resolution loop.
+struct OperatorDirectoryCache {
+    nodes: Vec<NodeId>,
+    node_rpc_directory: NodeRpcDirectory,
+    last_refresh: Instant,
+}
 
 /// Configuration for the storage node
 #[derive(Clone)]
@@ -154,17 +169,21 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
         .context("failed to create RPC server Fendermint client")?;
     let rpc_client = Arc::new(Mutex::new(rpc_client));
 
-    // Start RPC server for signature queries and blob downloads
+    // Start RPC server for signature queries, blob downloads, and shard pulls
     let signatures_for_rpc = signatures.clone();
     let rpc_bind_addr = config.rpc_bind_addr;
     let rpc_client_for_server = rpc_client.clone();
     let iroh_for_rpc = iroh_node.clone();
+    let bls_key_for_rpc = config.bls_private_key;
+    let rpc_url_for_server = config.rpc_url.clone();
     tokio::spawn(async move {
         if let Err(e) = rpc::start_rpc_server(
             rpc_bind_addr,
             signatures_for_rpc,
             rpc_client_for_server,
             iroh_for_rpc,
+            bls_key_for_rpc,
+            rpc_url_for_server,
         )
         .await
         {
@@ -194,6 +213,14 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
         }
     });
 
+    // Determine this node's NodeId from its Iroh identity
+    let our_node_id = NodeId(node_addr.node_id.as_bytes().clone());
+    info!("Our NodeId: {:?}", hex::encode(our_node_id.0));
+
+    // Operator directory cache (refreshed periodically)
+    let mut op_cache: Option<OperatorDirectoryCache> = None;
+    let cache_refresh_interval = Duration::from_secs(300);
+
     info!("Starting blob resolution loop");
     info!(
         "BLS public key: {:?}",
@@ -203,32 +230,25 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
 
     loop {
         // Check completed downloads and move them to the downloaded set
-        // Collect finished tasks to process
         let mut finished = Vec::new();
         in_progress.retain(|hash, handle| {
             if handle.is_finished() {
                 finished.push(*hash);
-                false // Remove from in_progress
+                false
             } else {
-                true // Keep in in_progress
+                true
             }
         });
 
-        // Process finished downloads
         for hash in finished {
-            // Note: The task has finished, but we mark it as downloaded
-            // The actual result checking would require more complex handling
-            // For now, we assume successful completion if the task finished
-            info!("Blob {} download completed, waiting for finalization", hash);
-            downloaded.insert(hash, std::time::Instant::now());
+            info!("Blob {} resolution completed, waiting for finalization", hash);
+            downloaded.insert(hash, Instant::now());
         }
 
-        // TODO: Query on-chain blob status to check if downloaded blobs are finalized
-        // For now, just log the downloaded blobs waiting for finalization
+        // Clean up old downloaded entries
         if !downloaded.is_empty() {
             debug!("Blobs waiting for finalization: {}", downloaded.len());
-            // Clean up old entries (older than 5 minutes) to prevent memory leaks
-            let cutoff = std::time::Instant::now() - Duration::from_secs(300);
+            let cutoff = Instant::now() - Duration::from_secs(300);
             downloaded.retain(|hash, timestamp| {
                 if *timestamp < cutoff {
                     warn!("Blob {} has been waiting for finalization for >5 minutes, removing from tracking", hash);
@@ -239,6 +259,27 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
             });
         }
 
+        // Refresh operator directory cache if stale or missing
+        let cache_stale = op_cache
+            .as_ref()
+            .map_or(true, |c| c.last_refresh.elapsed() > cache_refresh_interval);
+
+        if cache_stale {
+            match build_node_directories(&gateway).await {
+                Ok((nodes, _node_directory, node_rpc_directory)) => {
+                    info!("Refreshed operator directory: {} nodes", nodes.len());
+                    op_cache = Some(OperatorDirectoryCache {
+                        nodes,
+                        node_rpc_directory,
+                        last_refresh: Instant::now(),
+                    });
+                }
+                Err(e) => {
+                    warn!("Failed to refresh operator directory: {}", e);
+                }
+            }
+        }
+
         // Query for added blobs
         match gateway.query_added_blobs().await {
             Ok(blobs) => {
@@ -246,15 +287,13 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
                     info!("Found {} added blobs to resolve", blobs.len());
 
                     for blob_item in blobs {
-                        let (hash, size, sources) = blob_item;
+                        let (hash, size, _sources) = blob_item;
 
-                        // Skip if already downloading
+                        // Skip if already in progress or downloaded
                         if in_progress.contains_key(&hash) {
                             debug!("Blob {} already in progress, skipping", hash);
                             continue;
                         }
-
-                        // Check if we're at the concurrency limit
                         if in_progress.len() >= config.max_concurrent_downloads {
                             warn!(
                                 "Max concurrent downloads ({}) reached, deferring blob {}",
@@ -262,37 +301,45 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
                             );
                             continue;
                         }
-
-                        // Skip if already downloaded and waiting for finalization
                         if downloaded.contains_key(&hash) {
                             debug!("Blob {} already downloaded, waiting for finalization", hash);
                             continue;
                         }
 
-                        // Spawn a task to download this blob
+                        // Need operator directory to resolve
+                        let Some(cache) = &op_cache else {
+                            warn!("No operator directory available, deferring blob {}", hash);
+                            continue;
+                        };
+
+                        if cache.nodes.is_empty() {
+                            warn!("No nodes in operator directory, deferring blob {}", hash);
+                            continue;
+                        }
+
+                        // Spawn shard-based resolution
                         let iroh_clone = iroh_node.clone();
+                        let nodes_clone = cache.nodes.clone();
+                        let rpc_dir_clone = cache.node_rpc_directory.clone();
+                        let our_id = our_node_id;
                         let bls_key = config.bls_private_key;
                         let sigs = signatures.clone();
 
-                        // Convert B256 hash to iroh_blobs::Hash
-                        let iroh_hash = Hash::from_bytes(hash.0);
-
-                        // Convert sources from B256 to iroh::NodeId
-                        let iroh_sources: std::collections::HashSet<_> = sources
-                            .into_iter()
-                            .map(|(addr, sub_id, source_b256)| {
-                                let node_id = iroh::NodeId::from_bytes(&source_b256.0)
-                                    .expect("B256 should be valid NodeId bytes");
-                                (addr, sub_id, node_id)
-                            })
-                            .collect();
+                        info!(
+                            "Spawning shard resolution for blob {} (size: {})",
+                            hash, size
+                        );
 
                         let handle = tokio::spawn(async move {
-                            resolver::resolve_blob(
+                            resolver::resolve_blob_shards(
                                 iroh_clone,
-                                iroh_hash,
+                                hash,
                                 size,
-                                iroh_sources,
+                                DEFAULT_DATA_SHARDS,
+                                DEFAULT_PARITY_SHARDS,
+                                nodes_clone,
+                                rpc_dir_clone,
+                                our_id,
                                 bls_key,
                                 sigs,
                             )

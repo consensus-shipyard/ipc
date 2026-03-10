@@ -14,7 +14,7 @@ interface FileExplorerProps {
   onNavigateToFolder: (path: string) => void;
   onNavigateUp: () => void;
   onRefresh: () => void;
-  onUpload: (file: File, targetPath: string) => Promise<boolean>;
+  onUpload: (file: File, targetPath: string, dataShards: number, parityShards: number) => Promise<boolean>;
   onDownload: (blobHash: string, fileName: string) => Promise<boolean>;
   onDelete: (key: string) => Promise<boolean>;
   onFetchFiles: (prefix: string) => void;
@@ -41,23 +41,39 @@ export function FileExplorer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [showUploadConfig, setShowUploadConfig] = useState(false);
+  const [dataShards, setDataShards] = useState(4);
+  const [parityShards, setParityShards] = useState(2);
 
   useEffect(() => {
     onFetchFiles(currentPath);
   }, [onFetchFiles, currentPath]);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const success = await onUpload(file, currentPath);
-      if (success) {
-        onRefresh();
-      }
+      setPendingFile(file);
+      setShowUploadConfig(true);
     }
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleUploadConfirm = async () => {
+    if (!pendingFile) return;
+    setShowUploadConfig(false);
+    const success = await onUpload(pendingFile, currentPath, dataShards, parityShards);
+    if (success) {
+      onRefresh();
+    }
+    setPendingFile(null);
+  };
+
+  const handleUploadCancel = () => {
+    setShowUploadConfig(false);
+    setPendingFile(null);
   };
 
   const handleCreateFolder = () => {
@@ -72,10 +88,10 @@ export function FileExplorer({
   const formatSize = (size?: bigint) => {
     if (!size) return '-';
     const bytes = Number(size);
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    if (bytes < 1000) return `${bytes} B`;
+    if (bytes < 1000 * 1000) return `${(bytes / 1000).toFixed(1)} KB`;
+    if (bytes < 1000 * 1000 * 1000) return `${(bytes / (1000 * 1000)).toFixed(1)} MB`;
+    return `${(bytes / (1000 * 1000 * 1000)).toFixed(1)} GB`;
   };
 
   const getBreadcrumbs = () => {
@@ -169,6 +185,44 @@ export function FileExplorer({
           >
             Cancel
           </button>
+        </div>
+      )}
+
+      {showUploadConfig && pendingFile && (
+        <div className="upload-config">
+          <div className="upload-config-header">
+            <strong>Upload: {pendingFile.name}</strong>
+          </div>
+          <div className="upload-config-fields">
+            <label className="upload-config-label">
+              Data chunks (k):
+              <input
+                type="number"
+                min="1"
+                value={dataShards}
+                onChange={(e) => setDataShards(parseInt(e.target.value) || 1)}
+                className="input input-small"
+              />
+            </label>
+            <label className="upload-config-label">
+              Parity chunks (m):
+              <input
+                type="number"
+                min="1"
+                value={parityShards}
+                onChange={(e) => setParityShards(parseInt(e.target.value) || 1)}
+                className="input input-small"
+              />
+            </label>
+          </div>
+          <div className="upload-config-actions">
+            <button onClick={handleUploadConfirm} className="btn btn-primary">
+              Upload
+            </button>
+            <button onClick={handleUploadCancel} className="btn btn-secondary">
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 

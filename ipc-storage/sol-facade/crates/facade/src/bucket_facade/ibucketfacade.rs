@@ -36,8 +36,8 @@ interface IBucketFacade {
     event ObjectDeleted(bytes key, bytes32 blobHash);
     event ObjectMetadataUpdated(bytes key, bytes metadata);
 
-    function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size) external;
-    function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size, uint64 ttl, KeyValue[] memory metadata, bool overwrite) external;
+    function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size, uint16 dataShards, uint16 parityShards) external;
+    function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size, uint64 ttl, KeyValue[] memory metadata, bool overwrite, uint16 dataShards, uint16 parityShards) external;
     function deleteObject(string memory key) external;
     function getObject(string memory key) external view returns (ObjectValue memory);
     function queryObjects(string memory prefix, string memory delimiter, string memory startKey, uint64 limit) external view returns (Query memory);
@@ -80,6 +80,16 @@ interface IBucketFacade {
         "name": "size",
         "type": "uint64",
         "internalType": "uint64"
+      },
+      {
+        "name": "dataShards",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "parityShards",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "outputs": [],
@@ -140,6 +150,16 @@ interface IBucketFacade {
         "name": "overwrite",
         "type": "bool",
         "internalType": "bool"
+      },
+      {
+        "name": "dataShards",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "parityShards",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "outputs": [],
@@ -2226,9 +2246,9 @@ pub mod IBucketFacade {
             }
         }
     };
-    /**Function with signature `addObject(bytes32,string,bytes32,bytes32,uint64)` and selector `0x2d6f2550`.
+    /**Function with signature `addObject(bytes32,string,bytes32,bytes32,uint64,uint16,uint16)` and selector `0x9579baf9`.
     ```solidity
-    function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size) external;
+    function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size, uint16 dataShards, uint16 parityShards) external;
     ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2243,8 +2263,12 @@ pub mod IBucketFacade {
         pub recoveryHash: ::alloy_sol_types::private::FixedBytes<32>,
         #[allow(missing_docs)]
         pub size: u64,
+        #[allow(missing_docs)]
+        pub dataShards: u16,
+        #[allow(missing_docs)]
+        pub parityShards: u16,
     }
-    ///Container type for the return parameters of the [`addObject(bytes32,string,bytes32,bytes32,uint64)`](addObject_0Call) function.
+    ///Container type for the return parameters of the [`addObject(bytes32,string,bytes32,bytes32,uint64,uint16,uint16)`](addObject_0Call) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct addObject_0Return {}
@@ -2264,6 +2288,8 @@ pub mod IBucketFacade {
                 ::alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::Uint<64>,
+                ::alloy_sol_types::sol_data::Uint<16>,
+                ::alloy_sol_types::sol_data::Uint<16>,
             );
             #[doc(hidden)]
             type UnderlyingRustTuple<'a> = (
@@ -2272,6 +2298,8 @@ pub mod IBucketFacade {
                 ::alloy_sol_types::private::FixedBytes<32>,
                 ::alloy_sol_types::private::FixedBytes<32>,
                 u64,
+                u16,
+                u16,
             );
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
@@ -2292,6 +2320,8 @@ pub mod IBucketFacade {
                         value.hash,
                         value.recoveryHash,
                         value.size,
+                        value.dataShards,
+                        value.parityShards,
                     )
                 }
             }
@@ -2305,6 +2335,8 @@ pub mod IBucketFacade {
                         hash: tuple.2,
                         recoveryHash: tuple.3,
                         size: tuple.4,
+                        dataShards: tuple.5,
+                        parityShards: tuple.6,
                     }
                 }
             }
@@ -2346,13 +2378,15 @@ pub mod IBucketFacade {
                 ::alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::FixedBytes<32>,
                 ::alloy_sol_types::sol_data::Uint<64>,
+                ::alloy_sol_types::sol_data::Uint<16>,
+                ::alloy_sol_types::sol_data::Uint<16>,
             );
             type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = addObject_0Return;
             type ReturnTuple<'a> = ();
             type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
-            const SIGNATURE: &'static str = "addObject(bytes32,string,bytes32,bytes32,uint64)";
-            const SELECTOR: [u8; 4] = [45u8, 111u8, 37u8, 80u8];
+            const SIGNATURE: &'static str = "addObject(bytes32,string,bytes32,bytes32,uint64,uint16,uint16)";
+            const SELECTOR: [u8; 4] = [149u8, 121u8, 186u8, 249u8];
             #[inline]
             fn new<'a>(
                 tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType,
@@ -2377,6 +2411,12 @@ pub mod IBucketFacade {
                     <::alloy_sol_types::sol_data::Uint<
                         64,
                     > as alloy_sol_types::SolType>::tokenize(&self.size),
+                    <::alloy_sol_types::sol_data::Uint<
+                        16,
+                    > as alloy_sol_types::SolType>::tokenize(&self.dataShards),
+                    <::alloy_sol_types::sol_data::Uint<
+                        16,
+                    > as alloy_sol_types::SolType>::tokenize(&self.parityShards),
                 )
             }
             #[inline]
@@ -2391,9 +2431,9 @@ pub mod IBucketFacade {
             }
         }
     };
-    /**Function with signature `addObject(bytes32,string,bytes32,bytes32,uint64,uint64,(string,string)[],bool)` and selector `0x774343fe`.
+    /**Function with signature `addObject(bytes32,string,bytes32,bytes32,uint64,uint64,(string,string)[],bool,uint16,uint16)` and selector `0x5f404e39`.
     ```solidity
-    function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size, uint64 ttl, KeyValue[] memory metadata, bool overwrite) external;
+    function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size, uint64 ttl, KeyValue[] memory metadata, bool overwrite, uint16 dataShards, uint16 parityShards) external;
     ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2415,8 +2455,12 @@ pub mod IBucketFacade {
             ::alloy_sol_types::private::Vec<<KeyValue as ::alloy_sol_types::SolType>::RustType>,
         #[allow(missing_docs)]
         pub overwrite: bool,
+        #[allow(missing_docs)]
+        pub dataShards: u16,
+        #[allow(missing_docs)]
+        pub parityShards: u16,
     }
-    ///Container type for the return parameters of the [`addObject(bytes32,string,bytes32,bytes32,uint64,uint64,(string,string)[],bool)`](addObject_1Call) function.
+    ///Container type for the return parameters of the [`addObject(bytes32,string,bytes32,bytes32,uint64,uint64,(string,string)[],bool,uint16,uint16)`](addObject_1Call) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct addObject_1Return {}
@@ -2439,6 +2483,8 @@ pub mod IBucketFacade {
                 ::alloy_sol_types::sol_data::Uint<64>,
                 ::alloy_sol_types::sol_data::Array<KeyValue>,
                 ::alloy_sol_types::sol_data::Bool,
+                ::alloy_sol_types::sol_data::Uint<16>,
+                ::alloy_sol_types::sol_data::Uint<16>,
             );
             #[doc(hidden)]
             type UnderlyingRustTuple<'a> = (
@@ -2450,6 +2496,8 @@ pub mod IBucketFacade {
                 u64,
                 ::alloy_sol_types::private::Vec<<KeyValue as ::alloy_sol_types::SolType>::RustType>,
                 bool,
+                u16,
+                u16,
             );
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
@@ -2473,6 +2521,8 @@ pub mod IBucketFacade {
                         value.ttl,
                         value.metadata,
                         value.overwrite,
+                        value.dataShards,
+                        value.parityShards,
                     )
                 }
             }
@@ -2489,6 +2539,8 @@ pub mod IBucketFacade {
                         ttl: tuple.5,
                         metadata: tuple.6,
                         overwrite: tuple.7,
+                        dataShards: tuple.8,
+                        parityShards: tuple.9,
                     }
                 }
             }
@@ -2533,14 +2585,16 @@ pub mod IBucketFacade {
                 ::alloy_sol_types::sol_data::Uint<64>,
                 ::alloy_sol_types::sol_data::Array<KeyValue>,
                 ::alloy_sol_types::sol_data::Bool,
+                ::alloy_sol_types::sol_data::Uint<16>,
+                ::alloy_sol_types::sol_data::Uint<16>,
             );
             type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = addObject_1Return;
             type ReturnTuple<'a> = ();
             type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str =
-                "addObject(bytes32,string,bytes32,bytes32,uint64,uint64,(string,string)[],bool)";
-            const SELECTOR: [u8; 4] = [119u8, 67u8, 67u8, 254u8];
+                "addObject(bytes32,string,bytes32,bytes32,uint64,uint64,(string,string)[],bool,uint16,uint16)";
+            const SELECTOR: [u8; 4] = [95u8, 64u8, 78u8, 57u8];
             #[inline]
             fn new<'a>(
                 tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType,
@@ -2574,6 +2628,12 @@ pub mod IBucketFacade {
                     <::alloy_sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
                         &self.overwrite,
                     ),
+                    <::alloy_sol_types::sol_data::Uint<
+                        16,
+                    > as alloy_sol_types::SolType>::tokenize(&self.dataShards),
+                    <::alloy_sol_types::sol_data::Uint<
+                        16,
+                    > as alloy_sol_types::SolType>::tokenize(&self.parityShards),
                 )
             }
             #[inline]
@@ -3649,12 +3709,12 @@ pub mod IBucketFacade {
         pub const SELECTORS: &'static [[u8; 4usize]] = &[
             [1u8, 83u8, 234u8, 145u8],
             [23u8, 211u8, 82u8, 192u8],
-            [45u8, 111u8, 37u8, 80u8],
             [45u8, 124u8, 182u8, 0u8],
             [76u8, 83u8, 234u8, 181u8],
+            [95u8, 64u8, 78u8, 57u8],
             [98u8, 148u8, 233u8, 163u8],
             [111u8, 10u8, 79u8, 244u8],
-            [119u8, 67u8, 67u8, 254u8],
+            [149u8, 121u8, 186u8, 249u8],
             [164u8, 67u8, 168u8, 63u8],
             [201u8, 174u8, 239u8, 129u8],
         ];
@@ -3734,18 +3794,6 @@ pub mod IBucketFacade {
                     queryObjects_0
                 },
                 {
-                    fn addObject_0(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<IBucketFacadeCalls> {
-                        <addObject_0Call as alloy_sol_types::SolCall>::abi_decode_raw(
-                            data, validate,
-                        )
-                        .map(IBucketFacadeCalls::addObject_0)
-                    }
-                    addObject_0
-                },
-                {
                     fn deleteObject(
                         data: &[u8],
                         validate: bool,
@@ -3768,6 +3816,18 @@ pub mod IBucketFacade {
                         .map(IBucketFacadeCalls::queryObjects_1)
                     }
                     queryObjects_1
+                },
+                {
+                    fn addObject_1(
+                        data: &[u8],
+                        validate: bool,
+                    ) -> alloy_sol_types::Result<IBucketFacadeCalls> {
+                        <addObject_1Call as alloy_sol_types::SolCall>::abi_decode_raw(
+                            data, validate,
+                        )
+                        .map(IBucketFacadeCalls::addObject_1)
+                    }
+                    addObject_1
                 },
                 {
                     fn queryObjects_2(
@@ -3794,16 +3854,16 @@ pub mod IBucketFacade {
                     updateObjectMetadata
                 },
                 {
-                    fn addObject_1(
+                    fn addObject_0(
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<IBucketFacadeCalls> {
-                        <addObject_1Call as alloy_sol_types::SolCall>::abi_decode_raw(
+                        <addObject_0Call as alloy_sol_types::SolCall>::abi_decode_raw(
                             data, validate,
                         )
-                        .map(IBucketFacadeCalls::addObject_1)
+                        .map(IBucketFacadeCalls::addObject_0)
                     }
-                    addObject_1
+                    addObject_0
                 },
                 {
                     fn queryObjects_3(

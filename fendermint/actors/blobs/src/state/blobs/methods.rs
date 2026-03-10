@@ -650,6 +650,8 @@ impl State {
                                         source: subscription.source,
                                         epoch: current_epoch,
                                         token_amount: TokenAmount::zero(),
+                                        data_shards: blob.data_shards,
+                                        parity_shards: blob.parity_shards,
                                     },
                                 )?;
                             }
