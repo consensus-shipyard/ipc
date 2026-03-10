@@ -530,7 +530,7 @@ pub async fn build_node_directories<C: QueryClient + Send + Sync>(
             .await
             .with_context(|| format!("failed to parse node addr from {}", url))?;
 
-        let node_id = NodeId(node_addr.node_id.as_bytes().clone());
+        let node_id = NodeId(*node_addr.node_id.as_bytes());
 
         nodes.push(node_id);
         node_directory.insert(node_id, node_addr);
