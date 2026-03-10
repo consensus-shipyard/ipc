@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
-use erasure_encoding::{shards_for_node, shard_node, BlobId, NodeId, DEFAULT_MAX_CHUNK_SIZE};
+use erasure_encoding::{shard_node, shards_for_node, BlobId, NodeId, DEFAULT_MAX_CHUNK_SIZE};
 use ethers::prelude::*;
 use ethers::providers::{Http, Provider};
 use futures::StreamExt;
@@ -22,9 +22,9 @@ use iroh_manager::IrohNode;
 use std::str::FromStr;
 use tracing::{debug, error, info, warn};
 
-use crate::distribution::{shard_key, NodeRpcDirectory};
 use super::store::Store;
 use super::SignatureStorage;
+use crate::distribution::{shard_key, NodeRpcDirectory};
 
 // Event signatures for blob events (keccak256 of the event signature)
 // BlobFinalized(address indexed subscriber, bytes32 hash, bool resolved)
@@ -426,7 +426,10 @@ pub async fn resolve_blob_shards(
                 })?;
 
             let outcome = progress.finish().await.with_context(|| {
-                format!("shard {}/{} download did not complete", chunk_idx, shard_idx)
+                format!(
+                    "shard {}/{} download did not complete",
+                    chunk_idx, shard_idx
+                )
             })?;
 
             info!(

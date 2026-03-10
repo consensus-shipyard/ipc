@@ -2385,7 +2385,8 @@ pub mod IBucketFacade {
             type Return = addObject_0Return;
             type ReturnTuple<'a> = ();
             type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
-            const SIGNATURE: &'static str = "addObject(bytes32,string,bytes32,bytes32,uint64,uint16,uint16)";
+            const SIGNATURE: &'static str =
+                "addObject(bytes32,string,bytes32,bytes32,uint64,uint16,uint16)";
             const SELECTOR: [u8; 4] = [149u8, 121u8, 186u8, 249u8];
             #[inline]
             fn new<'a>(

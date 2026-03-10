@@ -241,7 +241,10 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
         });
 
         for hash in finished {
-            info!("Blob {} resolution completed, waiting for finalization", hash);
+            info!(
+                "Blob {} resolution completed, waiting for finalization",
+                hash
+            );
             downloaded.insert(hash, Instant::now());
         }
 

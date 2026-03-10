@@ -1,8 +1,10 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 use std::io::Write;
 
 use erasure_encoding::{
-    decode_chunks, encode_and_assign, ChunkRecoveryInput, ErasureError, NodeId,
-    ReedSolomonEncoder, RotatingAssigner,
+    decode_chunks, encode_and_assign, ChunkRecoveryInput, ErasureError, NodeId, ReedSolomonEncoder,
+    RotatingAssigner,
 };
 use rand::Rng;
 
@@ -46,14 +48,9 @@ fn end_to_end_mmap_large_file() {
     assert_eq!(mmap.len(), file_size);
 
     // 3. Encode and assign shards to nodes.
-    let (metadata, chunk_iter) = encode_and_assign::<ReedSolomonEncoder, _>(
-        &mmap,
-        k,
-        m,
-        &nodes,
-        RotatingAssigner::new(),
-    )
-    .expect("encoding should succeed");
+    let (metadata, chunk_iter) =
+        encode_and_assign::<ReedSolomonEncoder, _>(&mmap, k, m, &nodes, RotatingAssigner::new())
+            .expect("encoding should succeed");
 
     assert_eq!(metadata.original_len, file_size);
     assert_eq!(metadata.data_shards, k);

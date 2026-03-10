@@ -1,3 +1,4 @@
+// Copyright 2022-2024 Protocol Labs
 // Copyright 2025 Recall Contributors
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -58,7 +59,9 @@ mod tests {
 
         // blob_id [7, 0..] % 5 = 2, so shard (0, 0) → node[2]
         let expected = shard_node(&blob_id, 0, 0, shards_per_chunk, &nodes);
-        assert!(verify_shard_assignment(&blob_id, 0, 0, shards_per_chunk, &nodes, &expected).is_ok());
+        assert!(
+            verify_shard_assignment(&blob_id, 0, 0, shards_per_chunk, &nodes, &expected).is_ok()
+        );
     }
 
     #[test]

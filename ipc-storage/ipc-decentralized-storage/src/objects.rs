@@ -434,7 +434,10 @@ async fn handle_object_upload(
     let blob_id = BlobId(*hash.as_bytes());
     info!(
         "Distributing blob: hash={}, data_len={}, blob_id={}, nodes={}",
-        hash, data.len(), hex::encode(blob_id.0), nodes.len()
+        hash,
+        data.len(),
+        hex::encode(blob_id.0),
+        nodes.len()
     );
     let dist_result = distribute(
         DistributeParams {
@@ -685,11 +688,13 @@ async fn handle_blob_download<F: QueryClient + Send + Sync + Clone>(
     let start_time = Instant::now();
 
     // Query the blobs actor to get blob info
-    let maybe_blob = blob_get(client.clone(), blob_hash, height).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("blobs actor query error: {}", e),
-        })
-    })?;
+    let maybe_blob = blob_get(client.clone(), blob_hash, height)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("blobs actor query error: {}", e),
+            })
+        })?;
 
     match maybe_blob {
         Some(blob) => {
@@ -868,4 +873,3 @@ fn get_filename_with_extension(filename: &str, content_type: &str) -> Option<Str
         .first()
         .map(|ext| format!("{}.{}", filename, ext))
 }
-

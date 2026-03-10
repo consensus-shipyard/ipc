@@ -259,7 +259,16 @@ impl Blobs {
         let (mut blob, blob_added) = if let Some(blob) = blobs.get(&params.hash)? {
             (blob, false)
         } else {
-            (Blob::new(store, params.size, params.metadata_hash, params.data_shards, params.parity_shards)?, true)
+            (
+                Blob::new(
+                    store,
+                    params.size,
+                    params.metadata_hash,
+                    params.data_shards,
+                    params.parity_shards,
+                )?,
+                true,
+            )
         };
 
         // Add/update subscriber and the subscription

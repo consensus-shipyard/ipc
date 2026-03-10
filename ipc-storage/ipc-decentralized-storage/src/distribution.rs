@@ -1,3 +1,4 @@
+// Copyright 2022-2024 Protocol Labs
 // Copyright 2025 Recall Contributors
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -113,7 +114,10 @@ pub async fn distribute(
 
     info!(
         "Encoded blob: {} chunks, k={}, m={}, original_len={}, input_data_len={}",
-        metadata.num_chunks, metadata.data_shards, metadata.parity_shards, metadata.original_len,
+        metadata.num_chunks,
+        metadata.data_shards,
+        metadata.parity_shards,
+        metadata.original_len,
         params.data.len()
     );
 
@@ -127,14 +131,21 @@ pub async fn distribute(
     for chunk in &chunks {
         info!(
             "Chunk {}: original_data_len={}, num_shards={}",
-            chunk.chunk_index, chunk.original_data_len, chunk.shards.len()
+            chunk.chunk_index,
+            chunk.original_data_len,
+            chunk.shards.len()
         );
         for assigned_shard in &chunk.shards {
-            let tag = shard_key(&params.blob_id, chunk.chunk_index, assigned_shard.shard.index);
+            let tag = shard_key(
+                &params.blob_id,
+                chunk.chunk_index,
+                assigned_shard.shard.index,
+            );
 
             info!(
                 "Shard {}/{}: data_len={}, assigned_to={:?}",
-                chunk.chunk_index, assigned_shard.shard.index,
+                chunk.chunk_index,
+                assigned_shard.shard.index,
                 assigned_shard.shard.data.len(),
                 hex::encode(assigned_shard.node.0)
             );

@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 use crate::traits::NodeAssigner;
 use crate::types::{AssignedShard, NodeId, Shard};
 
@@ -172,8 +174,13 @@ mod tests {
 
         for chunk in &chunks {
             for assigned in &chunk.shards {
-                let expected =
-                    shard_node(&blob_id, chunk.chunk_index, assigned.shard.index, k + m, &nodes);
+                let expected = shard_node(
+                    &blob_id,
+                    chunk.chunk_index,
+                    assigned.shard.index,
+                    k + m,
+                    &nodes,
+                );
                 assert_eq!(
                     assigned.node, expected,
                     "Mismatch at chunk={} shard={}",
@@ -225,15 +232,30 @@ mod tests {
         let shards_per_chunk = 3;
 
         // chunk 0, shard 0: (0 + 2) % 5 = 2
-        assert_eq!(shard_node(&blob_id, 0, 0, shards_per_chunk, &nodes), nodes[2]);
+        assert_eq!(
+            shard_node(&blob_id, 0, 0, shards_per_chunk, &nodes),
+            nodes[2]
+        );
         // chunk 0, shard 1: (1 + 2) % 5 = 3
-        assert_eq!(shard_node(&blob_id, 0, 1, shards_per_chunk, &nodes), nodes[3]);
+        assert_eq!(
+            shard_node(&blob_id, 0, 1, shards_per_chunk, &nodes),
+            nodes[3]
+        );
         // chunk 0, shard 2: (2 + 2) % 5 = 4
-        assert_eq!(shard_node(&blob_id, 0, 2, shards_per_chunk, &nodes), nodes[4]);
+        assert_eq!(
+            shard_node(&blob_id, 0, 2, shards_per_chunk, &nodes),
+            nodes[4]
+        );
         // chunk 1, shard 0: (3 + 2) % 5 = 0
-        assert_eq!(shard_node(&blob_id, 1, 0, shards_per_chunk, &nodes), nodes[0]);
+        assert_eq!(
+            shard_node(&blob_id, 1, 0, shards_per_chunk, &nodes),
+            nodes[0]
+        );
         // chunk 1, shard 1: (4 + 2) % 5 = 1
-        assert_eq!(shard_node(&blob_id, 1, 1, shards_per_chunk, &nodes), nodes[1]);
+        assert_eq!(
+            shard_node(&blob_id, 1, 1, shards_per_chunk, &nodes),
+            nodes[1]
+        );
     }
 
     #[test]
@@ -257,8 +279,13 @@ mod tests {
         assert_eq!(chunks.len(), 2);
         for chunk in &chunks {
             for assigned in &chunk.shards {
-                let expected =
-                    shard_node(&blob_id, chunk.chunk_index, assigned.shard.index, k + m, &nodes);
+                let expected = shard_node(
+                    &blob_id,
+                    chunk.chunk_index,
+                    assigned.shard.index,
+                    k + m,
+                    &nodes,
+                );
                 assert_eq!(assigned.node, expected);
             }
         }

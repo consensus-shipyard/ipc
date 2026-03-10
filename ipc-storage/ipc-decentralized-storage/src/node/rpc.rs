@@ -25,8 +25,8 @@ use iroh_manager::IrohNode;
 use tracing::{info, warn};
 use warp::Filter;
 
-use crate::distribution::ShardPullRequest;
 use super::{SharedFendermintClient, SignatureStorage};
+use crate::distribution::ShardPullRequest;
 
 /// Start the RPC server for signature queries and blob queries
 pub async fn start_rpc_server(
@@ -383,8 +383,7 @@ async fn handle_get_blob_content(
                     message: format!("failed to create client: {}", e),
                 })
             })?;
-            let gateway =
-                BlobGateway::new(retrieval_client, 10, std::time::Duration::from_secs(5));
+            let gateway = BlobGateway::new(retrieval_client, 10, std::time::Duration::from_secs(5));
             let (nodes, node_directory, node_rpc_directory) =
                 build_node_directories(&gateway).await.map_err(|e| {
                     warp::reject::custom(RpcBadRequest {
@@ -574,16 +573,10 @@ async fn handle_shard_pull(
     //       request.shards_per_chunk, &nodes, &our_node_id
     //   )?;
 
-    let shard_key = crate::distribution::shard_key(
-        &blob_id,
-        request.chunk_index,
-        request.shard_index,
-    );
+    let shard_key =
+        crate::distribution::shard_key(&blob_id, request.chunk_index, request.shard_index);
 
-    info!(
-        "Received shard pull request: {} (hash={})",
-        shard_key, hash
-    );
+    info!("Received shard pull request: {} (hash={})", shard_key, hash);
 
     // Spawn a task to download from the gateway and sign on completion
     let shard_key_clone = shard_key.clone();
@@ -617,14 +610,12 @@ async fn handle_shard_pull(
                         Ok(bytes) => {
                             info!(
                                 "Verified shard {} content: {} bytes",
-                                shard_key_clone, bytes.len()
+                                shard_key_clone,
+                                bytes.len()
                             );
                         }
                         Err(e) => {
-                            warn!(
-                                "Failed to verify shard {} content: {}",
-                                shard_key_clone, e
-                            );
+                            warn!("Failed to verify shard {} content: {}", shard_key_clone, e);
                         }
                     }
 
@@ -646,7 +637,10 @@ async fn handle_shard_pull(
                     );
                 }
                 Err(e) => {
-                    warn!("Failed to complete shard {} download: {}", shard_key_clone, e);
+                    warn!(
+                        "Failed to complete shard {} download: {}",
+                        shard_key_clone, e
+                    );
                 }
             },
             Err(e) => {

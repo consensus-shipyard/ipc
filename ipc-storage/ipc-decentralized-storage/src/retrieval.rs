@@ -1,3 +1,4 @@
+// Copyright 2022-2024 Protocol Labs
 // Copyright 2025 Recall Contributors
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -86,7 +87,16 @@ pub async fn retrieve(params: &BlobRetrievalParams, local_blobs: &BlobsClient) -
             let node_addr = params.node_directory.get(&node);
             let node_rpc_url = params.node_rpc_directory.get(&node).map(|s| s.as_str());
 
-            match fetch_shard(local_blobs, &params.blob_id, chunk_idx, shard_idx, node_addr, node_rpc_url).await {
+            match fetch_shard(
+                local_blobs,
+                &params.blob_id,
+                chunk_idx,
+                shard_idx,
+                node_addr,
+                node_rpc_url,
+            )
+            .await
+            {
                 Ok(data) => {
                     fetched_shards.push(Shard {
                         index: shard_idx,
@@ -141,7 +151,10 @@ pub async fn retrieve(params: &BlobRetrievalParams, local_blobs: &BlobsClient) -
 
     let recovered = decode_chunks::<ReedSolomonEncoder>(&mut recovery_inputs, params.original_len)?;
 
-    info!("Successfully retrieved and decoded {} bytes", recovered.len());
+    info!(
+        "Successfully retrieved and decoded {} bytes",
+        recovered.len()
+    );
     Ok(recovered)
 }
 
@@ -161,15 +174,18 @@ async fn fetch_shard(
         if let Ok(bytes) = blobs.read_to_bytes(hash).await {
             info!(
                 "Shard {}/{} found locally (tag={}, hash={}, size={})",
-                chunk_index, shard_index, tag, hash, bytes.len()
+                chunk_index,
+                shard_index,
+                tag,
+                hash,
+                bytes.len()
             );
             return Ok(bytes.to_vec());
         }
     }
 
     // Download from the assigned node
-    let rpc_url = node_rpc_url
-        .ok_or_else(|| anyhow::anyhow!("No RPC URL for shard {}", tag))?;
+    let rpc_url = node_rpc_url.ok_or_else(|| anyhow::anyhow!("No RPC URL for shard {}", tag))?;
 
     // Query the node's RPC for the shard's Iroh hash and NodeAddr
     let (hash, source_addr) = query_shard_hash(rpc_url, blob_id, chunk_index, shard_index).await?;
@@ -190,7 +206,10 @@ async fn fetch_shard(
         .await
         .context("shard download did not complete")?;
 
-    let bytes = blobs.read_to_bytes(hash).await.context("failed to read downloaded shard")?;
+    let bytes = blobs
+        .read_to_bytes(hash)
+        .await
+        .context("failed to read downloaded shard")?;
     Ok(bytes.to_vec())
 }
 

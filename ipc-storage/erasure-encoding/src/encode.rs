@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 use crate::error::{ErasureError, Result};
 use crate::traits::{Encoder, NodeAssigner};
 use crate::types::{AssignedShard, EncodedChunk, EncodingMetadata, NodeId, Shard};
