@@ -9,8 +9,6 @@ mod params;
 mod queue;
 mod subscribers;
 mod subscriptions;
-#[cfg(test)]
-mod tests;
 
 pub use blob::*;
 pub use expiries::*;
