@@ -256,7 +256,7 @@ impl BlobsActor {
         let num_chunks = if params.size == 0 {
             1
         } else {
-            ((params.size + MAX_CHUNK_SIZE - 1) / MAX_CHUNK_SIZE) as usize
+            params.size.div_ceil(MAX_CHUNK_SIZE) as usize
         };
 
         // Compute the set of unique assigned operator indices using the deterministic
