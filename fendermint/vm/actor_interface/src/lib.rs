@@ -44,6 +44,12 @@ macro_rules! define_singleton {
 
 pub mod account;
 pub mod activity;
+#[cfg(feature = "ipc-storage")]
+pub mod adm;
+#[cfg(feature = "ipc-storage")]
+pub mod blob_reader;
+#[cfg(feature = "ipc-storage")]
+pub mod blobs;
 pub mod burntfunds;
 pub mod chainmetadata;
 pub mod cron;
@@ -55,6 +61,8 @@ pub mod f3_light_client;
 pub mod gas_market;
 pub mod init;
 pub mod ipc;
+#[cfg(feature = "ipc-storage")]
+pub mod ipc_storage_config;
 pub mod multisig;
 pub mod placeholder;
 pub mod reward;

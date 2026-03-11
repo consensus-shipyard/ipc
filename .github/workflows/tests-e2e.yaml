@@ -47,6 +47,10 @@ jobs:
         with:
           shared-key: build
 
+      # this is required because "make e2e-only" exceeds the disk space limit
+      - name: Remove target folder to free disk space
+        run: rm -rf target
+
       - name: Run e2e tests
         run: |
           set -e
