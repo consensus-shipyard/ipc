@@ -160,7 +160,7 @@ fetch_metrics() {
 
     if [ $time_diff -ge 15 ] && [ ${METRICS[last_height]:-0} -gt 0 ]; then
         local height_diff=$((METRICS[height] - METRICS[last_height]))
-        METRICS[blocks_per_min]=$((height_diff * 4))
+        METRICS[blocks_per_min]=$((height_diff * 60 / time_diff))
         METRICS[last_height]=${METRICS[height]}
         METRICS[last_check]=$current_time
     elif [ ${METRICS[last_height]:-0} -eq 0 ]; then
@@ -222,7 +222,7 @@ format_timestamp() {
     [ -z "$ts" ] && echo "--" && return
     if [[ "$ts" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2} ]]; then
         local input="${ts:0:19}"
-        [[ "$ts" =~ Z$ ]] || input="${input}Z"
+        [[ "$ts" =~ Z$ ]] && input="${input}Z"
         local epoch
         epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$input" +%s 2>/dev/null)
         [ -z "$epoch" ] && epoch=$(date -d "${ts:0:19}" +%s 2>/dev/null)
