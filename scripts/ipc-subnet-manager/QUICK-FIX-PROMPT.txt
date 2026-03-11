@@ -1,0 +1,48 @@
+I need help fixing a critical bug in the IPC codebase that prevents libp2p from binding on cloud VMs, breaking parent finality voting.
+
+**Bug Location:** ipc/cli/src/commands/node/peer.rs lines 95-106
+
+**The Problem:**
+The code currently uses the external_ip for BOTH listen_addr and external_addresses:
+```rust
+let external_ip = p2p_config.external_ip.as_deref().unwrap_or("127.0.0.1");
+let listen_addr = format!("/ip4/{}/tcp/{}", external_ip, resolver_port);
+```
+
+On cloud VMs (GCP/AWS/Azure), public IPs aren't bound to interfaces, so this causes:
+- libp2p fails to bind with "Cannot assign requested address (os error 99)"
+- No vote gossip → No parent finality → cross-msg fund doesn't work
+
+**The Fix:**
+Separate the concerns:
+- listen_addr should use "0.0.0.0" (can bind on any interface)
+- external_addresses should use the public IP (what we advertise)
+
+Change to:
+```rust
+let listen_addr = format!("/ip4/0.0.0.0/tcp/{}", resolver_port);
+let external_ip = p2p_config.external_ip.as_deref().unwrap_or("127.0.0.1");
+let external_addresses = vec![format!("/ip4/{}/tcp/{}", external_ip, resolver_port)];
+
+let fendermint_config = FendermintOverrides {
+    resolver: Some(ResolverOverrideConfig {
+        connection: Some(ConnectionOverrideConfig {
+            listen_addr: Some(listen_addr),
+            external_addresses: Some(external_addresses),
+            extra: toml::Table::new(),
+        }),
+        // ...
+    }),
+    // ...
+};
+```
+
+**Testing:**
+After the fix, verify on a cloud VM that:
+1. `ss -tulpn | grep 26655` shows it listening on `0.0.0.0:26655`
+2. Config has `listen_addr = "/ip4/0.0.0.0/tcp/26655"`
+3. Config has `external_addresses = ["/ip4/<PUBLIC_IP>/tcp/26655/p2p/<PEER_ID>"]`
+4. Logs show "parent finality vote gossip loop" started
+5. `ipc-cli cross-msg fund` successfully executes
+
+Please implement this fix and any necessary changes to related code.

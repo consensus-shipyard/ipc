@@ -1,0 +1,171 @@
+# IPC Subnet Configuration
+# This file configures the subnet and validator nodes for automated management
+
+# Subnet Configuration
+subnet:
+  # Subnet ID - get this from your subnet creation
+  id: "/r314159/t410fh6ah2f55pqenbbcvmosswmiheze2f5mvg3lwjha"
+
+  # Parent chain RPC endpoint
+  parent_rpc: "https://api.calibration.node.glif.io/rpc/v1"
+  #parent_rpc: "http://localhost:8555"
+
+  # Parent chain ID
+  parent_chain_id: "/r314159"
+
+  # Parent registry contract address
+  parent_registry: "0xbb08047e30d5cd03282b944ff38642cae8fb0317"
+
+  # Parent gateway contract address
+  parent_gateway: "0x44c758fb59ca473d52e8f4896acbced4dbc029bf"
+
+# Validator Nodes
+validators:
+  - name: "validator-1"
+    ip: "34.73.187.192"
+    ssh_user: "philip"
+    ipc_user: "ipc"
+    role: "primary"  # First node initialized
+    private_key: "0x867c766fa9ea9fab8929a6ec6a4fe32ccf33969035d3d7f2262f6eb8021b56d8"
+
+  - name: "validator-2"
+    ip: "35.237.175.224"
+    ssh_user: "philip"
+    ipc_user: "ipc"
+    role: "secondary"
+    private_key: "0x40aa709b5d6765411f2afbdb0b4ae00e45a06425b37a386334c80482b203d04d"
+
+  - name: "validator-3"
+    ip: "34.75.205.89"
+    ssh_user: "philip"
+    ipc_user: "ipc"
+    role: "secondary"
+    private_key: "0xc1099a062e296366a2ac3b26ac80a409833e6a74edbf677a0bd14580d2c68ea2"
+
+# Network Configuration
+network:
+  cometbft_p2p_port: 26656
+  libp2p_port: 26655
+  eth_api_port: 8545
+
+# Paths
+paths:
+  # Path to IPC repository on remote hosts
+  ipc_repo: "/home/ipc/ipc"
+
+  # Path to ipc-cli binary on remote hosts
+  ipc_binary: "/home/ipc/ipc/target/release/ipc-cli"
+
+  # Node home directory (will be created)
+  node_home: "/home/ipc/.ipc-node"
+
+  # Node init config path
+  node_init_config: "/home/ipc/node-init.yml"
+
+  # IPC CLI config directory
+  ipc_config_dir: "/home/ipc/.ipc"
+
+  # IPC CLI config file
+  ipc_config_file: "/home/ipc/.ipc/config.toml"
+
+# Initialization Settings
+init:
+  # Supply source (native or ERC20)
+  subnet_supply_source_kind: "native"
+
+  # Permission mode (collateral or federated)
+  permission_mode: "federated"
+
+  # Validator power (for federated mode)
+  validator_power: 3
+
+  # Genesis configuration
+  genesis:
+    base_fee: "1000"
+    power_scale: 3
+    network_version: 21
+
+  # IPC configuration (optimized for fast parent finality)
+  ipc:
+    vote_interval: 1          # Vote every block
+    vote_timeout: 30          # Reduced from 60s for faster timeout
+
+    # Bottom-up checkpointing (disabled due to nonce management bug)
+    bottomup:
+      enabled: false          # Disable bottom-up checkpointing to prevent mempool clogging
+
+  # Top-down finality configuration (optimized for speed)
+  topdown:
+    chain_head_delay: 5       # Reduced from 10 for faster parent block processing
+    proposal_delay: 5         # Reduced from 10 for faster proposals
+    max_proposal_range: 50    # Reduced from 100 for smaller batches
+    polling_interval: 5       # Poll parent every 5s instead of 10s
+    exponential_back_off: 3   # Reduced from 5 for faster retries
+    exponential_retry_limit: 3 # Reduced from 5
+    parent_http_timeout: 30   # Reduced from 60s for faster timeout
+
+  # CometBFT overrides (optimal performance profile - validated through testing)
+  cometbft:
+    # Core consensus timeouts
+    timeout_commit: "100ms"         # Time between blocks
+    timeout_propose: "400ms"        # Time to wait for proposal (OPTIMAL: tested 300/400/500ms) ⭐
+    timeout_prevote: "200ms"        # Time to wait for prevotes (default: 1s)
+    timeout_precommit: "200ms"      # Time to wait for precommits (default: 1s)
+
+    # Timeout deltas (increases per round if consensus fails)
+    timeout_propose_delta: "100ms"  # (default: 500ms)
+    timeout_prevote_delta: "50ms"   # (default: 500ms)
+    timeout_precommit_delta: "50ms" # (default: 500ms)
+
+    # Empty blocks
+    create_empty_blocks: true
+    create_empty_blocks_interval: "0s"  # Create immediately when timeout_commit expires
+
+    # P2P performance
+    send_rate: 20971520         # 20MB/s (default: 5MB/s)
+    recv_rate: 20971520         # 20MB/s (default: 5MB/s)
+    max_packet_msg_payload_size: 10240  # 10KB packets (default: 1KB)
+
+    # RPC
+    rpc_laddr: "tcp://0.0.0.0:26657"
+
+# IPC CLI Configuration (for ~/.ipc/config.toml)
+ipc_cli:
+  # Keystore path
+  keystore_path: "~/.ipc"
+
+  # Parent subnet configuration
+  parent:
+    id: "/r314159"
+    network_type: "fevm"
+    provider_http: "https://api.calibration.node.glif.io/rpc/v1"
+    #provider_http: "http://localhost:8555"
+    registry_addr: "0xbb08047e30d5cd03282b944ff38642cae8fb0317"
+    gateway_addr: "0x44c758fb59ca473d52e8f4896acbced4dbc029bf"
+
+  # Child subnet configuration (this subnet)
+  child:
+    # Uses subnet.id from above
+    network_type: "fevm"
+    # Provider HTTP - can be different from parent
+    # For local node, use http://localhost:8545
+    # For remote, use the parent's RPC or a dedicated endpoint
+    provider_http: "http://localhost:8545"
+    # Child subnet's own gateway and registry contracts
+    gateway_addr: "0x77aa40b105843728088c0132e43fc44348881da8"
+    registry_addr: "0x74539671a1d2f1c8f200826baba665179f53a1b7"
+
+# Relayer Configuration
+relayer:
+  # Checkpoint interval in seconds
+  checkpoint_interval: 10
+  # Maximum parallel checkpoint submissions
+  max_parallelism: 1
+
+# Environment Variable Overrides:
+# - IPC_SUBNET_ID
+# - IPC_SUBNET_PARENT_RPC
+# - IPC_VALIDATORS_0_IP (validator 1)
+# - IPC_VALIDATORS_1_IP (validator 2)
+# - IPC_VALIDATORS_2_IP (validator 3)
+

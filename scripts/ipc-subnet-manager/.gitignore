@@ -1,0 +1,18 @@
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+/tmp/
+
+# Backup configs
+*.backup
+*.bak
+
+# Lock files
+*.lock
+
+# Local overrides
+ipc-subnet-config.local.yml
+
