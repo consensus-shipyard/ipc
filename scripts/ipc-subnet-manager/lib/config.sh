@@ -936,11 +936,15 @@ generate_ipc_cli_config() {
     local keystore_path=$(get_config_value "ipc_cli.keystore_path")
 
     # Parent subnet config
+    # Use subnet.parent_* as source of truth (single place for parent chain addresses)
     local parent_id=$(get_config_value "ipc_cli.parent.id")
     local parent_network_type=$(get_config_value "ipc_cli.parent.network_type")
     local parent_provider_http=$(get_config_value "ipc_cli.parent.provider_http")
-    local parent_registry=$(get_config_value "ipc_cli.parent.registry_addr")
-    local parent_gateway=$(get_config_value "ipc_cli.parent.gateway_addr")
+    local parent_registry=$(get_config_value "subnet.parent_registry")
+    local parent_gateway=$(get_config_value "subnet.parent_gateway")
+    # Fallback to ipc_cli.parent if subnet section lacks them (backwards compat)
+    [ -z "$parent_registry" ] || [ "$parent_registry" = "null" ] && parent_registry=$(get_config_value "ipc_cli.parent.registry_addr")
+    [ -z "$parent_gateway" ] || [ "$parent_gateway" = "null" ] && parent_gateway=$(get_config_value "ipc_cli.parent.gateway_addr")
 
     # Child subnet config
     local child_id=$(get_config_value "subnet.id")
@@ -1217,19 +1221,24 @@ update_yaml_with_parent_addresses() {
     log_info "Parent gateway: $parent_gateway"
     log_info "Parent registry: $parent_registry"
 
-    # Update the YAML config file
+    # Update the YAML config file (subnet and ipc_cli.parent - keep both in sync)
     local config_file="$CONFIG_FILE"
 
     # Use yq to update if available, otherwise use sed
     if command -v yq &> /dev/null; then
         yq eval ".subnet.parent_gateway = \"$parent_gateway\"" -i "$config_file"
         yq eval ".subnet.parent_registry = \"$parent_registry\"" -i "$config_file"
-        log_success "Updated YAML config with parent addresses"
+        yq eval ".ipc_cli.parent.gateway_addr = \"$parent_gateway\"" -i "$config_file"
+        yq eval ".ipc_cli.parent.registry_addr = \"$parent_registry\"" -i "$config_file"
+        log_success "Updated YAML config with parent addresses (subnet and ipc_cli.parent)"
     else
         # Fallback to sed
         sed -i.bak "s|parent_gateway:.*|parent_gateway: \"$parent_gateway\"|" "$config_file"
         sed -i.bak2 "s|parent_registry:.*|parent_registry: \"$parent_registry\"|" "$config_file"
-        log_success "Updated YAML config with parent addresses (using sed)"
+        # Update ipc_cli.parent (first occurrence is parent section)
+        sed -i.bak3 "0,/registry_addr:/s|registry_addr:.*|registry_addr: \"$parent_registry\"|" "$config_file"
+        sed -i.bak4 "0,/gateway_addr:/s|gateway_addr:.*|gateway_addr: \"$parent_gateway\"|" "$config_file"
+        log_success "Updated YAML config with parent addresses (subnet and ipc_cli.parent, using sed)"
     fi
 }
 
