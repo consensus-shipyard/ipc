@@ -1781,14 +1781,9 @@ update_validator_binaries() {
         cargo clean && \
         make"
 
-    log_info "[$name] Pulling latest changes and building..."
-    local build_output
-    build_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" "$update_cmd 2>&1")
-    local build_exit=$?
-
-    if [ $build_exit -ne 0 ]; then
+    log_info "[$name] Pulling latest changes and building... (this may take 10-15 min for full rebuild)"
+    if ! ssh_exec_long "$ip" "$ssh_user" "$ipc_user" "$update_cmd"; then
         log_error "[$name] Build failed"
-        echo "$build_output" | tail -20
         return 1
     fi
 

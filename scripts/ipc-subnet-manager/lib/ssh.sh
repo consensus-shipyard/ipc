@@ -19,6 +19,25 @@ ssh_exec() {
         "$ssh_user@$ip" "sudo su - $ipc_user -c '$cmd'" 2>&1
 }
 
+# Execute long-running command with streaming output and extended keepalive
+# Use for builds (10-15 min) - prevents SSH timeout and shows progress
+ssh_exec_long() {
+    local ip="$1"
+    local ssh_user="$2"
+    local ipc_user="$3"
+    shift 3
+    local cmd="$*"
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would execute on $ip: $cmd"
+        return 0
+    fi
+
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+        -o ServerAliveInterval=30 -o ServerAliveCountMax=60 \
+        "$ssh_user@$ip" "sudo su - $ipc_user -c '$cmd'" 2>&1
+}
+
 # Execute command without sudo/su wrapping (for direct execution)
 ssh_exec_direct() {
     local ip="$1"
