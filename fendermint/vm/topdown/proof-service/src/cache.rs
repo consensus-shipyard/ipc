@@ -26,6 +26,21 @@ use std::path::Path;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 
+const LOCK_RETRY_ATTEMPTS: usize = 3;
+
+fn read_with_retry<T, F>(mut try_read: F) -> Option<T>
+where
+    F: FnMut() -> Option<T>,
+{
+    for _ in 0..LOCK_RETRY_ATTEMPTS {
+        if let Some(guard) = try_read() {
+            return Some(guard);
+        }
+        std::thread::yield_now();
+    }
+    None
+}
+
 /// Thread-safe two-level cache for proof bundles
 #[derive(Clone)]
 pub struct ProofCache {
@@ -179,10 +194,12 @@ impl ProofCache {
         cert: CertificateEntry,
         epoch_proofs: Vec<EpochProofEntry>,
     ) -> Result<()> {
+        use std::time::Instant;
         let instance_id = cert.instance_id();
         let epochs: Vec<ChainEpoch> = epoch_proofs.iter().map(|e| e.epoch).collect();
 
         // Persist atomically first (if enabled).
+        let persist_start = Instant::now();
         if let Err(e) =
             self.with_persistence(|p| p.save_certificate_with_epoch_proofs(&cert, &epoch_proofs))
         {
@@ -190,7 +207,7 @@ impl ProofCache {
                 instance: instance_id,
                 epoch_count: epochs.len(),
                 status: OperationStatus::Failure,
-                latency: 0.0,
+                latency: persist_start.elapsed().as_secs_f64(),
             });
             return Err(e);
         }
@@ -198,7 +215,7 @@ impl ProofCache {
             instance: instance_id,
             epoch_count: epochs.len(),
             status: OperationStatus::Success,
-            latency: 0.0,
+            latency: persist_start.elapsed().as_secs_f64(),
         });
 
         // Then update in-memory structures (infallible).
@@ -345,11 +362,12 @@ impl ProofCache {
     pub fn try_get_next_uncommitted_epoch_with_cert(&self) -> Option<EpochProofWithCertificate> {
         let after = self.last_committed_epoch() + 1;
 
-        let proofs = match self.epoch_proofs.try_read() {
+        let proofs = match read_with_retry(|| self.epoch_proofs.try_read()) {
             Some(g) => g,
             None => {
                 tracing::warn!(
                     after,
+                    attempts = LOCK_RETRY_ATTEMPTS,
                     "Proof cache is busy (epoch_proofs lock contended); skipping topdown proposal message"
                 );
                 return None;
@@ -362,12 +380,13 @@ impl ProofCache {
         };
         drop(proofs);
 
-        let certificates = match self.certificates.try_read() {
+        let certificates = match read_with_retry(|| self.certificates.try_read()) {
             Some(g) => g,
             None => {
                 tracing::warn!(
                     epoch,
                     cert_instance = proof_entry.cert_instance,
+                    attempts = LOCK_RETRY_ATTEMPTS,
                     "Proof cache is busy (certificates lock contended); skipping topdown proposal message"
                 );
                 return None;

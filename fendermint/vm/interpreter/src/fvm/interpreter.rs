@@ -600,13 +600,15 @@ where
                 let to = msg.to;
                 let method_num = msg.method_num;
                 let gas_limit = msg.gas_limit;
+                let start = std::time::Instant::now();
                 let (state, (apply_ret, emitters)) = state.call(*msg.clone()).await?;
+                let latency = start.elapsed().as_secs_f64();
                 let exit_code = apply_ret.msg_receipt.exit_code.value();
                 emit(MsgExec {
                     purpose: MsgExecPurpose::Call,
                     height: state.block_height(),
                     message: *msg,
-                    duration: 0.0,
+                    duration: latency,
                     exit_code,
                 });
                 let response = AppliedMessage {

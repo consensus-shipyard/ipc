@@ -13,6 +13,7 @@ use filecoin_f3_certs::FinalityCertificate;
 use filecoin_f3_gpbft::PowerEntries;
 use filecoin_f3_lightclient::{LightClient, LightClientState};
 use ipc_observability::emit;
+use std::time::Instant;
 use tracing::{debug, error, info};
 
 /// F3 client for fetching and validating certificates
@@ -171,13 +172,14 @@ impl F3Client {
     }
 
     async fn fetch_certificate(&self, instance: u64) -> Result<FinalityCertificate> {
+        let fetch_start = Instant::now();
         match self.light_client.get_certificate(instance).await {
             Ok(cert) => {
                 emit(F3CertificateFetched {
                     instance,
                     ec_chain_len: cert.ec_chain.suffix().len(),
                     status: OperationStatus::Success,
-                    latency: 0.0,
+                    latency: fetch_start.elapsed().as_secs_f64(),
                 });
                 debug!(
                     instance,
@@ -191,7 +193,7 @@ impl F3Client {
                     instance,
                     ec_chain_len: 0,
                     status: OperationStatus::Failure,
-                    latency: 0.0,
+                    latency: fetch_start.elapsed().as_secs_f64(),
                 });
                 error!(
                     instance,
@@ -207,6 +209,7 @@ impl F3Client {
         &mut self,
         certificate: &FinalityCertificate,
     ) -> Result<LightClientState> {
+        let validation_start = Instant::now();
         let instance = certificate.gpbft_instance;
 
         match self
@@ -219,7 +222,7 @@ impl F3Client {
                     new_instance: new_state.instance,
                     power_table_size: new_state.power_table.len(),
                     status: OperationStatus::Success,
-                    latency: 0.0,
+                    latency: validation_start.elapsed().as_secs_f64(),
                 });
                 info!(
                     instance,
@@ -235,7 +238,7 @@ impl F3Client {
                     new_instance: self.state.instance,
                     power_table_size: self.state.power_table.len(),
                     status: OperationStatus::Failure,
-                    latency: 0.0,
+                    latency: validation_start.elapsed().as_secs_f64(),
                 });
                 error!(
                     instance,

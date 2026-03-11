@@ -27,6 +27,7 @@ use proofs::{
     },
 };
 use std::str::FromStr;
+use std::time::Instant;
 use url::Url;
 
 // Event signatures for proof generation.
@@ -177,6 +178,7 @@ impl ProofAssembler {
     ) -> Result<UnifiedProofBundle> {
         let parent_epoch = parent_tipset.epoch;
         let child_epoch = child_tipset.epoch;
+        let generation_start = Instant::now();
 
         tracing::debug!(
             parent_epoch,
@@ -212,7 +214,7 @@ impl ProofAssembler {
             witness_blocks: bundle.blocks.len(),
             bundle_size_bytes,
             status: OperationStatus::Success,
-            latency: 0.0,
+            latency: generation_start.elapsed().as_secs_f64(),
         });
 
         tracing::info!(
