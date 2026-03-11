@@ -172,7 +172,7 @@ where
 
                 warn!(
                     target: "service.node_manager",
-                    "{} service failed (attempt {}/{}): {} – restarting in {}s",
+                    "{} service failed (attempt {}/{}): {:#} – restarting in {}s",
                     service_name,
                     attempts,
                     config.max_restarts,

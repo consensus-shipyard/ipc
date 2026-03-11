@@ -133,7 +133,7 @@ async fn run_service(
 
     let temp_client = fendermint_vm_topdown_proof_service::f3_client::F3Client::new_from_rpc(
         &rpc_url,
-        "calibrationnet",
+        "calibrationnet2",
         initial_instance,
     )
     .await?;
@@ -159,6 +159,7 @@ async fn run_service(
         },
         parent_rpc_url: rpc_url,
         gateway_id: GatewayId::EthAddress(gateway_address),
+        network_name: None,
     };
 
     let initial_committed_epoch = initial_instance as ChainEpoch;

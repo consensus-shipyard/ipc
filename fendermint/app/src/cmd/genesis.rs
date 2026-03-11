@@ -411,7 +411,7 @@ async fn fetch_f3_params_from_parent(
     let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
 
     // Convert power entries (power can exceed 64 bits; store as big-endian bytes).
-    let power_table: anyhow::Result<Vec<_>> = power_table_response
+    let mut power_table: Vec<_> = power_table_response
         .iter()
         .map(|entry| {
             // Decode base64 public key
@@ -430,8 +430,14 @@ async fn fetch_f3_params_from_parent(
                 power_be,
             })
         })
-        .collect();
-    let power_table = power_table?;
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    // Keep canonical F3 ordering: power desc, then participant id asc.
+    power_table.sort_by(|a, b| {
+        let pa = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &a.power_be);
+        let pb = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &b.power_be);
+        pb.cmp(&pa).then_with(|| a.id.cmp(&b.id))
+    });
 
     tracing::info!(
         "Successfully fetched F3 parameters for instance {} from parent chain",

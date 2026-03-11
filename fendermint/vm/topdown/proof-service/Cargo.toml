@@ -46,7 +46,7 @@ prometheus = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 
-proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
+proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", rev = "45ed1e8c3f99c6055169be1b6812eeff2657f553" }
 
 # F3 certificate handling
 filecoin-f3-certs = { git = "https://github.com/moshababo/rust-f3", branch = "cargo-git-compat" }

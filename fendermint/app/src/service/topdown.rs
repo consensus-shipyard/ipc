@@ -39,10 +39,21 @@ struct LegacyPostInit {
     parent_finality_votes: VoteTally,
 }
 
+/// F3 topdown background task which requires committed state to be queryable.
+struct F3PostInit {
+    manager: TopDownManager<NamespaceBlockstore>,
+    settings: Settings,
+    topdown_config: TopDownSettings,
+    db: RocksDb,
+    state_store: NamespaceBlockstore,
+    app_namespace: <AppStore as KVStore>::Namespace,
+}
+
 /// Result of topdown initialization performed before `App::new()`.
 pub(super) struct TopDownInit {
     manager: TopDownManager<NamespaceBlockstore>,
     legacy_post_init: Option<LegacyPostInit>,
+    f3_post_init: Option<F3PostInit>,
 }
 
 impl TopDownInit {
@@ -50,7 +61,7 @@ impl TopDownInit {
         self.manager.clone()
     }
 
-    pub(super) async fn spawn_legacy_polling_syncer_if_needed(
+    pub(super) async fn spawn_post_init_tasks(
         self,
         app: App<
             RocksDb,
@@ -78,6 +89,13 @@ impl TopDownInit {
                 }
             });
         }
+        if let Some(p) = self.f3_post_init {
+            tokio::spawn(async move {
+                if let Err(e) = run_f3_post_init(p).await {
+                    tracing::error!("F3 post-init failed: {e:#}");
+                }
+            });
+        }
         Ok(())
     }
 }
@@ -100,6 +118,7 @@ pub(super) async fn start_topdown_if_enabled(
         return Ok(TopDownInit {
             manager: TopDownManager::disabled(),
             legacy_post_init: None,
+            f3_post_init: None,
         });
     }
 
@@ -109,34 +128,48 @@ pub(super) async fn start_topdown_if_enabled(
         .context("topdown is enabled but topdown config is missing")?;
 
     let f3_enabled_in_config = topdown_config.f3.is_some();
-    let f3_state_in_committed_state =
-        query_f3_state_in_committed_state(db, state_store, app_namespace.clone())?;
-    let gateway_finality_in_committed_state =
-        query_gateway_parent_finality_in_committed_state(db, state_store, app_namespace.clone())?;
-    let gateway_event_cursor_in_committed_state =
-        query_gateway_event_cursor_in_committed_state(db, state_store, app_namespace.clone())?;
+    let seed = query_committed_topdown_seed(db, state_store, app_namespace.clone())?;
 
     // Fail-fast consistency between config and committed state.
     //
     // - If committed state has F3 state, config must enable F3.
     // - If config enables F3, committed state must have initial F3 state.
-    if f3_state_in_committed_state.is_some() && !f3_enabled_in_config {
+    if seed.f3_state.is_some() && !f3_enabled_in_config {
         bail!("F3 is enabled in committed state but not in config");
-    }
-    if f3_enabled_in_config && f3_state_in_committed_state.is_none() {
-        bail!("F3 is enabled in config but initial F3 state is missing in committed state");
     }
 
     if f3_enabled_in_config {
-        if gateway_finality_in_committed_state.is_none() {
+        if !seed.queryable {
+            tracing::info!(
+                "F3 enabled in config but committed state not ready; deferring F3 init until after InitChain"
+            );
+            let manager = TopDownManager::disabled();
+            return Ok(TopDownInit {
+                manager: manager.clone(),
+                legacy_post_init: None,
+                f3_post_init: Some(F3PostInit {
+                    manager,
+                    settings: settings.clone(),
+                    topdown_config: topdown_config.clone(),
+                    db: db.clone(),
+                    state_store: state_store.clone(),
+                    app_namespace,
+                }),
+            });
+        }
+
+        if seed.f3_state.is_none() {
+            bail!("F3 is enabled in config but initial F3 state is missing in committed state");
+        }
+        if seed.gateway_latest_parent_finality.is_none() {
             bail!("F3 is enabled but gateway latest parent finality is missing in committed state");
         }
         return start_f3_topdown(
             settings,
             topdown_config,
-            f3_state_in_committed_state,
-            gateway_finality_in_committed_state,
-            gateway_event_cursor_in_committed_state,
+            seed.f3_state,
+            seed.gateway_latest_parent_finality,
+            seed.gateway_event_cursor,
         )
         .await;
     }
@@ -159,77 +192,55 @@ struct GatewayEventCursor {
     next_power_change_config_number: u64,
 }
 
-fn query_f3_state_in_committed_state(
-    db: &RocksDb,
-    state_store: &NamespaceBlockstore,
-    app_namespace: <AppStore as KVStore>::Namespace,
-) -> anyhow::Result<Option<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>> {
-    // Query F3 state from committed state once (used for fail-fast + F3 cache init).
-    let exec_state =
-        crate::app::create_read_only_exec_state::<_, _, AppStore>(db, state_store, app_namespace)
-            .context("failed to create read-only exec state")?;
+type F3State = fendermint_vm_actor_interface::f3_light_client::GetStateResponse;
 
-    let f3_state_in_committed_state = match exec_state {
-        Some(mut state) => crate::app::query_f3_state(&mut state)
-            .context("failed to query F3 state from committed state")?,
-        None => None,
-    };
-
-    Ok(f3_state_in_committed_state)
+#[derive(Debug)]
+struct CommittedTopdownSeed {
+    queryable: bool,
+    f3_state: Option<F3State>,
+    gateway_latest_parent_finality: Option<IPCParentFinality>,
+    gateway_event_cursor: Option<GatewayEventCursor>,
 }
 
-fn query_gateway_parent_finality_in_committed_state(
+fn query_committed_topdown_seed(
     db: &RocksDb,
     state_store: &NamespaceBlockstore,
     app_namespace: <AppStore as KVStore>::Namespace,
-) -> anyhow::Result<Option<IPCParentFinality>> {
+) -> anyhow::Result<CommittedTopdownSeed> {
     type ROStore = fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore<
         std::sync::Arc<NamespaceBlockstore>,
     >;
-    // Query the gateway's latest parent finality from committed/genesis state once.
+
     let exec_state =
         crate::app::create_read_only_exec_state::<_, _, AppStore>(db, state_store, app_namespace)
             .context("failed to create read-only exec state")?;
 
-    let latest = match exec_state {
-        Some(mut state) => {
-            let gw =
-                fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller::<ROStore>::default();
-            Some(gw.get_latest_parent_finality(&mut state)?)
-        }
-        None => None,
+    let Some(mut state) = exec_state else {
+        return Ok(CommittedTopdownSeed {
+            queryable: false,
+            f3_state: None,
+            gateway_latest_parent_finality: None,
+            gateway_event_cursor: None,
+        });
     };
 
-    Ok(latest)
-}
+    let f3_state = crate::app::query_f3_state(&mut state)
+        .context("failed to query F3 state from committed state")?;
+    let gw = fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller::<ROStore>::default();
+    let gateway_latest_parent_finality = Some(gw.get_latest_parent_finality(&mut state)?);
+    let applied_top_down_nonce = gw.applied_top_down_nonce(&mut state)?;
+    let (next_cfg, _start_cfg) = gw.tracker_configuration_numbers(&mut state)?;
+    let gateway_event_cursor = Some(GatewayEventCursor {
+        applied_top_down_nonce,
+        next_power_change_config_number: next_cfg,
+    });
 
-fn query_gateway_event_cursor_in_committed_state(
-    db: &RocksDb,
-    state_store: &NamespaceBlockstore,
-    app_namespace: <AppStore as KVStore>::Namespace,
-) -> anyhow::Result<Option<GatewayEventCursor>> {
-    type ROStore = fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore<
-        std::sync::Arc<NamespaceBlockstore>,
-    >;
-    let exec_state =
-        crate::app::create_read_only_exec_state::<_, _, AppStore>(db, state_store, app_namespace)
-            .context("failed to create read-only exec state")?;
-
-    let cursor = match exec_state {
-        Some(mut state) => {
-            let gw =
-                fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller::<ROStore>::default();
-            let applied_top_down_nonce = gw.applied_top_down_nonce(&mut state)?;
-            let (next_cfg, _start_cfg) = gw.tracker_configuration_numbers(&mut state)?;
-            Some(GatewayEventCursor {
-                applied_top_down_nonce,
-                next_power_change_config_number: next_cfg,
-            })
-        }
-        None => None,
-    };
-
-    Ok(cursor)
+    Ok(CommittedTopdownSeed {
+        queryable: true,
+        f3_state,
+        gateway_latest_parent_finality,
+        gateway_event_cursor,
+    })
 }
 
 fn make_resolver_service(
@@ -389,6 +400,7 @@ async fn start_legacy_topdown(
             parent_finality_provider,
             parent_finality_votes: parent_finality_votes.clone(),
         }),
+        f3_post_init: None,
     })
 }
 
@@ -401,6 +413,32 @@ async fn start_f3_topdown(
     gateway_finality_in_committed_state: Option<IPCParentFinality>,
     gateway_event_cursor_in_committed_state: Option<GatewayEventCursor>,
 ) -> anyhow::Result<TopDownInit> {
+    let (handler, retry_cfg) = init_f3_components(
+        settings,
+        topdown_config,
+        f3_state_in_committed_state,
+        gateway_finality_in_committed_state,
+        gateway_event_cursor_in_committed_state,
+    )
+    .await?;
+
+    Ok(TopDownInit {
+        manager: TopDownManager::f3_with_retry_config(handler, retry_cfg),
+        legacy_post_init: None,
+        f3_post_init: None,
+    })
+}
+
+async fn init_f3_components(
+    settings: &Settings,
+    topdown_config: &TopDownSettings,
+    f3_state_in_committed_state: Option<F3State>,
+    gateway_finality_in_committed_state: Option<IPCParentFinality>,
+    gateway_event_cursor_in_committed_state: Option<GatewayEventCursor>,
+) -> anyhow::Result<(
+    fendermint_vm_interpreter::fvm::F3TopDownHandler,
+    fendermint_vm_interpreter::fvm::topdown::F3ExecutionCacheRetryConfig,
+)> {
     let f3_config = topdown_config
         .f3
         .as_ref()
@@ -409,20 +447,19 @@ async fn start_f3_topdown(
     let f3_state = f3_state_in_committed_state
         .context("F3 is enabled in config but initial F3 state is missing in committed state")?;
     let initial_instance = f3_state.processed_instance_id;
-    // Epoch cursor comes from the gateway contract (seeded at genesis).
     let initial_epoch = gateway_finality_in_committed_state
         .context("F3 enabled but gateway latest parent finality missing in committed state")?
         .height as fvm_shared::clock::ChainEpoch;
     let gateway_cursor = gateway_event_cursor_in_committed_state
         .context("F3 enabled but gateway event cursor missing in committed state")?;
 
-    let db_path = Some(settings.data_dir().join("proof-cache"));
+    let db_path = settings.data_dir().join("proof-cache");
     let cache = Arc::new(
         fendermint_vm_topdown_proof_service::ProofCache::new_with_persistence(
             initial_epoch,
             initial_instance,
             f3_config.proof_service.cache_config.clone(),
-            db_path.as_ref().expect("db_path always set here"),
+            &db_path,
         )?,
     );
 
@@ -462,18 +499,43 @@ async fn start_f3_topdown(
         });
     }
 
-    Ok(TopDownInit {
-        manager: TopDownManager::f3_with_retry_config(
-            handler,
-            fendermint_vm_interpreter::fvm::topdown::F3ExecutionCacheRetryConfig {
-                backoff_initial: f3_config.execution_cache_retry.backoff_initial,
-                backoff_max: f3_config.execution_cache_retry.backoff_max,
-                critical_after: f3_config.execution_cache_retry.critical_after,
-                error_after: f3_config.execution_cache_retry.error_after,
-            },
-        ),
-        legacy_post_init: None,
-    })
+    Ok((
+        handler,
+        fendermint_vm_interpreter::fvm::topdown::F3ExecutionCacheRetryConfig {
+            backoff_initial: f3_config.execution_cache_retry.backoff_initial,
+            backoff_max: f3_config.execution_cache_retry.backoff_max,
+            critical_after: f3_config.execution_cache_retry.critical_after,
+            error_after: f3_config.execution_cache_retry.error_after,
+        },
+    ))
+}
+
+async fn run_f3_post_init(p: F3PostInit) -> anyhow::Result<()> {
+    let mut backoff = std::time::Duration::from_millis(200);
+    let max_backoff = std::time::Duration::from_secs(5);
+
+    loop {
+        let seed = query_committed_topdown_seed(&p.db, &p.state_store, p.app_namespace.clone())?;
+        if !seed.queryable {
+            tokio::time::sleep(backoff).await;
+            backoff = std::cmp::min(backoff.saturating_mul(2), max_backoff);
+            continue;
+        }
+
+        let (handler, retry_cfg) = init_f3_components(
+            &p.settings,
+            &p.topdown_config,
+            seed.f3_state,
+            seed.gateway_latest_parent_finality,
+            seed.gateway_event_cursor,
+        )
+        .await?;
+
+        p.manager.activate_f3_once(handler, retry_cfg)?;
+
+        tracing::info!("F3 post-init activation completed");
+        return Ok(());
+    }
 }
 
 fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::Config> {

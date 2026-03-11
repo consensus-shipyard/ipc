@@ -305,8 +305,8 @@ vote_timeout = 60
 # [ipc.topdown.proof_service]
 # # Enable F3 proof-based parent finality (default: false)
 # enabled = false
-# # F3 network name - must match parent chain ("calibrationnet", "mainnet")
-# f3_network_name = "calibrationnet"
+# # F3 network name - must match parent chain ("calibrationnet2, "mainnet")
+# f3_network_name = "calibrationnet2"
 # # How often to poll parent chain for new F3 certificates, in seconds
 # polling_interval = 30
 # # How many F3 instances ahead to pre-generate proofs (lookahead window)

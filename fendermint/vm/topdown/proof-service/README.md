@@ -279,7 +279,7 @@ All configuration options in `ProofServiceConfig`:
 | `enabled`              | bool           | Yes      | Enable/disable the service                       |
 | `parent_rpc_url`       | String         | Yes      | F3 RPC endpoint URL (HTTP or HTTPS)              |
 | `parent_subnet_id`     | String         | Yes      | Parent subnet ID (e.g., "/r314159")              |
-| `f3_network_name`      | String         | Yes      | F3 network name ("calibrationnet", "mainnet")    |
+| `f3_network_name`      | String         | Yes      | F3 network name ("calibrationnet2", "mainnet")   |
 | `gateway_actor_id`     | Option<u64>    | Yes      | Gateway actor ID on parent chain                 |
 | `subnet_id`            | Option<String> | Yes      | Current subnet ID for event filtering            |
 | `lookahead_instances`  | u64            | Yes      | How many instances to pre-generate (must be > 0) |

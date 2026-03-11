@@ -12,9 +12,11 @@ use crate::storage_layout::{
 };
 use crate::types::FinalizedTipset;
 use anyhow::{Context, Result};
+use ethers::abi::Token;
 use ethers::contract::EthEvent;
-use ethers::types::H256;
+use ethers::types::{Address as EthAddress, H256, U256};
 use fvm_ipld_encoding;
+use ipc_api::subnet_id::SubnetID;
 use ipc_actors_abis::{lib_gateway, lib_power_change_log};
 use ipc_observability::emit;
 use proofs::proofs::storage::utils::compute_mapping_slot;
@@ -24,7 +26,7 @@ use proofs::{
         common::bundle::UnifiedProofBundle, generate_proof_bundle, EventProofSpec, StorageProofSpec,
     },
 };
-use std::time::Instant;
+use std::str::FromStr;
 use url::Url;
 
 // Event signatures for proof generation.
@@ -68,30 +70,40 @@ mod signature_tests {
 pub struct ProofAssembler {
     rpc_url: Url,
     gateway_actor_id: u64,
-    subnet_id: String,
+    subnet_hash_key: [u8; 32],
+    topdown_topic_1: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct SubnetProofContext {
+    pub subnet_hash_key: [u8; 32],
+    pub subnet_actor_eth_topic: String,
+    pub subnet_actor_topic_bytes: Option<[u8; 32]>,
 }
 
 impl ProofAssembler {
     /// Create a new proof assembler
-    pub fn new(rpc_url: String, gateway_actor_id: u64, subnet_id: String) -> Result<Self> {
+    pub fn new(
+        rpc_url: String,
+        gateway_actor_id: u64,
+        subnet_context: SubnetProofContext,
+    ) -> Result<Self> {
         let url = Url::parse(&rpc_url).context("Failed to parse RPC URL")?;
         Ok(Self {
             rpc_url: url,
             gateway_actor_id,
-            subnet_id,
+            subnet_hash_key: subnet_context.subnet_hash_key,
+            topdown_topic_1: subnet_context.subnet_actor_eth_topic,
         })
     }
 
     fn build_storage_specs(&self) -> Vec<StorageProofSpec> {
-        // Mapping key is bytes32; proofs utils only provide `compute_mapping_slot(key, slot)`.
-        // We use the proof library's ASCII bytes32 helper to match the existing on-chain encoding
-        // used by the proofs stack (topic/storage filters operate on bytes32 strings).
-        let key = proofs::proofs::common::evm::ascii_to_bytes32(&self.subnet_id);
-        let base = compute_mapping_slot(key, SUBNETS_MAPPING_SLOT);
+        // The gateway maps `subnets[SubnetID.toHash()]`.
+        let base = compute_mapping_slot(self.subnet_hash_key, SUBNETS_MAPPING_SLOT);
         // Struct member is at relative slot 3.
         let mut slot_bytes = base;
-        let base_u256 = ethers::types::U256::from_big_endian(&base);
-        let slot_u256 = base_u256 + ethers::types::U256::from(SUBNET_TOPDOWN_NONCE_OFFSET);
+        let base_u256 = U256::from_big_endian(&base);
+        let slot_u256 = base_u256 + U256::from(SUBNET_TOPDOWN_NONCE_OFFSET);
         slot_u256.to_big_endian(&mut slot_bytes);
 
         vec![
@@ -112,7 +124,7 @@ impl ProofAssembler {
         vec![
             EventProofSpec {
                 event_signature: new_topdown_message_signature(),
-                topic_1: self.subnet_id.clone(),
+                topic_1: self.topdown_topic_1.clone(),
                 actor_id_filter: Some(self.gateway_actor_id),
             },
             EventProofSpec {
@@ -166,8 +178,6 @@ impl ProofAssembler {
         let parent_epoch = parent_tipset.epoch;
         let child_epoch = child_tipset.epoch;
 
-        let generation_start = Instant::now();
-
         tracing::debug!(
             parent_epoch,
             child_epoch,
@@ -195,8 +205,6 @@ impl ProofAssembler {
             .map(|v| v.len())
             .unwrap_or(0);
 
-        let latency = generation_start.elapsed().as_secs_f64();
-
         emit(ProofBundleGenerated {
             highest_epoch: parent_epoch,
             storage_proofs: bundle.storage_proofs.len(),
@@ -204,7 +212,7 @@ impl ProofAssembler {
             witness_blocks: bundle.blocks.len(),
             bundle_size_bytes,
             status: OperationStatus::Success,
-            latency,
+            latency: 0.0,
         });
 
         tracing::info!(
@@ -262,6 +270,71 @@ impl ProofAssembler {
     }
 }
 
+async fn resolve_filecoin_address_to_eth(client: &LotusClient, addr: &str) -> Result<EthAddress> {
+    let raw: serde_json::Value = client
+        .request(
+            "Filecoin.FilecoinAddressToEthAddress",
+            serde_json::json!([addr]),
+        )
+        .await
+        .with_context(|| format!("failed to resolve Filecoin address to eth: {addr}"))?;
+
+    let eth = if let Some(s) = raw.as_str() {
+        s.to_string()
+    } else if let Some(s) = raw.get("EthAddress").and_then(|v| v.as_str()) {
+        s.to_string()
+    } else {
+        anyhow::bail!(
+            "unexpected response resolving Filecoin address {addr}: {}",
+            raw
+        );
+    };
+
+    EthAddress::from_str(&eth)
+        .with_context(|| format!("invalid eth address returned for {addr}: {eth}"))
+}
+
+pub async fn derive_subnet_proof_context(
+    parent_rpc_url: &str,
+    subnet_id: &SubnetID,
+) -> Result<SubnetProofContext> {
+    let url = Url::parse(parent_rpc_url).context("Failed to parse parent RPC URL")?;
+    let client = LotusClient::new(url, None::<&str>);
+
+    let mut route = Vec::with_capacity(subnet_id.children_as_ref().len());
+    for addr in subnet_id.children_as_ref() {
+        route.push(resolve_filecoin_address_to_eth(&client, &addr.to_string()).await?);
+    }
+
+    let route_tokens = route
+        .iter()
+        .copied()
+        .map(Token::Address)
+        .collect::<Vec<_>>();
+    let encoded = ethers::abi::encode(&[
+        Token::Uint(U256::from(subnet_id.root_id())),
+        Token::Array(route_tokens),
+    ]);
+    let subnet_hash_key = ethers::utils::keccak256(encoded);
+
+    let subnet_actor_eth_topic = route
+        .last()
+        .map(|a| format!("{:#x}", a))
+        .unwrap_or_default();
+
+    let subnet_actor_topic_bytes = route.last().map(|addr| {
+        let mut topic = [0u8; 32];
+        topic[12..].copy_from_slice(addr.as_bytes());
+        topic
+    });
+
+    Ok(SubnetProofContext {
+        subnet_hash_key,
+        subnet_actor_eth_topic,
+        subnet_actor_topic_bytes,
+    })
+}
+
 /// Resolve an Ethereum address to a Filecoin actor ID on the parent chain.
 ///
 /// Used at proof-service startup when `gateway_id` is configured as an Ethereum address.
@@ -285,18 +358,27 @@ mod tests {
 
     #[test]
     fn test_assembler_creation() {
+        let subnet_context = SubnetProofContext {
+            subnet_hash_key: [0u8; 32],
+            subnet_actor_eth_topic: String::new(),
+            subnet_actor_topic_bytes: None,
+        };
         let assembler = ProofAssembler::new(
             "http://localhost:1234".to_string(),
             1001,
-            "test-subnet".to_string(),
+            subnet_context,
         );
         assert!(assembler.is_ok());
     }
 
     #[test]
     fn test_invalid_url() {
-        let assembler =
-            ProofAssembler::new("not a url".to_string(), 1001, "test-subnet".to_string());
+        let subnet_context = SubnetProofContext {
+            subnet_hash_key: [0u8; 32],
+            subnet_actor_eth_topic: String::new(),
+            subnet_actor_topic_bytes: None,
+        };
+        let assembler = ProofAssembler::new("not a url".to_string(), 1001, subnet_context);
         assert!(assembler.is_err());
     }
 }

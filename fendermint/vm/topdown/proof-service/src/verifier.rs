@@ -21,8 +21,8 @@ use ethers::abi::RawLog;
 use ethers::contract::EthEvent;
 use ethers::types::H256;
 use fendermint_vm_evm_event_utils::{
-    decode_new_power_change_request, decode_new_topdown_message, parse_u64_from_0x_word_low64,
-    raw_log_from_event_proof,
+    decode_new_power_change_request, decode_new_topdown_message, parse_0x_bytes,
+    parse_u64_from_0x_word_low64, raw_log_from_event_proof,
 };
 use ipc_actors_abis::{lib_gateway, lib_power_change_log};
 use proofs::proofs::common::bundle::{UnifiedProofBundle, UnifiedVerificationResult};
@@ -30,12 +30,13 @@ use proofs::proofs::events::bundle::EventProofBundle;
 use proofs::proofs::events::verifier::verify_event_proof;
 use proofs::proofs::storage::verifier::verify_storage_proof;
 
-use proofs::proofs::common::evm::{ascii_to_bytes32, extract_evm_log, hash_event_signature};
+use proofs::proofs::common::evm::{extract_evm_log, hash_event_signature};
 use proofs::proofs::storage::utils::compute_mapping_slot;
 
 pub struct ProofVerifier {
     events: Vec<Vec<[u8; 32]>>,
-    subnet_id: String,
+    subnet_hash_key: [u8; 32],
+    expected_topdown_topic_1: Option<[u8; 32]>,
 }
 
 /// Cursor derived from *proved* end-of-epoch storage values.
@@ -53,18 +54,25 @@ pub(crate) struct EventNumberCursor {
 }
 
 impl ProofVerifier {
-    pub fn new(subnet_id: String) -> Self {
+    pub fn new(subnet_hash_key: [u8; 32], subnet_actor_topic_1: Option<[u8; 32]>) -> Self {
+        let mut topdown_topics =
+            vec![hash_event_signature(&lib_gateway::NewTopDownMessageFilter::abi_signature())];
+        if let Some(topic_1) = subnet_actor_topic_1 {
+            topdown_topics.push(topic_1);
+        }
+
         let events = vec![
-            vec![
-                hash_event_signature(&lib_gateway::NewTopDownMessageFilter::abi_signature()),
-                ascii_to_bytes32(&subnet_id),
-            ],
+            topdown_topics,
             vec![hash_event_signature(
                 &lib_power_change_log::NewPowerChangeRequestFilter::abi_signature(),
             )],
         ];
 
-        Self { events, subnet_id }
+        Self {
+            events,
+            subnet_hash_key,
+            expected_topdown_topic_1: subnet_actor_topic_1,
+        }
     }
 
     /// Verify a inclusion proof in the proof bundle using pre-merged tipsets from certificates
@@ -182,7 +190,7 @@ impl ProofVerifier {
         cursor: &mut EventNumberCursor,
     ) -> Result<()> {
         // 1) Extract values.
-        let mut nums = extract_epoch_event_numbers(parent_epoch, bundle)
+        let mut nums = extract_epoch_event_numbers(parent_epoch, bundle, self.expected_topdown_topic_1)
             .with_context(|| format!("failed to extract event numbers for epoch {parent_epoch}"))?;
 
         // 2) Verify local contiguity within the epoch.
@@ -194,7 +202,7 @@ impl ProofVerifier {
 
         // 3) Anchor both sequences to proved "next" storage values.
         // Storage holds the next nonce/config-number *after* applying the epoch.
-        let next_topdown = next_topdown_message_nonce_from_storage(bundle, &self.subnet_id)?;
+        let next_topdown = next_topdown_message_nonce_from_storage(bundle, self.subnet_hash_key)?;
         let next_cfg = next_power_change_config_number_from_storage(bundle)?;
 
         verify_sequence_against_storage_next(
@@ -223,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_verifier_creation() {
-        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let verifier = ProofVerifier::new([0u8; 32], None);
         assert_eq!(verifier.events.len(), 2);
     }
 }
@@ -234,9 +242,8 @@ fn h256_to_0x(h: H256) -> String {
     format!("0x{}", hex::encode(h.as_bytes()))
 }
 
-fn expected_topdown_nonce_slot(subnet_id: &str) -> H256 {
-    let key = ascii_to_bytes32(subnet_id);
-    let base = compute_mapping_slot(key, SUBNETS_MAPPING_SLOT);
+fn expected_topdown_nonce_slot(subnet_hash_key: [u8; 32]) -> H256 {
+    let base = compute_mapping_slot(subnet_hash_key, SUBNETS_MAPPING_SLOT);
     let mut slot_bytes = base;
     let base_u256 = ethers::types::U256::from_big_endian(&base);
     let slot_u256 = base_u256 + ethers::types::U256::from(SUBNET_TOPDOWN_NONCE_OFFSET);
@@ -246,9 +253,9 @@ fn expected_topdown_nonce_slot(subnet_id: &str) -> H256 {
 
 fn next_topdown_message_nonce_from_storage(
     bundle: &UnifiedProofBundle,
-    subnet_id: &str,
+    subnet_hash_key: [u8; 32],
 ) -> Result<u64> {
-    let expected_slot = h256_to_0x(expected_topdown_nonce_slot(subnet_id));
+    let expected_slot = h256_to_0x(expected_topdown_nonce_slot(subnet_hash_key));
     let storage = bundle
         .storage_proofs
         .iter()
@@ -265,8 +272,26 @@ fn next_power_change_config_number_from_storage(bundle: &UnifiedProofBundle) -> 
         .iter()
         .find(|sp| sp.slot.eq_ignore_ascii_case(&expected_slot))
         .context("missing storage proof for nextConfigurationNumber (slot 20)")?;
-    parse_u64_from_0x_word_low64(&storage.value)
+    parse_low64_from_0x_word(&storage.value)
         .context("failed to parse nextConfigurationNumber from storage proof")
+}
+
+/// Parse the low 64 bits from a 32-byte EVM storage word.
+///
+/// `nextConfigurationNumber` may live in a packed slot where higher bits are used by
+/// neighboring fields, so we intentionally read only the low 64 bits here.
+fn parse_low64_from_0x_word(word_0x: &str) -> Result<u64> {
+    let mut b = parse_0x_bytes(word_0x)?;
+    if b.len() > 32 {
+        anyhow::bail!("expected <= 32 bytes, got {}", b.len());
+    }
+    if b.len() < 32 {
+        let mut padded = vec![0u8; 32 - b.len()];
+        padded.append(&mut b);
+        b = padded;
+    }
+    let tail: [u8; 8] = b[24..32].try_into().expect("slice is 8 bytes");
+    Ok(u64::from_be_bytes(tail))
 }
 
 fn verify_sequence_against_storage_next(
@@ -332,6 +357,7 @@ struct EpochEventNumbers {
 fn extract_epoch_event_numbers(
     parent_epoch: i64,
     bundle: &UnifiedProofBundle,
+    expected_topdown_topic_1: Option<[u8; 32]>,
 ) -> Result<EpochEventNumbers> {
     let mut out = EpochEventNumbers::default();
 
@@ -349,6 +375,11 @@ fn extract_epoch_event_numbers(
         }
 
         if topics[0] == topdown_sig {
+            if let Some(expected_topic_1) = expected_topdown_topic_1 {
+                if topics.get(1).copied() != Some(H256::from(expected_topic_1)) {
+                    continue;
+                }
+            }
             let decoded = decode_new_topdown_message(&RawLog { topics, data })?;
             out.topdown_nonces.push(decoded.message.local_nonce);
         } else if topics[0] == power_sig {
@@ -482,7 +513,7 @@ mod event_number_continuity_tests {
     #[test]
     fn continuity_check_passes_for_contiguous_nonces_and_config_numbers() -> Result<()> {
         let epoch = 100;
-        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let verifier = ProofVerifier::new([1u8; 32], None);
         let mut cursor = EventNumberCursor {
             next_parent_topdown_nonce: 10,
             next_parent_power_change_config_number: 7,
@@ -499,8 +530,7 @@ mod event_number_continuity_tests {
         // nextConfigurationNumber after applying 2 changes should be 9.
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 9);
         // topDownNonce after applying 2 messages with nonces 10,11 should be 12.
-        let topdown_nonce_storage =
-            mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 12);
+        let topdown_nonce_storage = mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 12);
 
         let bundle = UnifiedProofBundle {
             storage_proofs: vec![next_config_storage, topdown_nonce_storage],
@@ -520,7 +550,7 @@ mod event_number_continuity_tests {
     #[test]
     fn continuity_check_fails_on_config_storage_mismatch() -> Result<()> {
         let epoch = 100;
-        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let verifier = ProofVerifier::new([1u8; 32], None);
         let mut cursor = EventNumberCursor {
             next_parent_topdown_nonce: 0,
             next_parent_power_change_config_number: 7,
@@ -531,8 +561,7 @@ mod event_number_continuity_tests {
 
         // WRONG: should be 9, but we claim 10.
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 10);
-        let topdown_nonce_storage =
-            mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 0);
+        let topdown_nonce_storage = mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 0);
 
         let bundle = UnifiedProofBundle {
             storage_proofs: vec![next_config_storage, topdown_nonce_storage],
@@ -555,7 +584,7 @@ mod event_number_continuity_tests {
     #[test]
     fn continuity_check_fails_on_nonce_gap() -> Result<()> {
         let epoch = 100;
-        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let verifier = ProofVerifier::new([1u8; 32], None);
         let mut cursor = EventNumberCursor {
             next_parent_topdown_nonce: 10,
             next_parent_power_change_config_number: 0,
@@ -564,8 +593,7 @@ mod event_number_continuity_tests {
         let td0 = mk_topdown_rawlog(EthAddress::random(), [7u8; 32], 10);
         let td1 = mk_topdown_rawlog(EthAddress::random(), [8u8; 32], 12); // gap!
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0);
-        let topdown_nonce_storage =
-            mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 13);
+        let topdown_nonce_storage = mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 13);
 
         let bundle = UnifiedProofBundle {
             storage_proofs: vec![next_config_storage, topdown_nonce_storage],
@@ -585,7 +613,7 @@ mod event_number_continuity_tests {
     #[test]
     fn continuity_check_fails_on_duplicate_nonce() -> Result<()> {
         let epoch = 100;
-        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let verifier = ProofVerifier::new([1u8; 32], None);
         let mut cursor = EventNumberCursor {
             next_parent_topdown_nonce: 10,
             next_parent_power_change_config_number: 0,
@@ -597,8 +625,7 @@ mod event_number_continuity_tests {
 
         // Storage indicates two messages were applied (delta=2) ending at nonce 12.
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0);
-        let topdown_nonce_storage =
-            mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 12);
+        let topdown_nonce_storage = mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 12);
 
         let bundle = UnifiedProofBundle {
             storage_proofs: vec![next_config_storage, topdown_nonce_storage],
@@ -615,7 +642,7 @@ mod event_number_continuity_tests {
 
     #[test]
     fn continuity_check_detects_omitted_initial_events_via_storage_delta() -> Result<()> {
-        let verifier = ProofVerifier::new("test-subnet".to_string());
+        let verifier = ProofVerifier::new([1u8; 32], None);
         // Epoch 100 starts at nonce 10 (two events) and config-number 0 (no events).
         let mut cursor = EventNumberCursor {
             next_parent_topdown_nonce: 10,
@@ -629,7 +656,7 @@ mod event_number_continuity_tests {
         let bundle0 = UnifiedProofBundle {
             storage_proofs: vec![
                 mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0),
-                mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 12),
+                mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 12),
             ],
             event_proofs: vec![mk_event_proof(epoch0, td0), mk_event_proof(epoch0, td1)],
             blocks: vec![],
@@ -644,7 +671,7 @@ mod event_number_continuity_tests {
         let bundle1 = UnifiedProofBundle {
             storage_proofs: vec![
                 mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0),
-                mk_storage_proof_h256(expected_topdown_nonce_slot("test-subnet"), 15),
+                mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 15),
             ],
             event_proofs: vec![mk_event_proof(epoch1, td2), mk_event_proof(epoch1, td3)],
             blocks: vec![],

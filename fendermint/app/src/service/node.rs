@@ -169,7 +169,7 @@ pub async fn run(
     )?;
 
     topdown
-        .spawn_legacy_polling_syncer_if_needed(app.clone(), tendermint_client.clone())
+        .spawn_post_init_tasks(app.clone(), tendermint_client.clone())
         .await?;
 
     // Start the metrics on a background thread.

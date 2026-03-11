@@ -11,7 +11,6 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{self};
 use fvm_shared::{address::Address, error::ExitCode};
 use std::sync::Arc;
-use std::time::Instant;
 
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
@@ -256,6 +255,12 @@ where
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError> {
+        let input_tx_count = msgs.len();
+        tracing::info!(
+            input_tx_count,
+            max_transaction_bytes,
+            "prepare_messages_for_block start"
+        );
         let signed_msgs = msgs
             .iter()
             .filter_map(|msg| match ipld_decode_signed_message(msg) {
@@ -266,26 +271,52 @@ where
                 }
             })
             .collect::<Vec<_>>();
+        tracing::info!(
+            input_tx_count,
+            decoded_signed_count = signed_msgs.len(),
+            "prepare_messages_for_block decoded mempool messages"
+        );
 
         let signed_msgs =
             select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
+        tracing::info!(
+            selected_by_base_fee = signed_msgs.len(),
+            "prepare_messages_for_block selected messages above base fee"
+        );
 
         let total_gas_limit = state.block_gas_tracker().available();
+        let signed_msg_count = signed_msgs.len();
         let signed_msgs_iter = select_messages_by_gas_limit(signed_msgs, total_gas_limit)
             .into_iter()
             .map(Into::into);
+        tracing::info!(
+            selected_by_gas_limit = signed_msg_count,
+            total_gas_limit,
+            "prepare_messages_for_block selected messages by gas limit"
+        );
 
         // Get parent finality message - TopDownManager decides internally whether to use F3 or legacy
-        let top_down_iter = self
+        tracing::info!("prepare_messages_for_block entering topdown proposal lookup");
+        let top_down_msg = self
             .top_down_manager
             .chain_message_for_proposal()
-            .await
-            .into_iter();
+            .await;
+        let topdown_included = top_down_msg.is_some();
+        let top_down_iter = top_down_msg.into_iter();
+        tracing::info!(
+            topdown_included,
+            "prepare_messages_for_block finished topdown proposal lookup"
+        );
 
+        tracing::info!("prepare_messages_for_block encoding proposal messages");
         let mut all_msgs = top_down_iter
             .chain(signed_msgs_iter)
             .map(|msg| fvm_ipld_encoding::to_vec(&msg).context("failed to encode message as IPLD"))
             .collect::<Result<Vec<Vec<u8>>>>()?;
+        tracing::info!(
+            encoded_message_count = all_msgs.len(),
+            "prepare_messages_for_block encoded proposal messages"
+        );
 
         if all_msgs.len() > self.max_msgs_per_block {
             tracing::info!(
@@ -309,6 +340,14 @@ where
                 );
             }
         }
+
+        tracing::debug!(
+            input_signed_msgs = signed_msg_count,
+            topdown_included,
+            output_msgs = all_messages.len(),
+            total_bytes,
+            "Prepared proposal messages for block"
+        );
 
         Ok(PrepareMessagesResponse {
             messages: all_messages,
@@ -561,15 +600,13 @@ where
                 let to = msg.to;
                 let method_num = msg.method_num;
                 let gas_limit = msg.gas_limit;
-                let start = Instant::now();
                 let (state, (apply_ret, emitters)) = state.call(*msg.clone()).await?;
-                let latency = start.elapsed().as_secs_f64();
                 let exit_code = apply_ret.msg_receipt.exit_code.value();
                 emit(MsgExec {
                     purpose: MsgExecPurpose::Call,
                     height: state.block_height(),
                     message: *msg,
-                    duration: latency,
+                    duration: 0.0,
                     exit_code,
                 });
                 let response = AppliedMessage {

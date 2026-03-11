@@ -32,14 +32,17 @@ pub async fn fetch_certificate(
 pub fn power_entries_from_actor(
     entries: &[fendermint_actor_f3_light_client::types::PowerEntry],
 ) -> PowerEntries {
-    PowerEntries(
-        entries
-            .iter()
-            .map(|e| filecoin_f3_gpbft::PowerEntry {
-                id: e.id,
-                power: num_bigint::BigInt::from_bytes_be(Sign::Plus, &e.power_be),
-                pub_key: filecoin_f3_gpbft::PubKey(e.public_key.clone()),
-            })
-            .collect(),
-    )
+    // F3 signer indexes are over a canonical ordering: power desc, then participant id asc.
+    // Actor state materialization is keyed storage order, so normalize before validation.
+    let mut out: Vec<filecoin_f3_gpbft::PowerEntry> = entries
+        .iter()
+        .map(|e| filecoin_f3_gpbft::PowerEntry {
+            id: e.id,
+            power: num_bigint::BigInt::from_bytes_be(Sign::Plus, &e.power_be),
+            pub_key: filecoin_f3_gpbft::PubKey(e.public_key.clone()),
+        })
+        .collect();
+
+    out.sort_by(|a, b| b.power.cmp(&a.power).then_with(|| a.id.cmp(&b.id)));
+    PowerEntries(out)
 }

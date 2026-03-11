@@ -70,13 +70,31 @@ impl F3TopDownHandler {
     /// - No proof available for next height
     /// - Cache is temporarily empty (graceful degradation)
     pub fn chain_message_from_proof_cache(&self) -> Option<ChainMessage> {
-        // Get next uncommitted proof (epoch after last_committed)
-        let epoch_with_cert = self.proof_cache.get_next_uncommitted_epoch_with_cert()?;
-
+        let cache = self.proof_cache();
+        let last_committed_epoch = cache.last_committed_epoch();
+        let last_committed_instance = cache.last_committed_instance();
         tracing::debug!(
+            last_committed_epoch,
+            last_committed_instance,
+            "Evaluating proof cache for proposal parent-finality message"
+        );
+
+        // Get next uncommitted proof (epoch after last_committed), without blocking proposer.
+        let Some(epoch_with_cert) = cache.try_get_next_uncommitted_epoch_with_cert() else {
+            tracing::info!(
+                last_committed_epoch,
+                last_committed_instance,
+                "No next uncommitted proof found in cache for proposal"
+            );
+            return None;
+        };
+
+        tracing::info!(
             instance_id = epoch_with_cert.certificate.gpbft_instance,
             epoch = epoch_with_cert.epoch,
-            "found next uncommitted epoch with certificate in cache"
+            last_committed_epoch,
+            last_committed_instance,
+            "Found next uncommitted cached proof for proposal"
         );
 
         // Convert FinalityCertificate to SerializableF3Certificate for message

@@ -15,7 +15,9 @@
 //! Each proof requires both parent (epoch E) and child (typically epoch E+1) because
 //! Filecoin stores `parentReceipts` in the child block, not the parent.
 
-use crate::assembler::{resolve_eth_address_to_actor_id, ProofAssembler};
+use crate::assembler::{
+    derive_subnet_proof_context, resolve_eth_address_to_actor_id, ProofAssembler,
+};
 use crate::cache::ProofCache;
 use crate::config::{GatewayId, ProofServiceConfig};
 use crate::f3_client::F3Client;
@@ -27,6 +29,15 @@ use filecoin_f3_gpbft::PowerEntries;
 use ipc_api::subnet_id::SubnetID;
 use std::sync::Arc;
 use tokio::time::{interval, MissedTickBehavior};
+
+/// Outcome of attempting to process one certificate step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProcessOutcome {
+    /// A certificate was fetched, validated, and cached successfully.
+    Processed,
+    /// No work was available at this moment (caught up or at lookahead target).
+    NoWork,
+}
 
 /// Main proof generator service
 pub struct ProofGeneratorService {
@@ -79,12 +90,27 @@ impl ProofGeneratorService {
                 let cert_entry = cache
                     .get_certificate(cached)
                     .context("Failed to get cached certificate")?;
-                (cached, cert_entry.power_table)
+                let next_instance = cached
+                    .checked_add(1)
+                    .context("cached instance overflow while deriving next instance")?;
+                // Cached certificate entry stores the post-certificate power table, which is the
+                // trusted table for validating the next certificate instance.
+                (next_instance, cert_entry.power_table)
             } else {
-                (initial_instance, initial_power_table)
+                let next_instance = initial_instance
+                    .checked_add(1)
+                    .context("initial instance overflow while deriving next instance")?;
+                // On-chain actor state stores `processed_instance_id = N` with the latest power
+                // table (post-certificate), which validates certificate instance N+1.
+                (next_instance, initial_power_table)
             }
         } else {
-            (initial_instance, initial_power_table)
+            let next_instance = initial_instance
+                .checked_add(1)
+                .context("initial instance overflow while deriving next instance")?;
+            // On-chain actor state stores `processed_instance_id = N` with the latest power
+            // table (post-certificate), which validates certificate instance N+1.
+            (next_instance, initial_power_table)
         };
 
         // Create F3 client for certificate fetching + validation
@@ -96,11 +122,15 @@ impl ProofGeneratorService {
         )
         .context("Failed to create F3 client")?;
 
+        let subnet_context = derive_subnet_proof_context(&config.parent_rpc_url, subnet_id)
+            .await
+            .context("Failed to derive subnet proof context")?;
+
         // Create proof assembler
         let assembler = ProofAssembler::new(
             config.parent_rpc_url.clone(),
             gateway_actor_id,
-            subnet_id.to_string(),
+            subnet_context.clone(),
         )
         .context("Failed to create proof assembler")?;
 
@@ -109,7 +139,10 @@ impl ProofGeneratorService {
             cache,
             f3_client,
             assembler,
-            verifier: ProofVerifier::new(subnet_id.to_string()),
+            verifier: ProofVerifier::new(
+                subnet_context.subnet_hash_key,
+                subnet_context.subnet_actor_topic_bytes,
+            ),
             event_number_cursor: crate::verifier::EventNumberCursor {
                 next_parent_topdown_nonce: initial_applied_top_down_nonce,
                 next_parent_power_change_config_number: initial_next_power_change_config_number,
@@ -119,9 +152,9 @@ impl ProofGeneratorService {
 
     /// Main service loop - runs continuously and polls parent chain periodically
     ///
-    /// Each tick processes ONE certificate (if needed and available).
-    /// The ticker acts as the outer loop - no inner loop needed.
-    /// Errors are logged but don't stop the service - it will retry on next tick.
+    /// Processing remains strictly sequential: one certificate is fetched/validated/applied at a
+    /// time. However, we only sleep when no work is available. If we're behind and certificates
+    /// are available, process the next one immediately to catch up faster.
     pub async fn run(mut self) {
         tracing::info!(
             polling_interval = ?self.config.polling_interval,
@@ -133,27 +166,34 @@ impl ProofGeneratorService {
         poll_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         loop {
-            poll_interval.tick().await;
-
-            if let Err(e) = self.process_next_certificate().await {
-                tracing::error!(
-                    error = %e,
-                    "Failed to process certificate, will retry on next tick"
-                );
+            match self.process_next_certificate().await {
+                Ok(ProcessOutcome::Processed) => {
+                    // Keep draining backlog sequentially without waiting for the next poll tick.
+                }
+                Ok(ProcessOutcome::NoWork) => {
+                    poll_interval.tick().await;
+                }
+                Err(e) => {
+                    tracing::error!(
+                        error = format_args!("{e:#}"),
+                        "Failed to process certificate, will retry on next tick"
+                    );
+                    poll_interval.tick().await;
+                }
             }
         }
     }
 
     /// Process next certificate if we haven't reached the lookahead target.
     ///
-    /// This is the main tick handler - processes at most one certificate per call.
-    /// The ticker in `run()` provides the outer loop.
+    /// This processes at most one certificate per call.
+    /// The caller decides whether to sleep or immediately process another certificate.
     ///
     /// # Future improvements
     /// TODO: Gap recovery could be added when multiple RPC endpoints are available.
-    async fn process_next_certificate(&mut self) -> Result<()> {
+    async fn process_next_certificate(&mut self) -> Result<ProcessOutcome> {
         if !self.should_fetch_more() {
-            return Ok(());
+            return Ok(ProcessOutcome::NoWork);
         }
 
         // Provide *all-or-nothing* semantics per certificate.
@@ -165,7 +205,8 @@ impl ProofGeneratorService {
         let checkpoint = self.f3_client.checkpoint_state();
 
         let Some((certificate, power_table)) = self.fetch_next_certificate().await? else {
-            return Ok(()); // No certificate available, caught up with F3
+            // No certificate available right now.
+            return Ok(ProcessOutcome::NoWork);
         };
 
         if let Err(e) = self
@@ -173,7 +214,7 @@ impl ProofGeneratorService {
             .await
         {
             tracing::error!(
-                error = %e,
+                error = format_args!("{e:#}"),
                 instance = certificate.gpbft_instance,
                 "failed to generate/verify proofs for certificate; rolling back and retrying later"
             );
@@ -181,7 +222,7 @@ impl ProofGeneratorService {
             return Err(e);
         }
 
-        Ok(())
+        Ok(ProcessOutcome::Processed)
     }
 
     /// Check if we should fetch more certificates based on lookahead.

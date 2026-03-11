@@ -17,13 +17,13 @@ pub fn f3_network_name(subnet_id: &SubnetID) -> String {
 
     match root_id {
         FILECOIN_MAINNET_CHAIN_ID => "mainnet".to_string(),
-        FILECOIN_CALIBRATION_CHAIN_ID => "calibrationnet".to_string(),
+        FILECOIN_CALIBRATION_CHAIN_ID => "calibrationnet2".to_string(),
         _ => {
             tracing::warn!(
                 root_id,
-                "Unknown root chain ID for F3, defaulting to calibrationnet"
+                "Unknown root chain ID for F3, defaulting to calibrationnet2"
             );
-            "calibrationnet".to_string()
+            "calibrationnet2".to_string()
         }
     }
 }
@@ -57,6 +57,11 @@ pub struct ProofServiceConfig {
     /// Gateway identification on parent chain.
     /// Can be an Actor ID (u64) or an Ethereum address (String).
     pub gateway_id: GatewayId,
+
+    /// Optional override for the F3 network stream name.
+    ///
+    /// If not set, the service derives the name from the subnet root chain id.
+    pub network_name: Option<String>,
 }
 
 impl ProofServiceConfig {
@@ -80,10 +85,26 @@ impl ProofServiceConfig {
             anyhow::bail!("lookahead_instances must be > 0");
         }
 
+        if let Some(network_name) = &self.network_name {
+            if network_name.trim().is_empty() {
+                anyhow::bail!("network_name, if provided, must not be empty");
+            }
+        }
+
         Ok(())
     }
 
     pub fn f3_network_name(&self, subnet_id: &SubnetID) -> String {
+        if let Some(network_name) = &self.network_name {
+            let name = network_name.trim();
+            if !name.is_empty() {
+                tracing::info!(
+                    network_name = name,
+                    "using configured F3 network name override"
+                );
+                return name.to_string();
+            }
+        }
         f3_network_name(subnet_id)
     }
 }
@@ -96,6 +117,7 @@ impl Default for ProofServiceConfig {
             cache_config: Default::default(),
             parent_rpc_url: String::new(),
             gateway_id: GatewayId::ActorId(0),
+            network_name: None,
         }
     }
 }

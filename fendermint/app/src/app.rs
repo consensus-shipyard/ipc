@@ -771,28 +771,33 @@ where
         &self,
         request: request::PrepareProposal,
     ) -> AbciResult<response::PrepareProposal> {
+        let height = request.height.value();
         tracing::debug!(
-            height = request.height.value(),
+            height,
             time = request.time.to_string(),
             "prepare proposal"
         );
+        tracing::info!(height, "PrepareProposal start");
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
         let state = self
-            .read_only_view(Some(request.height.value()))?
+            .read_only_view(Some(height))?
             .ok_or_else(|| anyhow!("exec state should be present"))?;
+        tracing::info!(height, "PrepareProposal read_only_view ready");
 
         let response = self
             .messages_interpreter
             .prepare_messages_for_block(state, txs, request.max_tx_bytes.try_into().unwrap())
             .await
             .context("failed to prepare proposal")?;
+        tracing::info!(height, "PrepareProposal message preparation finished");
 
         let txs = Vec::from_iter(response.messages.into_iter().map(bytes::Bytes::from));
+        tracing::debug!(height, tx_count = txs.len(), "PrepareProposal response ready");
 
         emit(BlockProposalSent {
             validator: &request.proposer_address,
-            height: request.height.value(),
+            height,
             tx_count: txs.len(),
             size: response.total_bytes,
         });

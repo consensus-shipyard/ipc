@@ -11,4 +11,4 @@ anyhow = { workspace = true }
 ethers = { workspace = true }
 hex = { workspace = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }
-proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
+proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", rev = "45ed1e8c3f99c6055169be1b6812eeff2657f553" }
