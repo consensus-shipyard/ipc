@@ -43,8 +43,36 @@ members = [
   "fendermint/actors/chainmetadata",
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
+  "fendermint/actors/init",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
+
+  # ipc decentralized storage
+
+  # rpc serves
+  "ipc-storage/ipc-decentralized-storage",
+
+  # actors
+  "fendermint/actors/adm_types",         # fil_actor_adm - ADM types
+  "fendermint/actors/adm",               # ADM actor
+  "fendermint/actors/machine",           # Machine base trait
+  "fendermint/actors/blobs",
+  "fendermint/actors/blobs/shared",
+  "fendermint/actors/blobs/testing",
+  "fendermint/actors/blob_reader",
+  "fendermint/actors/bucket",            # S3-like object storage
+  "fendermint/actors/timehub",           # Timestamping service
+  "fendermint/actors/ipc_storage_config",
+  "fendermint/actors/ipc_storage_config/shared",
+
+  # storage components (netwatch patched for socket2 0.5 compatibility!)
+  "ipc-storage/erasure-encoding",
+  "ipc-storage/iroh_manager",
+  "ipc-storage/ipld",
+  "ipc-storage/actor_sdk",
+
+  # sol contracts facade
+  "ipc-storage/sol-facade/crates/facade",
 
   "build-rs-utils",
   "contracts-artifacts",
@@ -71,6 +99,7 @@ axum = { version = "0.6", features = ["ws"] }
 base64 = "0.21"
 bollard = "0.15"
 blake2b_simd = "1.0"
+blake3 = "1.5"
 bloom = "0.3"
 bytes = "1.4"
 clap = { version = "4.1", features = ["derive", "env", "string"] }
@@ -78,6 +107,7 @@ color-eyre = "0.5.11"
 byteorder = "1.5.0"
 config = "0.13"
 const-hex = "1.14.0"
+data-encoding = "2.3.3"
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
@@ -97,6 +127,15 @@ hex-literal = "0.4.1"
 http = "0.2.12"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
+# Iroh dependencies
+ambassador = "0.3.5"
+iroh = "0.35"
+iroh-base = "0.35"
+iroh-blobs = { version = "0.35", features = ["rpc"] }
+iroh-relay = "0.35"
+iroh-quinn = { version = "0.13" }
+n0-future = "0.1.2"
+quic-rpc = { version = "0.20", features = ["quinn-transport"] }
 jsonrpc-v2 = { version = "0.11", default-features = false, features = [
   "bytes-v10",
 ] }
@@ -127,6 +166,7 @@ libp2p-bitswap = { path = "ext/libp2p-bitswap" }
 libsecp256k1 = "0.7"
 literally = "0.1.3"
 log = "0.4"
+memmap2 = "0.9"
 lru_time_cache = "0.11"
 multiaddr = "0.18"
 multihash = { version = "0.18.1", default-features = false, features = [
@@ -146,10 +186,19 @@ quickcheck = "1"
 quickcheck_async = "0.1"
 quickcheck_macros = "1"
 rand = "0.8"
+reed-solomon-simd = "3"
 rand_chacha = "0.3"
 regex = "1"
+replace_with = "0.1.7"
 statrs = "0.18.0"
 reqwest = { version = "0.11.13", features = ["json"] }
+# Objects HTTP API dependencies
+warp = "0.3"
+uuid = { version = "1.0", features = ["v4"] }
+mime_guess = "2.0"
+urlencoding = "2.1"
+# Solidity facades (vendored locally, upgraded to FVM 4.7)
+ipc_storage_sol_facade = { path = "ipc-storage/sol-facade/crates/facade" }
 sha2 = "0.10"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"
@@ -226,6 +275,7 @@ fvm_ipld_amt = "0.7.4"
 # NOTE: Using master branch instead of v17.0.0 tag due to serde dependency fixes
 # Master is currently at commit 2f040c12 which fixes the serde::__private::PhantomData import issue
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
+fil_actor_adm = { path = "fendermint/actors/adm_types" }
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actor_evm = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
@@ -234,6 +284,9 @@ cid = { version = "0.11", default-features = false, features = [
   "serde-codec",
   "std",
 ] }
+multihash-codetable = "0.1"
+digest = { git = "https://github.com/RustCrypto/traits", tag = "digest-v0.11.0-rc.2" }
+netwatch = { path = "patches/netwatch" }
 
 frc42_dispatch = { path = "./ext/frc42_dispatch" }
 
@@ -252,6 +305,11 @@ tendermint-proto = { version = "0.31" }
 [patch.crates-io]
 # Using latest FVM to match builtin-actors v17.0.0 requirements
 fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
+
+# Fix netwatch socket2 0.5 compatibility (macOS BSD sockets)
+# Patched version with socket2 0.5+ API fixes
+netwatch = { path = "patches/netwatch" }
+
 fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
 fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
 fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
@@ -260,6 +318,9 @@ fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git",
 fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
 fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
 yamux = { git = "https://github.com/paritytech/yamux", tag = "yamux-v0.13.4" }
+
+# Pin digest to 0.11.0-rc.2 for compatibility with blake2 from huitseeker/hashes (used by rust-f3)
+digest = { git = "https://github.com/RustCrypto/traits", tag = "digest-v0.11.0-rc.2" }
 
 [profile.wasm]
 inherits = "release"

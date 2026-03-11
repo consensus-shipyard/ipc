@@ -67,7 +67,11 @@ impl BlockGasTracker {
 
         // sanity check, should not happen; only trace if it does so we can debug later.
         if self.cumul_gas_used >= self.block_gas_limit {
-            tracing::warn!("out of block gas; cumulative gas used exceeds block gas limit!");
+            tracing::warn!(
+                cumul_gas_used = self.cumul_gas_used,
+                block_gas_limit = self.block_gas_limit,
+                "out of block gas; cumulative gas used exceeds block gas limit!"
+            );
         }
     }
 

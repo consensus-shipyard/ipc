@@ -18,6 +18,8 @@ pub const FIRST_NON_SINGLETON_ADDR: ActorID = 100;
 
 define_singleton!(INIT { id: 1, code_id: 2 });
 
+pub const INIT_ACTOR_NAME: &str = "init";
+
 pub type AddressMap = BTreeMap<Address, ActorID>;
 
 /// Delegated address of an Ethereum built-in actor.

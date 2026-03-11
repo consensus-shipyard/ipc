@@ -1,0 +1,16 @@
+[package]
+name = "erasure-encoding"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+reed-solomon-simd = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+blake3 = { workspace = true }
+memmap2 = { workspace = true }
+rand = { workspace = true }
+tempfile = { workspace = true }

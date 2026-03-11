@@ -393,11 +393,44 @@ fn main() -> Result<()> {
     );
 
     let actors = parse_dependencies_of_umbrella_crate(&actors_manifest_path)?;
-    let actors = Vec::from_iter(actors.iter().map(|(name, crate_path)| Actor {
-        package_name: name.as_str().to_owned(),
-        wasm_blob_path: wasm_blob_dir.join(name.as_str()).with_extension("wasm"),
-        crate_path: crate_path.clone(),
-    }));
+    let ipc_storage_enabled = std::env::var("CARGO_FEATURE_IPC_STORAGE").is_ok();
+
+    echo!(
+        "actors-custom-car",
+        purple,
+        "IPC_STORAGE feature enabled: {}",
+        ipc_storage_enabled
+    );
+
+    // IPC storage related actors that should only be built when ipc-storage feature is enabled
+    let ipc_storage_actors = [
+        "fendermint_actor_init",
+        "fendermint_actor_adm",
+        "fendermint_actor_adm_types",
+        "fendermint_actor_blobs",
+        "fendermint_actor_blob_reader",
+        "fendermint_actor_bucket",
+        "fendermint_actor_machine",
+        "fendermint_actor_ipc_storage_config",
+        "fendermint_actor_timehub",
+    ];
+
+    let actors = Vec::from_iter(
+        actors
+            .iter()
+            .filter(|(name, _)| {
+                if ipc_storage_enabled {
+                    true
+                } else {
+                    !ipc_storage_actors.contains(&name.as_str())
+                }
+            })
+            .map(|(name, crate_path)| Actor {
+                package_name: name.as_str().to_owned(),
+                wasm_blob_path: wasm_blob_dir.join(name.as_str()).with_extension("wasm"),
+                crate_path: crate_path.clone(),
+            }),
+    );
 
     print_cargo_rerun_if_dependency_instructions(&actors_manifest_path, &out_dir)?;
 
