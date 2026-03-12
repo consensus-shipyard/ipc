@@ -3,8 +3,8 @@
 //! Verified storage layout constants for the Gateway contract.
 //!
 //! These are derived from the Solidity compiler `storageLayout` for `GatewayDiamond`.
-//! In this repo the reliable source of `storageLayout` is the Hardhat build-info artifacts
-//! under `contracts/artifacts/build-info/*.json` (not `contracts/out/*`).
+//! In this repo the reliable source of `storageLayout` is a Hardhat/Foundry build-info artifact
+//! under `contracts/artifacts/build-info/*.json` or `contracts/out/build-info/*.json`.
 //!
 //! Keeping them in one place avoids "magic numbers" duplicated across assembler and checks.
 
@@ -32,43 +32,46 @@ mod tests {
     use serde_json::Value;
 
     fn load_gateway_diamond_storage_layout() -> Result<Value> {
-        // Prefer Hardhat build-info artifacts, which include Solidity `storageLayout`:
-        // `contracts/artifacts/build-info/*.json`
+        // Prefer Hardhat build-info artifacts, which include Solidity `storageLayout`.
+        // In CI, only `contracts/out/build-info` may be present.
         //
         // We resolve paths relative to this crate so tests work regardless of cwd.
-        let build_info_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../../contracts/artifacts/build-info");
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../");
+        let build_info_dirs = [
+            root.join("contracts/artifacts/build-info"),
+            root.join("contracts/out/build-info"),
+        ];
 
-        let entries = std::fs::read_dir(&build_info_dir).with_context(|| {
-            format!(
-                "failed to read Hardhat build-info directory: {:?}",
-                build_info_dir
-            )
-        })?;
-
-        for entry in entries {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+        for build_info_dir in &build_info_dirs {
+            let Ok(entries) = std::fs::read_dir(build_info_dir) else {
                 continue;
-            }
-
-            let bytes =
-                std::fs::read(&path).with_context(|| format!("failed to read {:?}", path))?;
-            let json: Value = match serde_json::from_slice(bytes.as_slice()) {
-                Ok(v) => v,
-                Err(_) => continue,
             };
 
-            let layout = &json["output"]["contracts"]["contracts/GatewayDiamond.sol"]
-                ["GatewayDiamond"]["storageLayout"];
-            if layout["storage"].as_array().is_some() && layout["types"].as_object().is_some() {
-                return Ok(layout.clone());
+            for entry in entries {
+                let entry = entry?;
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                    continue;
+                }
+
+                let bytes =
+                    std::fs::read(&path).with_context(|| format!("failed to read {:?}", path))?;
+                let json: Value = match serde_json::from_slice(bytes.as_slice()) {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+
+                let layout = &json["output"]["contracts"]["contracts/GatewayDiamond.sol"]
+                    ["GatewayDiamond"]["storageLayout"];
+                if layout["storage"].as_array().is_some() && layout["types"].as_object().is_some()
+                {
+                    return Ok(layout.clone());
+                }
             }
         }
 
         anyhow::bail!(
-            "no Hardhat build-info artifact contained GatewayDiamond storageLayout (expected under contracts/artifacts/build-info)"
+            "no build-info artifact contained GatewayDiamond storageLayout (looked in contracts/artifacts/build-info and contracts/out/build-info)"
         )
     }
 
