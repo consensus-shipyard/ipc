@@ -22,7 +22,7 @@ pub const SUBNET_TOPDOWN_NONCE_OFFSET: u64 = 3;
 /// - `GatewayActorStorage.validatorsTracker` starts at slot 11
 /// - `ParentValidatorsTracker.changes` is at slot 9
 /// - `PowerChangeLog.nextConfigurationNumber` is at slot 0
-/// => 11 + 9 + 0 = 20
+///   => 11 + 9 + 0 = 20
 pub const NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT: u64 = 20;
 
 #[cfg(test)]
@@ -75,8 +75,8 @@ mod tests {
     fn parse_slot_u64(v: &Value) -> Result<u64> {
         // Foundry encodes slot as a decimal string (e.g. "22").
         let s = v.as_str().context("expected storage slot to be a string")?;
-        Ok(s.parse::<u64>()
-            .with_context(|| format!("invalid slot string {s:?}"))?)
+        s.parse::<u64>()
+            .with_context(|| format!("invalid slot string {s:?}"))
     }
 
     #[test]
@@ -135,7 +135,6 @@ mod tests {
                     })
                     .unwrap_or(false)
             })
-            .map(|(slot, ty)| (slot, ty))
             .context("could not find GatewayActorStorage-like struct containing member=subnets")?;
 
         // 1) `GatewayActorStorage.subnets` mapping absolute slot.

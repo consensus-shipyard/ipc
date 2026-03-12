@@ -416,10 +416,16 @@ impl F3LightClientCaller {
         }
 
         let state_response: f3_light_client::GetStateResponse =
-            fvm_ipld_encoding::from_slice(&ret.msg_receipt.return_data.bytes())
+            fvm_ipld_encoding::from_slice(ret.msg_receipt.return_data.bytes())
                 .context("failed to deserialize F3 light client state")?;
 
         Ok(state_response)
+    }
+}
+
+impl Default for F3LightClientCaller {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

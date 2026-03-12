@@ -313,8 +313,7 @@ where
         // The gateway expects a fixed `bytes32 blockHash`, so for Filecoin we commit the FEVM
         // (Ethereum-view) block hash corresponding to this epoch, derived deterministically from
         // the cached tipset key bytes for this epoch (see `F3TopDownHandler`).
-        let finality =
-            IPCParentFinality::new(msg.height as i64, extracted.parent_eth_block_hash.to_vec());
+        let finality = IPCParentFinality::new(msg.height, extracted.parent_eth_block_hash.to_vec());
         let (prev_height, _prev_finality) = self
             .commit_finality(state, finality.clone(), 0)
             .await

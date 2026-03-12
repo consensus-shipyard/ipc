@@ -125,9 +125,7 @@ impl F3TopDownHandler {
     where
         DB: Blockstore + Clone + 'static + Send + Sync,
     {
-        let msg_cert = match &msg.certificate {
-            fendermint_vm_message::ipc::Certificate::FilecoinF3(cert) => cert,
-        };
+        let fendermint_vm_message::ipc::Certificate::FilecoinF3(msg_cert) = &msg.certificate;
 
         let cached = self
             .proof_cache

@@ -375,7 +375,7 @@ async fn fetch_f3_params_from_parent(
     // Fetch the F3 certificate for the specific instance so we can deterministically
     // derive the last finalized epoch for this instance (and its ETH block hash).
     let cert = fendermint_vm_topdown_proof_service::fetch_certificate(
-        &parent_endpoint.to_string(),
+        parent_endpoint.as_ref(),
         subnet_id,
         instance_id,
     )

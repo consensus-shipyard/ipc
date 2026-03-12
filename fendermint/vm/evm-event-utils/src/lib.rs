@@ -44,22 +44,6 @@ pub fn parse_u64_from_0x_word_low64(word_0x: &str) -> Result<u64> {
     Ok(u64::from_be_bytes(tail))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_u64_accepts_short_hex_quantity() {
-        assert_eq!(parse_u64_from_0x_word_low64("0x01").unwrap(), 1);
-    }
-
-    #[test]
-    fn parse_u64_rejects_overflow() {
-        // 2^64, i.e. low64=0 but high bits non-zero.
-        assert!(parse_u64_from_0x_word_low64("0x010000000000000000").is_err());
-    }
-}
-
 /// Convert an `EventProof` into an `ethers::abi::RawLog`.
 pub fn raw_log_from_event_proof(event_proof: &EventProof) -> Result<RawLog> {
     let topics: Result<Vec<H256>> = event_proof
@@ -93,4 +77,20 @@ pub fn decode_new_power_change_request(
 ) -> Result<lib_power_change_log::NewPowerChangeRequestFilter> {
     lib_power_change_log::NewPowerChangeRequestFilter::decode_log(raw)
         .map_err(|e| anyhow!("failed to decode NewPowerChangeRequest: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_u64_accepts_short_hex_quantity() {
+        assert_eq!(parse_u64_from_0x_word_low64("0x01").unwrap(), 1);
+    }
+
+    #[test]
+    fn parse_u64_rejects_overflow() {
+        // 2^64, i.e. low64=0 but high bits non-zero.
+        assert!(parse_u64_from_0x_word_low64("0x010000000000000000").is_err());
+    }
 }

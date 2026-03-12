@@ -178,6 +178,7 @@ Background service that:
 ```rust
 use fendermint_vm_topdown_proof_service::{launch_service, ProofServiceConfig, CacheConfig};
 use fendermint_vm_topdown_proof_service::config::GatewayId;
+use fendermint_vm_topdown_proof_service::LaunchServiceParams;
 use filecoin_f3_gpbft::PowerEntries;
 use std::time::Duration;
 
@@ -205,12 +206,14 @@ let db_path = Some(PathBuf::from("/var/lib/fendermint/proof-cache"));
 let (cache, handle) = launch_service(
     config,
     subnet_id,
-    initial_epoch,
-    initial_instance,
-    power_table,
-    applied_top_down_nonce,
-    next_power_change_config_number,
-    db_path,
+    LaunchServiceParams {
+        initial_committed_epoch: initial_epoch,
+        initial_instance,
+        initial_power_table: power_table,
+        initial_applied_top_down_nonce: applied_top_down_nonce,
+        initial_next_power_change_config_number: next_power_change_config_number,
+        db_path,
+    },
 ).await?.unwrap();
 
 // Query cache in block proposer - get proof with certificate

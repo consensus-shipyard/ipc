@@ -334,7 +334,7 @@ fn verify_sequence_against_storage_next(
     Ok(())
 }
 
-fn verify_contiguous_u64(values: &mut Vec<u64>, what: &str) -> Result<()> {
+fn verify_contiguous_u64(values: &mut [u64], what: &str) -> Result<()> {
     if values.is_empty() {
         return Ok(());
     }
