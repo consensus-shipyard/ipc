@@ -109,7 +109,7 @@ impl F3LightClient for F3LightClientActor {
 
         Ok(GetStateResponse {
             processed_instance_id: lc.processed_instance_id,
-            power_table_root: lc.power_table_root.clone(),
+            power_table_root: lc.power_table_root,
             power_table,
         })
     }
