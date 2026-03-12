@@ -44,7 +44,6 @@ members = [
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
   "fendermint/actors/init",
-  "fendermint/actors/f3-cert-manager",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
 
@@ -241,8 +240,6 @@ tracing-appender = "0.2.3"
 text-tables = "0.3.1"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
-parking_lot = "0.12"
-humantime-serde = "1.1"
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
 # Make sure every top level build target actually imports this dependency, and don't end up
@@ -328,13 +325,8 @@ fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git", bra
 fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
 yamux = { git = "https://github.com/paritytech/yamux", tag = "yamux-v0.13.4" }
 
-<<<<<<< HEAD
 # Pin digest to 0.11.0-rc.2 for compatibility with blake2 from huitseeker/hashes (used by rust-f3)
 digest = { git = "https://github.com/RustCrypto/traits", tag = "digest-v0.11.0-rc.2" }
-=======
-[patch."https://github.com/consensus-shipyard/ipc-filecoin-proofs"]
-proofs = { path = "../proofs" }
->>>>>>> 188d6113a (fix: make it actually run)
 
 [profile.wasm]
 inherits = "release"

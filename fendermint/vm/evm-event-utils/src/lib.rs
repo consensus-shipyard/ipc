@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 //! Shared helpers for decoding EVM logs from proof bundles.
 //!
 //! Both the interpreter and the proof-service need to decode Solidity events embedded in
