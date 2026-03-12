@@ -63,8 +63,7 @@ mod tests {
 
                 let layout = &json["output"]["contracts"]["contracts/GatewayDiamond.sol"]
                     ["GatewayDiamond"]["storageLayout"];
-                if layout["storage"].as_array().is_some() && layout["types"].as_object().is_some()
-                {
+                if layout["storage"].as_array().is_some() && layout["types"].as_object().is_some() {
                     return Ok(layout.clone());
                 }
             }
