@@ -7,8 +7,8 @@
 
 use clap::{Parser, Subcommand};
 use fendermint_vm_topdown_proof_service::config::{CacheConfig, GatewayId, ProofServiceConfig};
-use fendermint_vm_topdown_proof_service::{launch_service, LaunchServiceParams};
 use fendermint_vm_topdown_proof_service::ProofCache;
+use fendermint_vm_topdown_proof_service::{launch_service, LaunchServiceParams};
 use fvm_ipld_encoding;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::subnet_id::SubnetID;
