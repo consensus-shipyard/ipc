@@ -772,11 +772,7 @@ where
         request: request::PrepareProposal,
     ) -> AbciResult<response::PrepareProposal> {
         let height = request.height.value();
-        tracing::debug!(
-            height,
-            time = request.time.to_string(),
-            "prepare proposal"
-        );
+        tracing::debug!(height, time = request.time.to_string(), "prepare proposal");
         tracing::info!(height, "PrepareProposal start");
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
@@ -793,7 +789,11 @@ where
         tracing::info!(height, "PrepareProposal message preparation finished");
 
         let txs = Vec::from_iter(response.messages.into_iter().map(bytes::Bytes::from));
-        tracing::debug!(height, tx_count = txs.len(), "PrepareProposal response ready");
+        tracing::debug!(
+            height,
+            tx_count = txs.len(),
+            "PrepareProposal response ready"
+        );
 
         emit(BlockProposalSent {
             validator: &request.proposer_address,

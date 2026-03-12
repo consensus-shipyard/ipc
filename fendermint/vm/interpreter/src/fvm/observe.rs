@@ -94,11 +94,7 @@ impl_traceables!(
     CheckpointFinalized
 );
 
-impl_traceables!(
-    TraceLevel::Error,
-    "Topdown",
-    F3CacheWaitStuck
-);
+impl_traceables!(TraceLevel::Error, "Topdown", F3CacheWaitStuck);
 impl_traceables!(TraceLevel::Info, "Topdown", F3CacheWaitRecovered);
 
 #[derive(Debug)]

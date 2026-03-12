@@ -55,8 +55,9 @@ pub(crate) struct EventNumberCursor {
 
 impl ProofVerifier {
     pub fn new(subnet_hash_key: [u8; 32], subnet_actor_topic_1: Option<[u8; 32]>) -> Self {
-        let mut topdown_topics =
-            vec![hash_event_signature(&lib_gateway::NewTopDownMessageFilter::abi_signature())];
+        let mut topdown_topics = vec![hash_event_signature(
+            &lib_gateway::NewTopDownMessageFilter::abi_signature(),
+        )];
         if let Some(topic_1) = subnet_actor_topic_1 {
             topdown_topics.push(topic_1);
         }
@@ -190,8 +191,11 @@ impl ProofVerifier {
         cursor: &mut EventNumberCursor,
     ) -> Result<()> {
         // 1) Extract values.
-        let mut nums = extract_epoch_event_numbers(parent_epoch, bundle, self.expected_topdown_topic_1)
-            .with_context(|| format!("failed to extract event numbers for epoch {parent_epoch}"))?;
+        let mut nums =
+            extract_epoch_event_numbers(parent_epoch, bundle, self.expected_topdown_topic_1)
+                .with_context(|| {
+                    format!("failed to extract event numbers for epoch {parent_epoch}")
+                })?;
 
         // 2) Verify local contiguity within the epoch.
         verify_contiguous_u64(&mut nums.topdown_nonces, "top-down message nonces")?;
@@ -530,7 +534,8 @@ mod event_number_continuity_tests {
         // nextConfigurationNumber after applying 2 changes should be 9.
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 9);
         // topDownNonce after applying 2 messages with nonces 10,11 should be 12.
-        let topdown_nonce_storage = mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 12);
+        let topdown_nonce_storage =
+            mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 12);
 
         let bundle = UnifiedProofBundle {
             storage_proofs: vec![next_config_storage, topdown_nonce_storage],
@@ -561,7 +566,8 @@ mod event_number_continuity_tests {
 
         // WRONG: should be 9, but we claim 10.
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 10);
-        let topdown_nonce_storage = mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 0);
+        let topdown_nonce_storage =
+            mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 0);
 
         let bundle = UnifiedProofBundle {
             storage_proofs: vec![next_config_storage, topdown_nonce_storage],
@@ -593,7 +599,8 @@ mod event_number_continuity_tests {
         let td0 = mk_topdown_rawlog(EthAddress::random(), [7u8; 32], 10);
         let td1 = mk_topdown_rawlog(EthAddress::random(), [8u8; 32], 12); // gap!
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0);
-        let topdown_nonce_storage = mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 13);
+        let topdown_nonce_storage =
+            mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 13);
 
         let bundle = UnifiedProofBundle {
             storage_proofs: vec![next_config_storage, topdown_nonce_storage],
@@ -625,7 +632,8 @@ mod event_number_continuity_tests {
 
         // Storage indicates two messages were applied (delta=2) ending at nonce 12.
         let next_config_storage = mk_storage_proof(NEXT_CONFIG_NUMBER_ABSOLUTE_SLOT, 0);
-        let topdown_nonce_storage = mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 12);
+        let topdown_nonce_storage =
+            mk_storage_proof_h256(expected_topdown_nonce_slot([1u8; 32]), 12);
 
         let bundle = UnifiedProofBundle {
             storage_proofs: vec![next_config_storage, topdown_nonce_storage],

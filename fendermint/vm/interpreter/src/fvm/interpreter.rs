@@ -297,10 +297,7 @@ where
 
         // Get parent finality message - TopDownManager decides internally whether to use F3 or legacy
         tracing::info!("prepare_messages_for_block entering topdown proposal lookup");
-        let top_down_msg = self
-            .top_down_manager
-            .chain_message_for_proposal()
-            .await;
+        let top_down_msg = self.top_down_manager.chain_message_for_proposal().await;
         let topdown_included = top_down_msg.is_some();
         let top_down_iter = top_down_msg.into_iter();
         tracing::info!(

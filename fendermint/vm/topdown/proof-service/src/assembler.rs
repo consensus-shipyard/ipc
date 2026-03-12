@@ -16,8 +16,8 @@ use ethers::abi::Token;
 use ethers::contract::EthEvent;
 use ethers::types::{Address as EthAddress, H256, U256};
 use fvm_ipld_encoding;
-use ipc_api::subnet_id::SubnetID;
 use ipc_actors_abis::{lib_gateway, lib_power_change_log};
+use ipc_api::subnet_id::SubnetID;
 use ipc_observability::emit;
 use proofs::proofs::storage::utils::compute_mapping_slot;
 use proofs::{
@@ -365,11 +365,8 @@ mod tests {
             subnet_actor_eth_topic: String::new(),
             subnet_actor_topic_bytes: None,
         };
-        let assembler = ProofAssembler::new(
-            "http://localhost:1234".to_string(),
-            1001,
-            subnet_context,
-        );
+        let assembler =
+            ProofAssembler::new("http://localhost:1234".to_string(), 1001, subnet_context);
         assert!(assembler.is_ok());
     }
 

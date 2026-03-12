@@ -4,17 +4,17 @@
 mod staking;
 
 use anyhow::{Context, Ok};
+use ethers::contract::abigen;
 use ethers::types::U256;
 use fendermint_contract_test::Tester;
 use fendermint_rpc::response::decode_fevm_return_data;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
-use std::str::FromStr;
-use ethers::contract::abigen;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use std::str::FromStr;
 
 use crate::staking::DEFAULT_CHAIN_ID;
 use fendermint_crypto::SecretKey;

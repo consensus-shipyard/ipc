@@ -503,6 +503,8 @@ where
             });
         }
 
-        self.inner.gateway_caller.apply_cross_messages(state, messages)
+        self.inner
+            .gateway_caller
+            .apply_cross_messages(state, messages)
     }
 }
