@@ -23,8 +23,8 @@ use fendermint_storage::{
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::fvm::state::{
-    empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
-    FvmUpdatableParams,
+    empty_state_tree, ipc::F3LightClientCaller, CheckStateRef, FvmExecState, FvmQueryState,
+    FvmStateParams, FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
@@ -215,6 +215,77 @@ where
         };
         app.init_committed_state()?;
         Ok(app)
+    }
+}
+
+/// Create a read-only execution state for querying actors before app initialization.
+///
+/// This allows querying state (e.g., F3 Light Client) before the full App is created.
+/// Returns `None` if the state hasn't been initialized by genesis yet.
+pub fn create_read_only_exec_state<DB, BS, KV>(
+    db: &DB,
+    state_store: &BS,
+    namespace: KV::Namespace,
+) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<BS>>>>>
+where
+    KV: KVStore + Codec<SubnetAppState> + Encode<AppStoreKey>,
+    DB: KVReadable<KV> + 'static,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+{
+    // Read committed state from database (same pattern as get_committed_state)
+    let tx = db.read();
+    let state: Option<SubnetAppState> = tx
+        .get(&namespace, &AppStoreKey::State)
+        .context("get failed")?;
+
+    let state = match state {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+
+    let block_height = state.app_state.block_height;
+    let state_params = state.app_state.state_params;
+
+    // Check if state is queryable (genesis has been initialized)
+    // It's really the empty state tree that would be the best indicator.
+    if block_height == 0
+        && state_params.timestamp.0 == 0
+        && state_params.network_version == NetworkVersion::V0
+    {
+        return Ok(None);
+    }
+
+    // Create MultiEngine (same as in App::new)
+    let multi_engine = Arc::new(MultiEngine::new(1));
+
+    // Create read-only execution state
+    let exec_state = FvmExecState::new(
+        ReadOnlyBlockstore::new(Arc::new(state_store.clone())),
+        multi_engine.as_ref(),
+        block_height as ChainEpoch,
+        state_params,
+    )
+    .context("error creating execution state")?;
+
+    Ok(Some(exec_state))
+}
+
+/// Query the F3 Light Client Actor state from a read-only execution state.
+/// Returns the actor state if F3 is initialized, None otherwise.
+pub fn query_f3_state<BS>(
+    exec_state: &mut FvmExecState<ReadOnlyBlockstore<BS>>,
+) -> Result<Option<fendermint_vm_actor_interface::f3_light_client::GetStateResponse>>
+where
+    BS: Blockstore + Clone + 'static + Send + Sync,
+{
+    let f3_caller = F3LightClientCaller::new();
+    match f3_caller.get_state(exec_state) {
+        Ok(state) => Ok(Some(state)),
+        Err(e) => {
+            // F3 actor might not be deployed (non-Filecoin parent)
+            tracing::debug!("F3 Light Client Actor not found or not accessible: {}", e);
+            Ok(None)
+        }
     }
 }
 
@@ -481,6 +552,12 @@ where
             .context("Validator cache is not available")?
             .get_validator(id)
     }
+
+    /// Get access to the messages interpreter
+    /// Used to access the TopDownManager for updating the proof cache
+    pub fn interpreter(&self) -> &Arc<MI> {
+        &self.messages_interpreter
+    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -694,28 +771,33 @@ where
         &self,
         request: request::PrepareProposal,
     ) -> AbciResult<response::PrepareProposal> {
-        tracing::debug!(
-            height = request.height.value(),
-            time = request.time.to_string(),
-            "prepare proposal"
-        );
+        let height = request.height.value();
+        tracing::debug!(height, time = request.time.to_string(), "prepare proposal");
+        tracing::info!(height, "PrepareProposal start");
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
         let state = self
-            .read_only_view(Some(request.height.value()))?
+            .read_only_view(Some(height))?
             .ok_or_else(|| anyhow!("exec state should be present"))?;
+        tracing::info!(height, "PrepareProposal read_only_view ready");
 
         let response = self
             .messages_interpreter
             .prepare_messages_for_block(state, txs, request.max_tx_bytes.try_into().unwrap())
             .await
             .context("failed to prepare proposal")?;
+        tracing::info!(height, "PrepareProposal message preparation finished");
 
         let txs = Vec::from_iter(response.messages.into_iter().map(bytes::Bytes::from));
+        tracing::debug!(
+            height,
+            tx_count = txs.len(),
+            "PrepareProposal response ready"
+        );
 
         emit(BlockProposalSent {
             validator: &request.proposer_address,
-            height: request.height.value(),
+            height,
             tx_count: txs.len(),
             size: response.total_bytes,
         });

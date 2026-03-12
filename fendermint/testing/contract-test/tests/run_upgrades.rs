@@ -4,19 +4,17 @@
 mod staking;
 
 use anyhow::{Context, Ok};
+use ethers::contract::abigen;
 use ethers::types::U256;
 use fendermint_contract_test::Tester;
 use fendermint_rpc::response::decode_fevm_return_data;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
-use std::str::FromStr;
-use std::sync::Arc;
-
-use ethers::contract::abigen;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use std::str::FromStr;
 
 use crate::staking::DEFAULT_CHAIN_ID;
 use fendermint_crypto::SecretKey;
@@ -26,12 +24,12 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
+use fendermint_vm_interpreter::fvm::topdown::TopDownFinalityHandler;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
 use fendermint_vm_message::conv::from_fvm;
-use fendermint_vm_topdown::voting::VoteTally;
-use fendermint_vm_topdown::Toggle;
+// Topdown is disabled for these tests.
 
 // returns a seeded secret key which is guaranteed to be the same every time
 fn my_secret_key() -> SecretKey {
@@ -206,9 +204,7 @@ async fn test_applying_upgrades() {
         .unwrap();
 
     let end_block_manager = EndBlockManager::default();
-    let finality_provider = Arc::new(Toggle::disabled());
-    let vote_tally = VoteTally::empty();
-    let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
+    let top_down_manager = TopDownManager::new(TopDownFinalityHandler::Disabled);
 
     let interpreter: FvmMessagesInterpreter<MemoryBlockstore> = FvmMessagesInterpreter::new(
         end_block_manager,

@@ -15,11 +15,14 @@
 //! Each proof requires both parent (epoch E) and child (typically epoch E+1) because
 //! Filecoin stores `parentReceipts` in the child block, not the parent.
 
-use crate::assembler::ProofAssembler;
+use crate::assembler::{
+    derive_subnet_proof_context, resolve_eth_address_to_actor_id, ProofAssembler,
+};
 use crate::cache::ProofCache;
 use crate::config::{GatewayId, ProofServiceConfig};
 use crate::f3_client::F3Client;
-use crate::types::{CertificateEntry, EpochProofEntry, FinalizedTipset};
+use crate::types::{CertificateEntry, EpochProofEntry, FinalizedTipset, FinalizedTipsets};
+use crate::verifier::ProofVerifier;
 use anyhow::{Context, Result};
 use filecoin_f3_certs::FinalityCertificate;
 use filecoin_f3_gpbft::PowerEntries;
@@ -27,12 +30,27 @@ use ipc_api::subnet_id::SubnetID;
 use std::sync::Arc;
 use tokio::time::{interval, MissedTickBehavior};
 
+/// Outcome of attempting to process one certificate step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProcessOutcome {
+    /// A certificate was fetched, validated, and cached successfully.
+    Processed,
+    /// No work was available at this moment (caught up or at lookahead target).
+    NoWork,
+}
+
 /// Main proof generator service
 pub struct ProofGeneratorService {
     config: ProofServiceConfig,
     cache: Arc<ProofCache>,
     f3_client: F3Client,
     assembler: ProofAssembler,
+    verifier: ProofVerifier,
+    /// Cursor for continuity checks, seeded from L2 gateway state on startup.
+    ///
+    /// This allows fresh nodes to perform "storage delta vs observed event count" checks without
+    /// relying on local cache history.
+    event_number_cursor: crate::verifier::EventNumberCursor,
 }
 
 impl ProofGeneratorService {
@@ -53,6 +71,8 @@ impl ProofGeneratorService {
         subnet_id: &SubnetID,
         initial_instance: u64,
         initial_power_table: PowerEntries,
+        initial_applied_top_down_nonce: u64,
+        initial_next_power_change_config_number: u64,
     ) -> Result<Self> {
         let gateway_actor_id = extract_gateway_actor_id_from_config(&config).await?;
 
@@ -70,12 +90,27 @@ impl ProofGeneratorService {
                 let cert_entry = cache
                     .get_certificate(cached)
                     .context("Failed to get cached certificate")?;
-                (cached, cert_entry.power_table)
+                let next_instance = cached
+                    .checked_add(1)
+                    .context("cached instance overflow while deriving next instance")?;
+                // Cached certificate entry stores the post-certificate power table, which is the
+                // trusted table for validating the next certificate instance.
+                (next_instance, cert_entry.power_table)
             } else {
-                (initial_instance, initial_power_table)
+                let next_instance = initial_instance
+                    .checked_add(1)
+                    .context("initial instance overflow while deriving next instance")?;
+                // On-chain actor state stores `processed_instance_id = N` with the latest power
+                // table (post-certificate), which validates certificate instance N+1.
+                (next_instance, initial_power_table)
             }
         } else {
-            (initial_instance, initial_power_table)
+            let next_instance = initial_instance
+                .checked_add(1)
+                .context("initial instance overflow while deriving next instance")?;
+            // On-chain actor state stores `processed_instance_id = N` with the latest power
+            // table (post-certificate), which validates certificate instance N+1.
+            (next_instance, initial_power_table)
         };
 
         // Create F3 client for certificate fetching + validation
@@ -87,11 +122,15 @@ impl ProofGeneratorService {
         )
         .context("Failed to create F3 client")?;
 
+        let subnet_context = derive_subnet_proof_context(&config.parent_rpc_url, subnet_id)
+            .await
+            .context("Failed to derive subnet proof context")?;
+
         // Create proof assembler
         let assembler = ProofAssembler::new(
             config.parent_rpc_url.clone(),
             gateway_actor_id,
-            subnet_id.to_string(),
+            subnet_context.clone(),
         )
         .context("Failed to create proof assembler")?;
 
@@ -100,14 +139,22 @@ impl ProofGeneratorService {
             cache,
             f3_client,
             assembler,
+            verifier: ProofVerifier::new(
+                subnet_context.subnet_hash_key,
+                subnet_context.subnet_actor_topic_bytes,
+            ),
+            event_number_cursor: crate::verifier::EventNumberCursor {
+                next_parent_topdown_nonce: initial_applied_top_down_nonce,
+                next_parent_power_change_config_number: initial_next_power_change_config_number,
+            },
         })
     }
 
     /// Main service loop - runs continuously and polls parent chain periodically
     ///
-    /// Each tick processes ONE certificate (if needed and available).
-    /// The ticker acts as the outer loop - no inner loop needed.
-    /// Errors are logged but don't stop the service - it will retry on next tick.
+    /// Processing remains strictly sequential: one certificate is fetched/validated/applied at a
+    /// time. However, we only sleep when no work is available. If we're behind and certificates
+    /// are available, process the next one immediately to catch up faster.
     pub async fn run(mut self) {
         tracing::info!(
             polling_interval = ?self.config.polling_interval,
@@ -119,37 +166,63 @@ impl ProofGeneratorService {
         poll_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         loop {
-            poll_interval.tick().await;
-
-            if let Err(e) = self.process_next_certificate().await {
-                tracing::error!(
-                    error = %e,
-                    "Failed to process certificate, will retry on next tick"
-                );
+            match self.process_next_certificate().await {
+                Ok(ProcessOutcome::Processed) => {
+                    // Keep draining backlog sequentially without waiting for the next poll tick.
+                }
+                Ok(ProcessOutcome::NoWork) => {
+                    poll_interval.tick().await;
+                }
+                Err(e) => {
+                    tracing::error!(
+                        error = format_args!("{e:#}"),
+                        "Failed to process certificate, will retry on next tick"
+                    );
+                    poll_interval.tick().await;
+                }
             }
         }
     }
 
     /// Process next certificate if we haven't reached the lookahead target.
     ///
-    /// This is the main tick handler - processes at most one certificate per call.
-    /// The ticker in `run()` provides the outer loop.
+    /// This processes at most one certificate per call.
+    /// The caller decides whether to sleep or immediately process another certificate.
     ///
     /// # Future improvements
     /// TODO: Gap recovery could be added when multiple RPC endpoints are available.
-    async fn process_next_certificate(&mut self) -> Result<()> {
+    async fn process_next_certificate(&mut self) -> Result<ProcessOutcome> {
         if !self.should_fetch_more() {
-            return Ok(());
+            return Ok(ProcessOutcome::NoWork);
         }
 
+        // Provide *all-or-nothing* semantics per certificate.
+        //
+        // `fetch_next_certificate()` advances the internal F3 light-client state to the newly
+        // validated instance. If we fail later while generating/verifying/caching proofs, we MUST
+        // roll back that state; otherwise the next tick would fetch the next instance and we'd
+        // permanently skip this certificate, leaving a cache hole that can stall catch-up.
+        let checkpoint = self.f3_client.checkpoint_state();
+
         let Some((certificate, power_table)) = self.fetch_next_certificate().await? else {
-            return Ok(()); // No certificate available, caught up with F3
+            // No certificate available right now.
+            return Ok(ProcessOutcome::NoWork);
         };
 
-        self.generate_proofs_for_certificate(&certificate, &power_table)
-            .await?;
+        if let Err(e) = self
+            .generate_proofs_for_certificate(&certificate, &power_table)
+            .await
+        {
+            tracing::error!(
+                error = format_args!("{e:#}"),
+                instance = certificate.gpbft_instance,
+                "failed to generate/verify proofs for certificate; rolling back and retrying later"
+            );
+            self.f3_client.restore_state(checkpoint);
+            return Err(e);
+        }
 
-        Ok(())
+        Ok(ProcessOutcome::Processed)
     }
 
     /// Check if we should fetch more certificates based on lookahead.
@@ -212,10 +285,16 @@ impl ProofGeneratorService {
     /// - E2 (using E3 as child)
     /// - E3 has no child in this certificate, will be proven with next certificate
     async fn generate_proofs_for_certificate(
-        &self,
+        &mut self,
         cert: &FinalityCertificate,
         power_table: &PowerEntries,
     ) -> Result<()> {
+        // Always cache the validated certificate entry, even if it has no provable (parent, child)
+        // windows. A certificate may be "base-only" (empty suffix), yet it still advances the F3
+        // instance and can carry a new power table needed to validate subsequent certificates.
+        let rpc_endpoint = self.f3_client.rpc_endpoint().to_string();
+        let cert_entry = CertificateEntry::new(cert.clone(), power_table.clone(), rpc_endpoint);
+
         // Build (parent, child) pairs using windows - this makes the requirement explicit
         let tipset_pairs: Vec<_> = cert
             .ec_chain
@@ -231,6 +310,9 @@ impl ProofGeneratorService {
                 instance = cert.gpbft_instance,
                 "Certificate has fewer than 2 tipsets, no (parent, child) pairs to prove"
             );
+            self.cache
+                .insert_certificate_with_epoch_proofs(cert_entry, Vec::new())
+                .context("failed to cache base-only certificate")?;
             return Ok(());
         }
 
@@ -242,9 +324,20 @@ impl ProofGeneratorService {
             "Generating proofs for certificate epochs"
         );
 
-        let mut epoch_proofs = Vec::with_capacity(tipset_pairs.len());
+        // Verification needs to accept witness blocks from *both* the parent and the child tipset
+        // of each (parent, child) pair (receipts/state for the parent live in the child).
+        // Therefore, pass the whole certified chain from the certificate.
+        //
+        // Note: we still only *generate* proofs for the parent epochs via `windows(2)`, so the
+        // last tipset in the chain (which has no child in this certificate) is not proven yet.
+        let finalized_tipsets = FinalizedTipsets::from(&cert.ec_chain);
 
-        // Generate proofs for each (parent, child) pair
+        let mut epoch_proofs = Vec::with_capacity(tipset_pairs.len());
+        // Seed the cursor from L2 gateway state for fresh-node restarts, then keep it updated
+        // across epochs and certificates.
+        let mut cursor: crate::verifier::EventNumberCursor = self.event_number_cursor;
+
+        // Generate proofs for each (parent, child) pair.
         // The child tipset contains `parentReceipts` which commits to the parent's execution.
         for (parent_tipset, child_tipset) in tipset_pairs {
             let parent_epoch = parent_tipset.epoch;
@@ -261,6 +354,26 @@ impl ProofGeneratorService {
                 .await
                 .with_context(|| format!("Failed to generate proof for epoch {}", parent_epoch))?;
 
+            self.verifier
+                .verify_proof_bundle_with_tipsets(&proof_bundle, &finalized_tipsets)
+                .with_context(|| format!("Failed to verify proof for epoch {}", parent_epoch))?;
+
+            // Additional semantic checks:
+            // - top-down message nonce continuity (from decoded events)
+            // - power change configurationNumber continuity, and consistency with proved storage slot
+            // Maintain a cursor across epochs within this certificate so we can detect omitted
+            // events at the beginning of an epoch (anchored to proved end-of-epoch storage).
+            //
+            // Note: the first epoch proven in a certificate does not have a previous cursor.
+            self.verifier
+                .verify_event_number_continuity(parent_epoch, &proof_bundle, &mut cursor)
+                .with_context(|| {
+                    format!(
+                        "Nonce/config continuity check failed for epoch {}",
+                        parent_epoch
+                    )
+                })?;
+
             epoch_proofs.push(EpochProofEntry::new(
                 parent_epoch,
                 proof_bundle,
@@ -269,10 +382,11 @@ impl ProofGeneratorService {
         }
 
         // Cache the certificate and proofs
-        let rpc_endpoint = self.f3_client.rpc_endpoint().to_string();
-        let cert_entry = CertificateEntry::new(cert.clone(), power_table.clone(), rpc_endpoint);
-        self.cache.insert_certificate(cert_entry)?;
-        self.cache.insert_epoch_proofs(epoch_proofs)?;
+        self.cache
+            .insert_certificate_with_epoch_proofs(cert_entry, epoch_proofs)?;
+
+        // Persist updated cursor only after successful generation + caching.
+        self.event_number_cursor = cursor;
 
         tracing::info!(
             epoch_count = epochs_to_prove.len(),
@@ -298,17 +412,9 @@ async fn extract_gateway_actor_id_from_config(config: &ProofServiceConfig) -> Re
     match &config.gateway_id {
         GatewayId::ActorId(id) => Ok(*id),
         GatewayId::EthAddress(eth_addr) => {
-            resolve_eth_address_to_actor_id(eth_addr, &config.parent_rpc_url).await
+            resolve_eth_address_to_actor_id(&config.parent_rpc_url, eth_addr).await
         }
     }
-}
-
-async fn resolve_eth_address_to_actor_id(eth_addr: &str, parent_rpc_url: &str) -> Result<u64> {
-    let client = proofs::client::LotusClient::new(url::Url::parse(parent_rpc_url)?, None);
-    let actor_id = proofs::proofs::resolve_eth_address_to_actor_id(&client, eth_addr)
-        .await
-        .with_context(|| format!("Failed to resolve gateway Ethereum address: {}", eth_addr))?;
-    Ok(actor_id)
 }
 
 #[cfg(test)]
@@ -334,7 +440,8 @@ mod tests {
 
         // Note: Service creation succeeds with F3Client::new() even with a fake RPC endpoint
         // The actual RPC calls will fail later when the service tries to fetch certificates
-        let result = ProofGeneratorService::new(config, cache, &subnet_id, 0, power_table).await;
+        let result =
+            ProofGeneratorService::new(config, cache, &subnet_id, 0, power_table, 0, 0).await;
         assert!(result.is_ok());
     }
 }

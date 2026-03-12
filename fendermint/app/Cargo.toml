@@ -22,6 +22,7 @@ libp2p = { workspace = true }
 libp2p-bitswap = { workspace = true }
 multiaddr = { workspace = true }
 num-traits = { workspace = true }
+num-bigint = { workspace = true }
 openssl = { workspace = true }
 paste = { workspace = true }
 prometheus = { workspace = true }
@@ -45,8 +46,10 @@ tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 literally = { workspace = true }
 url = { workspace = true }
+ethers = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
+ipc_actors_abis = { path = "../../contract-bindings" }
 actors-custom-api = { path = "../actors/api" }
 fendermint_actor_f3_light_client = { path = "../actors/f3-light-client" }
 fendermint_app_options = { path = "./options" }
@@ -73,8 +76,8 @@ fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 fendermint_vm_topdown_proof_service = { path = "../vm/topdown/proof-service" }
 
-ipc_actors_abis = { path = "../../contract-bindings" }
-ethers = {workspace =  true}
+# F3 certificate handling
+filecoin-f3-gpbft = { git = "https://github.com/moshababo/rust-f3", branch = "cargo-git-compat" }
 
 # .car file wrapped in a crate
 actors-builtin-car = { path = "../actors-builtin-car" }

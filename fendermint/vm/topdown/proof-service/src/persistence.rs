@@ -23,7 +23,7 @@ use crate::types::{
 use anyhow::{Context, Result};
 use fvm_shared::clock::ChainEpoch;
 use proofs::proofs::common::bundle::UnifiedProofBundle;
-use rocksdb::{BoundColumnFamily, Options, DB};
+use rocksdb::{BoundColumnFamily, Options, WriteBatch, WriteOptions, DB};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -72,8 +72,16 @@ impl ProofCachePersistence {
             .with_context(|| format!("Failed to get {} column family", name))
     }
 
+    fn sync_write_options() -> WriteOptions {
+        let mut opts = WriteOptions::default();
+        // Make successful writes durable: the WAL is synced to disk before returning.
+        opts.set_sync(true);
+        opts
+    }
+
     fn init_schema(&self) -> Result<()> {
         let cf = self.get_cf(CF_METADATA)?;
+        let wopts = Self::sync_write_options();
 
         match self.db.get_cf(&cf, KEY_SCHEMA_VERSION)? {
             Some(data) => {
@@ -89,10 +97,11 @@ impl ProofCachePersistence {
                 info!(version = SCHEMA_VERSION, "Verified schema version");
             }
             None => {
-                self.db.put_cf(
+                self.db.put_cf_opt(
                     &cf,
                     KEY_SCHEMA_VERSION,
                     serde_json::to_vec(&SCHEMA_VERSION)?,
+                    &wopts,
                 )?;
                 info!(version = SCHEMA_VERSION, "Initialized new schema");
             }
@@ -103,14 +112,51 @@ impl ProofCachePersistence {
 
     pub fn save_certificate(&self, entry: &CertificateEntry) -> Result<()> {
         let cf = self.get_cf(CF_CERTIFICATES)?;
+        let wopts = Self::sync_write_options();
         let key = entry.instance_id().to_be_bytes();
         let value = serde_json::to_vec(&SerializableCertificateEntry::from(entry))
             .context("Failed to serialize certificate entry")?;
 
-        self.db.put_cf(&cf, key, value)?;
+        self.db.put_cf_opt(&cf, key, value, &wopts)?;
         debug!(
             instance_id = entry.instance_id(),
             "Saved certificate to disk"
+        );
+        Ok(())
+    }
+
+    /// Atomically save a certificate together with all its epoch proofs.
+    ///
+    /// This is used to guarantee "all-or-nothing" persistence: if any write fails, none of the
+    /// entries are committed to disk, avoiding partial cache state after restart.
+    pub fn save_certificate_with_epoch_proofs(
+        &self,
+        cert: &CertificateEntry,
+        epoch_proofs: &[EpochProofEntry],
+    ) -> Result<()> {
+        let cf_certs = self.get_cf(CF_CERTIFICATES)?;
+        let cf_proofs = self.get_cf(CF_EPOCH_PROOFS)?;
+        let wopts = Self::sync_write_options();
+
+        let cert_key = cert.instance_id().to_be_bytes();
+        let cert_value = serde_json::to_vec(&SerializableCertificateEntry::from(cert))
+            .context("Failed to serialize certificate entry")?;
+
+        let mut batch = WriteBatch::default();
+        batch.put_cf(&cf_certs, cert_key, cert_value);
+
+        for entry in epoch_proofs {
+            let key = entry.epoch.to_be_bytes();
+            let value =
+                serde_json::to_vec(entry).context("Failed to serialize epoch proof entry")?;
+            batch.put_cf(&cf_proofs, key, value);
+        }
+
+        self.db.write_opt(batch, &wopts)?;
+        debug!(
+            instance_id = cert.instance_id(),
+            epoch_count = epoch_proofs.len(),
+            "Saved certificate and epoch proofs to disk (atomic batch)"
         );
         Ok(())
     }
@@ -132,17 +178,20 @@ impl ProofCachePersistence {
 
     pub fn delete_certificate(&self, instance_id: u64) -> Result<()> {
         let cf = self.get_cf(CF_CERTIFICATES)?;
-        self.db.delete_cf(&cf, instance_id.to_be_bytes())?;
+        let wopts = Self::sync_write_options();
+        self.db
+            .delete_cf_opt(&cf, instance_id.to_be_bytes(), &wopts)?;
         debug!(instance_id, "Deleted certificate from disk");
         Ok(())
     }
 
     pub fn save_epoch_proof(&self, entry: &EpochProofEntry) -> Result<()> {
         let cf = self.get_cf(CF_EPOCH_PROOFS)?;
+        let wopts = Self::sync_write_options();
         let key = entry.epoch.to_be_bytes();
         let value = serde_json::to_vec(entry).context("Failed to serialize epoch proof entry")?;
 
-        self.db.put_cf(&cf, key, value)?;
+        self.db.put_cf_opt(&cf, key, value, &wopts)?;
         debug!(epoch = entry.epoch, "Saved epoch proof to disk");
         Ok(())
     }
@@ -164,7 +213,8 @@ impl ProofCachePersistence {
 
     pub fn delete_epoch_proof(&self, epoch: ChainEpoch) -> Result<()> {
         let cf = self.get_cf(CF_EPOCH_PROOFS)?;
-        self.db.delete_cf(&cf, epoch.to_be_bytes())?;
+        let wopts = Self::sync_write_options();
+        self.db.delete_cf_opt(&cf, epoch.to_be_bytes(), &wopts)?;
         debug!(epoch, "Deleted epoch proof from disk");
         Ok(())
     }
@@ -179,14 +229,6 @@ impl ProofCachePersistence {
     /// Clear all entries (alias for clear_all)
     pub fn clear_all_entries(&self) -> Result<()> {
         self.clear_all()
-    }
-
-    /// Load the last committed instance ID
-    ///
-    /// Note: This information is not persisted to disk, so this always returns None.
-    /// The last committed state is only stored in memory in the ProofCache.
-    pub fn load_last_committed(&self) -> Result<Option<u64>> {
-        Ok(None)
     }
 
     /// Load all entries as combined cache entries
@@ -225,13 +267,18 @@ impl ProofCachePersistence {
 
     fn clear_cf(&self, cf_name: &str) -> Result<()> {
         if let Some(cf) = self.db.cf_handle(cf_name) {
+            let wopts = Self::sync_write_options();
             let keys: Vec<Box<[u8]>> = self
                 .db
                 .iterator_cf(&cf, rocksdb::IteratorMode::Start)
                 .filter_map(|r| r.ok().map(|(k, _)| k))
                 .collect();
-            for key in keys {
-                self.db.delete_cf(&cf, &key)?;
+            if !keys.is_empty() {
+                let mut batch = WriteBatch::default();
+                for key in keys {
+                    batch.delete_cf(&cf, &key);
+                }
+                self.db.write_opt(batch, &wopts)?;
             }
         }
         Ok(())

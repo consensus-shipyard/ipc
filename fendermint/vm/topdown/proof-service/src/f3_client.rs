@@ -127,7 +127,10 @@ impl F3Client {
     /// # Returns
     /// `FinalityCertificate` that has been cryptographically verified
     pub async fn fetch_and_validate(&mut self) -> Result<(FinalityCertificate, PowerEntries)> {
-        let instance = self.state.instance + 1;
+        // The light client state tracks the next instance expected by validation.
+        // Fetch that exact instance from RPC; fetching `+1` causes continuity failures
+        // like "expected instance N, found instance N+1".
+        let instance = self.state.instance;
 
         debug!(instance, "Starting F3 certificate fetch and validation");
 
@@ -154,17 +157,29 @@ impl F3Client {
         Ok((certificate, power_table))
     }
 
+    /// Snapshot the current validated state.
+    ///
+    /// Used by the proof-service to provide *all-or-nothing* semantics:
+    /// if proof generation fails after fetching/validating a certificate, we can roll back
+    /// and retry the same certificate on the next tick.
+    pub fn checkpoint_state(&self) -> LightClientState {
+        self.state.clone()
+    }
+
+    /// Restore a previously checkpointed validated state.
+    pub fn restore_state(&mut self, state: LightClientState) {
+        self.state = state;
+    }
+
     async fn fetch_certificate(&self, instance: u64) -> Result<FinalityCertificate> {
         let fetch_start = Instant::now();
-
         match self.light_client.get_certificate(instance).await {
             Ok(cert) => {
-                let latency = fetch_start.elapsed().as_secs_f64();
                 emit(F3CertificateFetched {
                     instance,
                     ec_chain_len: cert.ec_chain.suffix().len(),
                     status: OperationStatus::Success,
-                    latency,
+                    latency: fetch_start.elapsed().as_secs_f64(),
                 });
                 debug!(
                     instance,
@@ -174,12 +189,11 @@ impl F3Client {
                 Ok(cert)
             }
             Err(e) => {
-                let latency = fetch_start.elapsed().as_secs_f64();
                 emit(F3CertificateFetched {
                     instance,
                     ec_chain_len: 0,
                     status: OperationStatus::Failure,
-                    latency,
+                    latency: fetch_start.elapsed().as_secs_f64(),
                 });
                 error!(
                     instance,
@@ -203,13 +217,12 @@ impl F3Client {
             .validate_certificates(&self.state, &[certificate.clone()])
         {
             Ok(new_state) => {
-                let latency = validation_start.elapsed().as_secs_f64();
                 emit(F3CertificateValidated {
                     instance,
                     new_instance: new_state.instance,
                     power_table_size: new_state.power_table.len(),
                     status: OperationStatus::Success,
-                    latency,
+                    latency: validation_start.elapsed().as_secs_f64(),
                 });
                 info!(
                     instance,
@@ -220,13 +233,12 @@ impl F3Client {
                 Ok(new_state)
             }
             Err(e) => {
-                let latency = validation_start.elapsed().as_secs_f64();
                 emit(F3CertificateValidated {
                     instance,
                     new_instance: self.state.instance,
                     power_table_size: self.state.power_table.len(),
                     status: OperationStatus::Failure,
-                    latency,
+                    latency: validation_start.elapsed().as_secs_f64(),
                 });
                 error!(
                     instance,
@@ -268,7 +280,7 @@ mod tests {
         // Real test would need integration test with live network
         let power_table = PowerEntries(vec![]);
 
-        let result = F3Client::new("http://localhost:1234", "calibrationnet", 0, power_table);
+        let result = F3Client::new("http://localhost:1234", "calibrationnet2", 0, power_table);
 
         assert!(result.is_ok());
     }

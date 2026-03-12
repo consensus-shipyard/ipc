@@ -1,52 +1,82 @@
 {
-  "chain_name": "U",
+  "chain_name": "7",
   "chain_id": 101,
-  "timestamp": 12982167733895342124,
+  "timestamp": 17133465601291489619,
   "network_version": 21,
-  "base_fee": "20131727983098262839895554089832955311",
-  "power_scale": 3,
+  "base_fee": "0",
+  "power_scale": 0,
   "validators": [
     {
-      "public_key": "BH4dgpBqtkh6sKhMXelu7LKYN2nb1UJSX6ZCYGPmtmsCM9y80iAUMj5wu4Yiu952Dv3Oq2Rrbt9h45EgRmHkFSc=",
-      "power": "40223257309125237738285695934834340379"
+      "public_key": "BOaJm/wQCVEyouz1u6+43/t+RsrsT7YBK8x7fOBj5JYzkmZ0zjWvt4tNrUzFwKCykzkY5XUk8SULr9XhE2kCKgM=",
+      "power": "133436547121158909513477972881658559922"
     },
     {
-      "public_key": "BBPbyO1PiFQ7AoLdOYNViHBJ+EF6FuhOYGAOTygqwuvdOt960J5TvCIjwX2UIm2vPm+9ILZarBWcTFXz8rQG9bQ=",
-      "power": "19706769749739782860581433033120308803"
+      "public_key": "BHYo2AfRilJS1GHpeE93pAb/gx/lOPjESuA9ntxQSB5iKAqKMOgpcl/RMTI3/EDOwSdx8T4yCwVWhhq4bl5mAXQ=",
+      "power": "240244227391930844362499398952384284081"
     },
     {
-      "public_key": "BGB9f7R3VPpLiWszpGgbG+BLbtllYDg1YGq0RMqmv9xhBz7RG6WVOSCmUem+TAVQkIX2tPT7ZcZF+FLkCoNHhOc=",
-      "power": "260894447470586868017041531430614024483"
+      "public_key": "BH5D8ccOKZTLbslmKgVzhkzYJUH8HfUHJ+GpgDNQe7R5TIpjhlJOB3i8O76iebA05LzpDPmKHu/3fw+E9PH+bJM=",
+      "power": "91680598785060915932670932172996893971"
     },
     {
-      "public_key": "BA0y6qtkjqTG5IdQDRNT3yHZx4WI+6Ua+LFYuXdfczM/ocBhjNJQmQVpCjDvuwHoBPD0hzK4KxtdJe+lPa7a3hU=",
-      "power": "178349749897518691979494799247727256537"
+      "public_key": "BA5IaVwESz+YmgJYU2ebuCqcRdCwTWQcboPi7damKfFkdkC3Wig8VaIWjiYwcE+H0R8XaE2Jg0rZ2TCOiRJ7cWk=",
+      "power": "203185844703013843453464423669543643840"
     },
     {
-      "public_key": "BPhrBPJqcNmmxgGlHirO5Tt03wYXcUKlHJVYuqdWzNew6RQby1tcXpqwyFxSazNt6cOQ0UNjXBa2RAnw9CWJieY=",
-      "power": "135063245844052113159013998821298664415"
+      "public_key": "BPs6vRJsPlUB+3ipe/r+4701HXWSV3E01vd/MkdRikAlfN+ALllUEkGmvK/exyeC7JLMr5ahI621l8ZEviYPpQ0=",
+      "power": "226575883433545164735832720684510944066"
+    },
+    {
+      "public_key": "BK/bT0XF7NcvLtxYLjuCNf9Jh4Lm7yzx9127OupNaS0aMClpWLXbMDAVokzCM62LF7/h359fgfRIDpZkqTuVC10=",
+      "power": "86547577664969384614076978215207358206"
+    },
+    {
+      "public_key": "BKeJffIrsfHZAT1LRYivDtggz53c/HoT3QQbM7nh8jo0R1eZ6jQ3ReAzyhSKP7JYFgMgACcsdmvONGGH2Sw9uDs=",
+      "power": "45906758430646698643388752623232051481"
     }
   ],
   "accounts": [
     {
       "meta": {
-        "Account": {
-          "owner": "f410fkutwqjirqgadmxm43p2myoi5m3gurnulc4uvrti"
+        "Multisig": {
+          "signers": [
+            "f1wfp3qxaniskb2wrmuznq4lh5f7yosusizebxj2a",
+            "f1hf25io4nmjhex2qdjqmdzyt4ckswceefcx2yqmi",
+            "f1zqyla4dld6ifsfaqp3syfycmkq25f5pidb7jyea"
+          ],
+          "threshold": 3,
+          "vesting_duration": 6751209550894226961,
+          "vesting_start": 6976100918620151485
         }
       },
-      "balance": "68216112094381133411177903949584186607"
+      "balance": "97156951261594553286313547130067065459"
+    },
+    {
+      "meta": {
+        "Multisig": {
+          "signers": [
+            "f1pdcdgdja64kfotq3cnwpj7yjkqleqr2xbbt6mzi",
+            "f15v3rxxexa5gppkzx74nkjft5ndxrygmzl5rmifq",
+            "f1nwtqqcnslcn2annevfckkzz5tx2dbylupbshkla"
+          ],
+          "threshold": 1,
+          "vesting_duration": 2114408940148013,
+          "vesting_start": 371510136937269349
+        }
+      },
+      "balance": "251556828864509738395289928249703715510"
+    },
+    {
+      "meta": {
+        "Account": {
+          "owner": "f1cgubsj6dus4eod774qyoczn45am6i7g3hcffnhi"
+        }
+      },
+      "balance": "283041057149337595479796882931880733859"
     }
   ],
   "eam_permission_mode": {
     "mode": "unrestricted"
   },
-  "ipc": {
-    "gateway": {
-      "subnet_id": "/r16315642738389104412",
-      "bottom_up_check_period": 11339269183869879227,
-      "majority_percentage": 73,
-      "active_validators_limit": 63
-    }
-  },
-  "ipc_contracts_owner": "0x8989898989898989898989898989898989898989"
+  "ipc_contracts_owner": "0x2424242424242424242424242424242424242424"
 }

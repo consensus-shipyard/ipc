@@ -1,0 +1,24 @@
+fendermint-overrides: |
+  [ipc]
+  subnet_id = "/r314159/t410..."
+
+  [ipc.topdown]
+  chain_head_delay = 10
+  proposal_delay = 2
+  max_proposal_range = 100
+  polling_interval = 10
+  exponential_back_off = 5
+  exponential_retry_limit = 5
+  parent_http_endpoint = "https://api.calibration.node.glif.io/rpc/v1"
+  parent_registry = "0x..."
+  parent_gateway = "0x..."
+
+  [ipc.topdown.f3]
+    [ipc.topdown.f3.proof_service]
+    enabled = true
+    polling_interval = "30s"
+    parent_rpc_url = "https://api.calibration.node.glif.io/rpc/v1"
+    gateway_id = "0x..." # parent gateway ETH address
+      [ipc.topdown.f3.proof_service.cache_config]
+      lookahead_instances = 5
+      retention_epochs = 100

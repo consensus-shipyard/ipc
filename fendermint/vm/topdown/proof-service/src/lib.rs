@@ -18,18 +18,22 @@
 //! the same certificate.
 
 pub mod assembler;
+pub mod bootstrap;
 pub mod cache;
 pub mod config;
 pub mod f3_client;
 pub mod observe;
 pub mod persistence;
 pub mod service;
+pub mod storage_layout;
 pub mod types;
 pub mod verifier;
 
 // Re-export main types for convenience
+pub use bootstrap::{fetch_certificate, power_entries_from_actor};
 pub use cache::ProofCache;
 pub use config::{CacheConfig, ProofServiceConfig};
+pub use filecoin_f3_gpbft::PowerEntries;
 pub use service::ProofGeneratorService;
 pub use types::{
     CertificateEntry, EpochProofEntry, EpochProofWithCertificate, SerializableF3Certificate,
@@ -40,6 +44,16 @@ use anyhow::{Context, Result};
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::subnet_id::SubnetID;
 use std::sync::Arc;
+
+#[derive(Debug)]
+pub struct LaunchServiceParams {
+    pub initial_committed_epoch: ChainEpoch,
+    pub initial_instance: u64,
+    pub initial_power_table: filecoin_f3_gpbft::PowerEntries,
+    pub initial_applied_top_down_nonce: u64,
+    pub initial_next_power_change_config_number: u64,
+    pub db_path: Option<std::path::PathBuf>,
+}
 
 /// Initialize and launch the proof generator service
 ///
@@ -60,11 +74,17 @@ use std::sync::Arc;
 pub async fn launch_service(
     config: ProofServiceConfig,
     subnet_id: SubnetID,
-    initial_committed_epoch: ChainEpoch,
-    initial_instance: u64,
-    initial_power_table: filecoin_f3_gpbft::PowerEntries,
-    db_path: Option<std::path::PathBuf>,
+    params: LaunchServiceParams,
 ) -> Result<Option<(Arc<ProofCache>, tokio::task::JoinHandle<()>)>> {
+    let LaunchServiceParams {
+        initial_committed_epoch,
+        initial_instance,
+        initial_power_table,
+        initial_applied_top_down_nonce,
+        initial_next_power_change_config_number,
+        db_path,
+    } = params;
+
     // Check if disabled first
     if !config.enabled {
         tracing::info!("Proof service is disabled in configuration");
@@ -106,7 +126,6 @@ pub async fn launch_service(
     // Clone what we need for the background task
     let config_clone = config.clone();
     let cache_clone = cache.clone();
-    let power_table_clone = initial_power_table.clone();
 
     // Spawn background task
     let handle = tokio::spawn(async move {
@@ -115,7 +134,9 @@ pub async fn launch_service(
             cache_clone,
             &subnet_id,
             initial_instance,
-            power_table_clone,
+            initial_power_table,
+            initial_applied_top_down_nonce,
+            initial_next_power_change_config_number,
         )
         .await
         {
@@ -143,7 +164,19 @@ mod tests {
 
         let power_table = PowerEntries(vec![]);
         let subnet_id = SubnetID::default();
-        let result = launch_service(config, subnet_id, 0, 0, power_table, None).await;
+        let result = launch_service(
+            config,
+            subnet_id,
+            LaunchServiceParams {
+                initial_committed_epoch: 0,
+                initial_instance: 0,
+                initial_power_table: power_table,
+                initial_applied_top_down_nonce: 0,
+                initial_next_power_change_config_number: 0,
+                db_path: None,
+            },
+        )
+        .await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
     }
@@ -164,7 +197,19 @@ mod tests {
         let power_table = PowerEntries(vec![]);
         let subnet_id = SubnetID::default();
 
-        let result = launch_service(config, subnet_id, 100, 5, power_table, None).await;
+        let result = launch_service(
+            config,
+            subnet_id,
+            LaunchServiceParams {
+                initial_committed_epoch: 100,
+                initial_instance: 5,
+                initial_power_table: power_table,
+                initial_applied_top_down_nonce: 0,
+                initial_next_power_change_config_number: 0,
+                db_path: None,
+            },
+        )
+        .await;
         assert!(result.is_ok());
 
         let (_cache, handle) = result.unwrap().unwrap();

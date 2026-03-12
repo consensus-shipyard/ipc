@@ -12,7 +12,9 @@
 //! reference the same certificate
 
 use crate::config::CacheConfig;
-use crate::observe::{ProofCached, CACHE_HIT_TOTAL, CACHE_SIZE};
+use crate::observe::{
+    OperationStatus, ProofCacheAtomicWrite, ProofCached, CACHE_HIT_TOTAL, CACHE_SIZE,
+};
 use crate::persistence::ProofCachePersistence;
 use crate::types::{CertificateEntry, EpochProofEntry, EpochProofWithCertificate};
 use anyhow::{Context, Result};
@@ -23,6 +25,21 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
+
+const LOCK_RETRY_ATTEMPTS: usize = 3;
+
+fn read_with_retry<T, F>(mut try_read: F) -> Option<T>
+where
+    F: FnMut() -> Option<T>,
+{
+    for _ in 0..LOCK_RETRY_ATTEMPTS {
+        if let Some(guard) = try_read() {
+            return Some(guard);
+        }
+        std::thread::yield_now();
+    }
+    None
+}
 
 /// Thread-safe two-level cache for proof bundles
 #[derive(Clone)]
@@ -115,8 +132,9 @@ impl ProofCache {
     /// Insert a certificate into the store
     pub fn insert_certificate(&self, entry: CertificateEntry) -> Result<()> {
         let instance_id = entry.instance_id();
-        self.certificates.write().insert(instance_id, entry.clone());
+        // Persist first so an error doesn't leave in-memory state ahead of disk.
         self.with_persistence(|p| p.save_certificate(&entry))?;
+        self.certificates.write().insert(instance_id, entry);
         tracing::debug!(instance_id, "Inserted certificate into cache");
         Ok(())
     }
@@ -147,13 +165,7 @@ impl ProofCache {
 
         let epochs: Vec<ChainEpoch> = entries.iter().map(|e| e.epoch).collect();
 
-        {
-            let mut proofs = self.epoch_proofs.write();
-            for entry in entries.iter() {
-                proofs.insert(entry.epoch, entry.clone());
-            }
-        }
-
+        // Persist first so an error doesn't leave in-memory state ahead of disk.
         self.with_persistence(|p| {
             for entry in &entries {
                 p.save_epoch_proof(entry)?;
@@ -161,8 +173,69 @@ impl ProofCache {
             Ok(())
         })?;
 
+        {
+            let mut proofs = self.epoch_proofs.write();
+            for entry in entries {
+                proofs.insert(entry.epoch, entry);
+            }
+        }
+
         self.emit_cache_metrics(&epochs);
         tracing::debug!(?epochs, "Inserted epoch proofs into cache");
+        Ok(())
+    }
+
+    /// Insert a certificate and all of its epoch proofs into the cache, atomically on disk.
+    ///
+    /// This is the preferred API for proof generation: it avoids partial persistence (e.g. cert
+    /// written but only some epoch proofs) if RocksDB writes fail or the process crashes mid-write.
+    pub fn insert_certificate_with_epoch_proofs(
+        &self,
+        cert: CertificateEntry,
+        epoch_proofs: Vec<EpochProofEntry>,
+    ) -> Result<()> {
+        use std::time::Instant;
+        let instance_id = cert.instance_id();
+        let epochs: Vec<ChainEpoch> = epoch_proofs.iter().map(|e| e.epoch).collect();
+
+        // Persist atomically first (if enabled).
+        let persist_start = Instant::now();
+        if let Err(e) =
+            self.with_persistence(|p| p.save_certificate_with_epoch_proofs(&cert, &epoch_proofs))
+        {
+            emit(ProofCacheAtomicWrite {
+                instance: instance_id,
+                epoch_count: epochs.len(),
+                status: OperationStatus::Failure,
+                latency: persist_start.elapsed().as_secs_f64(),
+            });
+            return Err(e);
+        }
+        emit(ProofCacheAtomicWrite {
+            instance: instance_id,
+            epoch_count: epochs.len(),
+            status: OperationStatus::Success,
+            latency: persist_start.elapsed().as_secs_f64(),
+        });
+
+        // Then update in-memory structures (infallible).
+        self.certificates.write().insert(instance_id, cert);
+        if !epoch_proofs.is_empty() {
+            {
+                let mut proofs = self.epoch_proofs.write();
+                for entry in epoch_proofs {
+                    proofs.insert(entry.epoch, entry);
+                }
+            }
+            // Must run after dropping the write lock; this helper reads from the cache.
+            self.emit_cache_metrics(&epochs);
+        }
+
+        tracing::debug!(
+            instance_id,
+            epoch_count = epochs.len(),
+            "Inserted certificate and epoch proofs into cache"
+        );
         Ok(())
     }
 
@@ -205,7 +278,6 @@ impl ProofCache {
     ) -> Option<EpochProofWithCertificate> {
         let proof_entry = self.get_epoch_proof(epoch)?;
         let cert = self.get_certificate(proof_entry.cert_instance)?;
-
         Some(EpochProofWithCertificate::new(&proof_entry, &cert))
     }
 
@@ -258,6 +330,82 @@ impl ProofCache {
     /// Get the current last committed F3 instance
     pub fn last_committed_instance(&self) -> u64 {
         self.last_committed_instance.load(Ordering::Acquire)
+    }
+
+    /// Get the next uncommitted epoch.
+    ///
+    /// Filecoin can have null rounds (epochs with no tipsets), so cached proofs may not exist for
+    /// `last_committed_epoch + 1`. We therefore return the smallest cached epoch strictly greater
+    /// than `last_committed_epoch`.
+    pub fn get_next_uncommitted_epoch(&self) -> Option<ChainEpoch> {
+        let after = self.last_committed_epoch() + 1;
+        let next = self
+            .epoch_proofs
+            .read()
+            .range(after..)
+            .next()
+            .map(|(epoch, _)| *epoch);
+        next
+    }
+
+    /// Get the next uncommitted proof entry (epoch + certificate)
+    /// Returns None if no proof is available for next epoch
+    pub fn get_next_uncommitted_epoch_with_cert(&self) -> Option<EpochProofWithCertificate> {
+        let next_epoch = self.get_next_uncommitted_epoch()?;
+        self.get_epoch_proof_with_certificate(next_epoch)
+    }
+
+    /// Best-effort non-blocking variant for proposer path.
+    ///
+    /// If cache locks are contended by writers (e.g. proof insertion), this returns `None`
+    /// immediately so consensus proposal building can continue without stalling.
+    pub fn try_get_next_uncommitted_epoch_with_cert(&self) -> Option<EpochProofWithCertificate> {
+        let after = self.last_committed_epoch() + 1;
+
+        let proofs = match read_with_retry(|| self.epoch_proofs.try_read()) {
+            Some(g) => g,
+            None => {
+                tracing::warn!(
+                    after,
+                    attempts = LOCK_RETRY_ATTEMPTS,
+                    "Proof cache is busy (epoch_proofs lock contended); skipping topdown proposal message"
+                );
+                return None;
+            }
+        };
+
+        let (epoch, proof_entry) = match proofs.range(after..).next() {
+            Some((epoch, proof_entry)) => (*epoch, proof_entry.clone()),
+            None => return None,
+        };
+        drop(proofs);
+
+        let certificates = match read_with_retry(|| self.certificates.try_read()) {
+            Some(g) => g,
+            None => {
+                tracing::warn!(
+                    epoch,
+                    cert_instance = proof_entry.cert_instance,
+                    attempts = LOCK_RETRY_ATTEMPTS,
+                    "Proof cache is busy (certificates lock contended); skipping topdown proposal message"
+                );
+                return None;
+            }
+        };
+
+        let cert = match certificates.get(&proof_entry.cert_instance) {
+            Some(cert) => cert.clone(),
+            None => {
+                tracing::warn!(
+                    epoch,
+                    cert_instance = proof_entry.cert_instance,
+                    "Next uncommitted proof references missing certificate in cache"
+                );
+                return None;
+            }
+        };
+
+        Some(EpochProofWithCertificate::new(&proof_entry, &cert))
     }
 
     /// Get the number of cached epoch proofs

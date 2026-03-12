@@ -59,6 +59,12 @@ register_metrics! {
         = register_int_counter_vec!("proof_cache_hit_total", "Cache hits/misses", &["result"]);
     CACHE_INSERT_TOTAL: IntCounterVec
         = register_int_counter_vec!("proof_cache_insert_total", "Cache insertions", &["status"]);
+    CACHE_ATOMIC_WRITE_LATENCY_SECS: HistogramVec
+        = register_histogram_vec!(
+            "proof_cache_atomic_write_latency_secs",
+            "Latency of atomic (certificate+epoch proofs) cache writes",
+            &["status"]
+        );
 }
 
 impl_traceables!(
@@ -67,7 +73,8 @@ impl_traceables!(
     F3CertificateFetched,
     F3CertificateValidated,
     ProofBundleGenerated,
-    ProofCached
+    ProofCached,
+    ProofCacheAtomicWrite
 );
 
 #[derive(Debug)]
@@ -151,6 +158,25 @@ impl Recordable for ProofCached {
         CACHE_SIZE.set(self.cache_size as i64);
         CACHE_HIGHEST_CACHED.set(self.highest_cached as i64);
         CACHE_INSERT_TOTAL.with_label_values(&["success"]).inc();
+    }
+}
+
+#[derive(Debug)]
+pub struct ProofCacheAtomicWrite {
+    pub instance: u64,
+    pub epoch_count: usize,
+    pub status: OperationStatus,
+    pub latency: f64,
+}
+
+impl Recordable for ProofCacheAtomicWrite {
+    fn record_metrics(&self) {
+        CACHE_INSERT_TOTAL
+            .with_label_values(&[self.status.as_str()])
+            .inc();
+        CACHE_ATOMIC_WRITE_LATENCY_SECS
+            .with_label_values(&[self.status.as_str()])
+            .observe(self.latency);
     }
 }
 

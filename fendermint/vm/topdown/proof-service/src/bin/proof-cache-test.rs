@@ -7,8 +7,8 @@
 
 use clap::{Parser, Subcommand};
 use fendermint_vm_topdown_proof_service::config::{CacheConfig, GatewayId, ProofServiceConfig};
-use fendermint_vm_topdown_proof_service::launch_service;
 use fendermint_vm_topdown_proof_service::ProofCache;
+use fendermint_vm_topdown_proof_service::{launch_service, LaunchServiceParams};
 use fvm_ipld_encoding;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::subnet_id::SubnetID;
@@ -133,7 +133,7 @@ async fn run_service(
 
     let temp_client = fendermint_vm_topdown_proof_service::f3_client::F3Client::new_from_rpc(
         &rpc_url,
-        "calibrationnet",
+        "calibrationnet2",
         initial_instance,
     )
     .await?;
@@ -159,16 +159,21 @@ async fn run_service(
         },
         parent_rpc_url: rpc_url,
         gateway_id: GatewayId::EthAddress(gateway_address),
+        network_name: None,
     };
 
     let initial_committed_epoch = initial_instance as ChainEpoch;
     let (cache, _handle) = launch_service(
         config,
         subnet_id_parsed,
-        initial_committed_epoch,
-        initial_instance,
-        power_table,
-        db_path,
+        LaunchServiceParams {
+            initial_committed_epoch,
+            initial_instance,
+            initial_power_table: power_table,
+            initial_applied_top_down_nonce: 0,
+            initial_next_power_change_config_number: 0,
+            db_path,
+        },
     )
     .await?
     .expect("Service should be enabled");

@@ -11,7 +11,6 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{self};
 use fvm_shared::{address::Address, error::ExitCode};
 use std::sync::Arc;
-use std::time::Instant;
 
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
@@ -256,6 +255,12 @@ where
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError> {
+        let input_tx_count = msgs.len();
+        tracing::info!(
+            input_tx_count,
+            max_transaction_bytes,
+            "prepare_messages_for_block start"
+        );
         let signed_msgs = msgs
             .iter()
             .filter_map(|msg| match ipld_decode_signed_message(msg) {
@@ -266,25 +271,49 @@ where
                 }
             })
             .collect::<Vec<_>>();
+        tracing::info!(
+            input_tx_count,
+            decoded_signed_count = signed_msgs.len(),
+            "prepare_messages_for_block decoded mempool messages"
+        );
 
         let signed_msgs =
             select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
+        tracing::info!(
+            selected_by_base_fee = signed_msgs.len(),
+            "prepare_messages_for_block selected messages above base fee"
+        );
 
         let total_gas_limit = state.block_gas_tracker().available();
+        let signed_msg_count = signed_msgs.len();
         let signed_msgs_iter = select_messages_by_gas_limit(signed_msgs, total_gas_limit)
             .into_iter()
             .map(Into::into);
+        tracing::info!(
+            selected_by_gas_limit = signed_msg_count,
+            total_gas_limit,
+            "prepare_messages_for_block selected messages by gas limit"
+        );
 
-        let top_down_iter = self
-            .top_down_manager
-            .chain_message_from_finality_or_quorum()
-            .await
-            .into_iter();
+        // Get parent finality message - TopDownManager decides internally whether to use F3 or legacy
+        tracing::info!("prepare_messages_for_block entering topdown proposal lookup");
+        let top_down_msg = self.top_down_manager.chain_message_for_proposal().await;
+        let topdown_included = top_down_msg.is_some();
+        let top_down_iter = top_down_msg.into_iter();
+        tracing::info!(
+            topdown_included,
+            "prepare_messages_for_block finished topdown proposal lookup"
+        );
 
+        tracing::info!("prepare_messages_for_block encoding proposal messages");
         let mut all_msgs = top_down_iter
             .chain(signed_msgs_iter)
             .map(|msg| fvm_ipld_encoding::to_vec(&msg).context("failed to encode message as IPLD"))
             .collect::<Result<Vec<Vec<u8>>>>()?;
+        tracing::info!(
+            encoded_message_count = all_msgs.len(),
+            "prepare_messages_for_block encoded proposal messages"
+        );
 
         if all_msgs.len() > self.max_msgs_per_block {
             tracing::info!(
@@ -309,6 +338,14 @@ where
             }
         }
 
+        tracing::debug!(
+            input_signed_msgs = signed_msg_count,
+            topdown_included,
+            output_msgs = all_messages.len(),
+            total_bytes,
+            "Prepared proposal messages for block"
+        );
+
         Ok(PrepareMessagesResponse {
             messages: all_messages,
             total_bytes,
@@ -317,7 +354,7 @@ where
 
     async fn attest_block_messages(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        mut state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
     ) -> Result<AttestMessagesResponse, AttestMessagesError> {
         if msgs.len() > self.max_msgs_per_block {
@@ -329,27 +366,65 @@ where
         }
 
         let mut block_gas_usage = 0;
-        let base_fee = state.block_gas_tracker().base_fee();
+        // Clone to avoid holding an immutable borrow of `state` while we also need mutable access
+        // during top-down attestation.
+        let base_fee = state.block_gas_tracker().base_fee().clone();
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
-                Ok(chain_msg) => match chain_msg {
-                    ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
-                        if !self.top_down_manager.is_finality_valid(finality).await {
-                            return Ok(AttestMessagesResponse::Reject);
+                Ok(chain_msg) => {
+                    match chain_msg {
+                        ChainMessage::Ipc(IpcMessage::ParentFinalityWithCert(ref msg)) => {
+                            // Attest parent-finality-with-cert message (checks local cache + on-chain continuity).
+                            match self
+                                .top_down_manager
+                                .attest_parent_finality_with_cert(&mut state, msg)
+                                .await
+                            {
+                                Ok(()) => {
+                                    tracing::debug!(
+                                        height = msg.height,
+                                        "parent finality with cert attested successfully"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        height = msg.height,
+                                        reason = if e.chain().any(|cause| {
+                                            matches!(
+                                                cause.downcast_ref::<crate::fvm::f3_topdown::F3TopDownError>(),
+                                                Some(crate::fvm::f3_topdown::F3TopDownError::CacheMiss { .. })
+                                            )
+                                        }) {
+                                            "cache_miss"
+                                        } else {
+                                            "invalid"
+                                        },
+                                        "parent finality with cert attestation failed - rejecting block"
+                                    );
+                                    return Ok(AttestMessagesResponse::Reject);
+                                }
+                            }
+                        }
+                        ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
+                            // v1 voting-based finality (kept for backward compatibility)
+                            if !self.top_down_manager.attest_legacy(finality).await {
+                                return Ok(AttestMessagesResponse::Reject);
+                            }
+                        }
+                        ChainMessage::Signed(signed) => {
+                            if signed.message.gas_fee_cap < base_fee {
+                                tracing::warn!(
+                                    fee_cap = signed.message.gas_fee_cap.to_string(),
+                                    base_fee = base_fee.to_string(),
+                                    "msg fee cap less than base fee"
+                                );
+                                return Ok(AttestMessagesResponse::Reject);
+                            }
+                            block_gas_usage += signed.message.gas_limit;
                         }
                     }
-                    ChainMessage::Signed(signed) => {
-                        if signed.message.gas_fee_cap < *base_fee {
-                            tracing::warn!(
-                                fee_cap = signed.message.gas_fee_cap.to_string(),
-                                base_fee = base_fee.to_string(),
-                                "msg fee cap less than base fee"
-                            );
-                            return Ok(AttestMessagesResponse::Reject);
-                        }
-                        block_gas_usage += signed.message.gas_limit;
-                    }
-                },
+                }
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to decode message in proposal as ChainMessage");
                     return Ok(AttestMessagesResponse::Reject);
@@ -459,9 +534,19 @@ where
                 })
             }
             ChainMessage::Ipc(ipc_msg) => match ipc_msg {
+                IpcMessage::ParentFinalityWithCert(msg) => {
+                    let applied_message = self
+                        .top_down_manager
+                        .execute_parent_finality_with_cert(state, msg)
+                        .await?;
+                    Ok(ApplyMessageResponse {
+                        applied_message,
+                        domain_hash: None,
+                    })
+                }
                 IpcMessage::TopDownExec(p) => {
-                    let applied_message =
-                        self.top_down_manager.execute_topdown_msg(state, p).await?;
+                    // OLD: v1 voting-based execution (kept for backward compatibility)
+                    let applied_message = self.top_down_manager.execute_legacy(state, p).await?;
                     Ok(ApplyMessageResponse {
                         applied_message,
                         domain_hash: None,
@@ -512,7 +597,7 @@ where
                 let to = msg.to;
                 let method_num = msg.method_num;
                 let gas_limit = msg.gas_limit;
-                let start = Instant::now();
+                let start = std::time::Instant::now();
                 let (state, (apply_ret, emitters)) = state.call(*msg.clone()).await?;
                 let latency = start.elapsed().as_secs_f64();
                 let exit_code = apply_ret.msg_receipt.exit_code.value();

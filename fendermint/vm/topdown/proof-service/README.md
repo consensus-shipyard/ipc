@@ -178,6 +178,7 @@ Background service that:
 ```rust
 use fendermint_vm_topdown_proof_service::{launch_service, ProofServiceConfig, CacheConfig};
 use fendermint_vm_topdown_proof_service::config::GatewayId;
+use fendermint_vm_topdown_proof_service::LaunchServiceParams;
 use filecoin_f3_gpbft::PowerEntries;
 use std::time::Duration;
 
@@ -196,7 +197,8 @@ let config = ProofServiceConfig {
         retention_epochs: 100,
     },
     polling_interval: Duration::from_secs(30),
-    ..Default::default()
+    max_cache_size_bytes: 100 * 1024 * 1024, // 100 MB
+    fallback_rpc_urls: vec![],
 };
 
 // Launch service with optional persistence
@@ -204,10 +206,14 @@ let db_path = Some(PathBuf::from("/var/lib/fendermint/proof-cache"));
 let (cache, handle) = launch_service(
     config,
     subnet_id,
-    initial_epoch,
-    initial_instance,
-    power_table,
-    db_path,
+    LaunchServiceParams {
+        initial_committed_epoch: initial_epoch,
+        initial_instance,
+        initial_power_table: power_table,
+        initial_applied_top_down_nonce: applied_top_down_nonce,
+        initial_next_power_change_config_number: next_power_change_config_number,
+        db_path,
+    },
 ).await?.unwrap();
 
 // Query cache in block proposer - get proof with certificate
@@ -276,7 +282,7 @@ All configuration options in `ProofServiceConfig`:
 | `enabled`              | bool           | Yes      | Enable/disable the service                       |
 | `parent_rpc_url`       | String         | Yes      | F3 RPC endpoint URL (HTTP or HTTPS)              |
 | `parent_subnet_id`     | String         | Yes      | Parent subnet ID (e.g., "/r314159")              |
-| `f3_network_name`      | String         | Yes      | F3 network name ("calibrationnet", "mainnet")    |
+| `f3_network_name`      | String         | Yes      | F3 network name ("calibrationnet2", "mainnet")   |
 | `gateway_actor_id`     | Option<u64>    | Yes      | Gateway actor ID on parent chain                 |
 | `subnet_id`            | Option<String> | Yes      | Current subnet ID for event filtering            |
 | `lookahead_instances`  | u64            | Yes      | How many instances to pre-generate (must be > 0) |
@@ -411,9 +417,9 @@ Older issue with reqwest library on macOS (now fixed in upstream).
 
 ### Unit Tests
 
-```bash
-cargo test --package fendermint_vm_topdown_proof_service --lib
-```
+````bash
+# Unit tests
+cargo test --package fendermint_vm_topdown_proof_service
 
 **Test Coverage:**
 
@@ -424,10 +430,41 @@ cargo test --package fendermint_vm_topdown_proof_service --lib
 - Metrics registration
 
 ### Integration Tests
-
 ```bash
 # Requires live Calibration network
 cargo test --package fendermint_vm_topdown_proof_service --test integration -- --ignored
+````
+
+### End-to-End Testing
+
+1. **Deploy Test Contract** (optional - for testing with TopdownMessenger):
+
+```bash
+cd /path/to/proofs/topdown-messenger
+forge create --rpc-url http://api.calibration.node.glif.io/rpc/v1 \
+    --private-key $PRIVATE_KEY \
+    src/TopdownMessenger.sol:TopdownMessenger
+```
+
+2. **Run Proof Service**:
+
+```bash
+./target/debug/proof-cache-test run \
+    --rpc-url "http://api.calibration.node.glif.io/rpc/v1" \
+    --initial-instance <RECENT_INSTANCE> \
+    --gateway-actor-id <GATEWAY_ACTOR_ID> \
+    --subnet-id "your-subnet-id" \
+    --poll-interval 10 \
+    --lookahead 3 \
+    --db-path /tmp/proof-cache-test.db
+```
+
+3. **Inspect Results**:
+
+```bash
+# After stopping the service
+./target/debug/proof-cache-test inspect --db-path /tmp/proof-cache-test.db
+./target/debug/proof-cache-test get --db-path /tmp/proof-cache-test.db --instance-id <INSTANCE>
 ```
 
 ### End-to-End Testing
