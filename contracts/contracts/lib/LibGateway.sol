@@ -29,7 +29,6 @@ library LibGateway {
 
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
-    // Keep in sync with the event signature in the proof-service: fendermint/vm/topdown/proof-service/src/assembler.rs:NEW_TOPDOWN_MESSAGE_SIGNATURE
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id);
     /// @dev event emitted when there is a new bottom-up message added to the batch.
     /// @dev there is no need to emit the message itself, as the message is included in batch.

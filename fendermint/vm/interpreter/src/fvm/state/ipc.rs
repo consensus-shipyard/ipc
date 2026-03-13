@@ -1,16 +1,17 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::ActorID;
+use num_traits::Zero;
 
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
-    eam::EthAddress, init::builtin_actor_eth_addr, ipc::GATEWAY_ACTOR_ID,
+    eam::EthAddress, f3_light_client, init::builtin_actor_eth_addr, ipc::GATEWAY_ACTOR_ID, system,
 };
 use fendermint_vm_genesis::{Collateral, Power, PowerScale, Validator, ValidatorKey};
 use fendermint_vm_message::conv::from_eth;
@@ -147,6 +148,24 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
     ) -> anyhow::Result<getter::Membership> {
         self.getter.call(state, |c| c.get_current_membership())
+    }
+
+    /// Return the next top-down message nonce expected to be applied by this gateway.
+    ///
+    /// This is the L2 execution cursor enforced when applying incoming top-down cross messages.
+    pub fn applied_top_down_nonce(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+        self.getter.call(state, |c| c.applied_top_down_nonce())
+    }
+
+    /// Return the validator tracker configuration numbers (next, start).
+    ///
+    /// `nextConfigurationNumber` advances as power-change requests are stored on the gateway.
+    pub fn tracker_configuration_numbers(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<(u64, u64)> {
+        self.topdown
+            .call(state, |c| c.get_tracker_configuration_numbers())
     }
 
     /// Get the current power table, which is the same as the membership but parsed into domain types.
@@ -296,4 +315,274 @@ fn membership_to_power_table(
     }
 
     pt
+}
+
+/// Caller for the F3 Light Client actor
+///
+/// This actor is responsible for:
+/// - Storing finalized F3 instance state (instance ID, validator power table)
+/// - Validator power table
+#[derive(Clone)]
+pub struct F3LightClientCaller {
+    actor_id: ActorID,
+}
+
+impl F3LightClientCaller {
+    pub fn new() -> Self {
+        Self {
+            actor_id: f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID,
+        }
+    }
+
+    /// Update the F3 light client state after verifying a proof bundle.
+    ///
+    /// This should be called after successfully executing a proof-based topdown finality message.
+    pub fn update_state(
+        &self,
+        state: &mut FvmExecState<impl Blockstore + Clone>,
+        processed_instance_id: u64,
+        power_table: Vec<f3_light_client::PowerEntry>,
+    ) -> anyhow::Result<()> {
+        let method_num = f3_light_client::Method::UpdateState as u64;
+
+        let params = f3_light_client::UpdateStateParams {
+            processed_instance_id,
+            power_table,
+        };
+
+        let params_bytes =
+            fvm_ipld_encoding::to_vec(&params).context("failed to serialize update params")?;
+
+        let msg = fvm_shared::message::Message {
+            version: Default::default(),
+            from: fvm_shared::address::Address::new_id(system::SYSTEM_ACTOR_ID),
+            to: fvm_shared::address::Address::new_id(self.actor_id),
+            sequence: 0,
+            value: TokenAmount::zero(),
+            method_num,
+            params: fvm_ipld_encoding::RawBytes::new(params_bytes),
+            gas_limit: 10_000_000_000,
+            gas_fee_cap: TokenAmount::zero(),
+            gas_premium: TokenAmount::zero(),
+        };
+
+        let (ret, _) = state
+            .execute_implicit(msg)
+            .context("failed to execute F3 light client update")?;
+
+        if let Some(err) = &ret.failure_info {
+            bail!(
+                "F3 light client update failed (exit code {}): {}",
+                ret.msg_receipt.exit_code.value(),
+                err
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Get the current F3 instance state from the light client actor.
+    pub fn get_state(
+        &self,
+        state: &mut FvmExecState<impl Blockstore + Clone>,
+    ) -> anyhow::Result<f3_light_client::GetStateResponse> {
+        let method_num = f3_light_client::Method::GetState as u64;
+
+        let msg = fvm_shared::message::Message {
+            version: Default::default(),
+            from: fvm_shared::address::Address::new_id(system::SYSTEM_ACTOR_ID),
+            to: fvm_shared::address::Address::new_id(self.actor_id),
+            sequence: 0,
+            value: TokenAmount::zero(),
+            method_num,
+            params: fvm_ipld_encoding::RawBytes::default(),
+            gas_limit: 10_000_000_000,
+            gas_fee_cap: TokenAmount::zero(),
+            gas_premium: TokenAmount::zero(),
+        };
+
+        // Read-only execution still requires `&mut FvmExecState` (it uses interior caches), but
+        // any effects are reverted by the executor.
+        let (ret, _) = state
+            .execute_read_only(msg)
+            .context("failed to execute F3 light client get_state")?;
+
+        if let Some(err) = &ret.failure_info {
+            bail!(
+                "F3 light client get_state failed (exit code {}): {}",
+                ret.msg_receipt.exit_code.value(),
+                err
+            );
+        }
+
+        let state_response: f3_light_client::GetStateResponse =
+            fvm_ipld_encoding::from_slice(ret.msg_receipt.return_data.bytes())
+                .context("failed to deserialize F3 light client state")?;
+
+        Ok(state_response)
+    }
+}
+
+impl Default for F3LightClientCaller {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::F3LightClientCaller;
+    use crate::fvm::state::genesis::FvmGenesisState;
+    use crate::fvm::store::memory::MemoryBlockstore;
+    use anyhow::Context;
+    use fendermint_vm_actor_interface::{f3_light_client, gas_market, init, system};
+    use fendermint_vm_core::Timestamp;
+    use fendermint_vm_genesis::PowerScale;
+    use fvm::engine::MultiEngine;
+    use fvm_shared::clock::ChainEpoch;
+    use fvm_shared::econ::TokenAmount;
+    use fvm_shared::version::NetworkVersion;
+    use num_traits::Zero;
+    use std::collections::BTreeSet;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn f3_light_client_caller_roundtrip_update_and_get_state() -> anyhow::Result<()> {
+        // Build a minimal genesis state with the built-in bundle, plus the custom F3 actor.
+        let store = MemoryBlockstore::new();
+        let multi_engine = Arc::new(MultiEngine::new(1));
+        let mut genesis_state = FvmGenesisState::new(
+            store,
+            multi_engine,
+            actors_builtin_car::CAR,
+            actors_custom_car::CAR,
+        )
+        .await
+        .context("failed to create FVM genesis state")?;
+
+        // System actor (required so the FVM can load the builtin actor manifest).
+        genesis_state
+            .create_builtin_actor(
+                system::SYSTEM_ACTOR_CODE_ID,
+                system::SYSTEM_ACTOR_ID,
+                &system::State {
+                    builtin_actors: genesis_state.manifest_data_cid,
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create system actor")?;
+
+        // Init actor (safe default for message execution environment).
+        let (init_state, _addr_to_id) = init::State::new(
+            genesis_state.store(),
+            "test".to_string(),
+            &[],
+            &BTreeSet::new(),
+            0,
+        )
+        .context("failed to create init state")?;
+        genesis_state
+            .create_builtin_actor(
+                init::INIT_ACTOR_CODE_ID,
+                init::INIT_ACTOR_ID,
+                &init_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create init actor")?;
+
+        // Gas market custom actor: required by BlockGasTracker initialization.
+        let gas_market_state = fendermint_actor_gas_market_eip1559::State {
+            base_fee: TokenAmount::from_atto(100),
+            constants: fendermint_actor_gas_market_eip1559::Constants::default(),
+        };
+        genesis_state
+            .create_custom_actor(
+                fendermint_actor_gas_market_eip1559::ACTOR_NAME,
+                gas_market::GAS_MARKET_ACTOR_ID,
+                &gas_market_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create gas market actor")?;
+
+        // Create the F3 light client custom actor.
+        let instance_id = 10u64;
+        let _base_epoch: ChainEpoch = 1234;
+        let power_table = vec![
+            fendermint_actor_f3_light_client::types::PowerEntry {
+                id: 1,
+                public_key: vec![1, 2, 3],
+                power_be: vec![100],
+            },
+            fendermint_actor_f3_light_client::types::PowerEntry {
+                id: 2,
+                public_key: vec![4, 5, 6],
+                power_be: vec![200],
+            },
+        ];
+        let f3_state = fendermint_actor_f3_light_client::state::State::new(
+            genesis_state.store(),
+            instance_id,
+            power_table.clone(),
+        )
+        .context("failed to create F3 light client actor state")?;
+        genesis_state
+            .create_custom_actor(
+                fendermint_actor_f3_light_client::F3_LIGHT_CLIENT_ACTOR_NAME,
+                f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID,
+                &f3_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create F3 light client actor")?;
+
+        // Initialize execution params (required for executing implicit/read-only messages).
+        genesis_state
+            .init_exec_state(
+                Timestamp(1),
+                NetworkVersion::V21,
+                TokenAmount::from_atto(100),
+                TokenAmount::zero(),
+                1,
+                0 as PowerScale,
+            )
+            .context("failed to init exec state")?;
+
+        let mut exec_state = genesis_state
+            .into_exec_state()
+            .map_err(|_| anyhow::anyhow!("genesis exec state missing"))?;
+
+        let caller = F3LightClientCaller::new();
+
+        // Round-trip: read initial actor state.
+        let state0 = caller.get_state(&mut exec_state)?;
+        assert_eq!(state0.processed_instance_id, instance_id);
+        // Epoch cursor is stored in the gateway; the actor no longer tracks finalized height.
+        assert_eq!(state0.power_table.len(), power_table.len());
+        assert_eq!(state0.power_table[0].id, 1);
+
+        // Update state and read again.
+        let new_instance = instance_id + 1;
+        let new_power_table = vec![f3_light_client::PowerEntry {
+            id: 99,
+            public_key: vec![9u8; 48],
+            power_be: vec![0x03, 0xE7],
+        }];
+        caller
+            .update_state(&mut exec_state, new_instance, new_power_table.clone())
+            .context("failed to update F3LightClientActor state")?;
+
+        let state1 = caller.get_state(&mut exec_state)?;
+        assert_eq!(state1.processed_instance_id, new_instance);
+        // Epoch cursor is stored in the gateway; the actor no longer tracks finalized height.
+        assert_eq!(state1.power_table, new_power_table);
+
+        // Also sanity-check that read-only exec doesn't mutate the actor (it reverts effects).
+        let state2 = caller.get_state(&mut exec_state)?;
+        assert_eq!(state2, state1);
+
+        Ok(())
+    }
 }

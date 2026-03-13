@@ -1,0 +1,33 @@
+# import-wallets:
+#   - wallet-type: evm
+#     private-key: "0xYOUR_PRIVKEY"
+
+# deploy:
+#   url: "https://api.calibration.node.glif.io/rpc/v1"
+#   from: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+#   chain-id: 314159
+
+create:
+  parent: /r314159
+  chain-id: 314159
+  from: 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  min-validator-stake: 1.0
+  min-validators: 1
+  bottomup-check-period: 50
+  permission-mode: federated
+  supply-source-kind: native
+  min-cross-msg-fee: 0.1
+  genesis-subnet-ipc-contracts-owner: 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  parent-filecoin-rpc: "https://api.calibration.node.glif.io/rpc/v1"
+
+activate:
+  mode: federated
+  validator-pubkeys:
+    - 0x048318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed753547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5
+  validator-power:
+    - 1
+
+genesis:
+  network-version: 21
+  base-fee: "1000"
+  power-scale: 3

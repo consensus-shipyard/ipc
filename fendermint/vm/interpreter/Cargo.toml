@@ -18,6 +18,8 @@ fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_message = { path = "../message" }
 fendermint_vm_resolver = { path = "../resolver" }
 fendermint_vm_topdown = { path = "../topdown" }
+fendermint_vm_topdown_proof_service = { path = "../topdown/proof-service" }
+fendermint_vm_evm_event_utils = { path = "../evm-event-utils" }
 fendermint_crypto = { path = "../../crypto" }
 fendermint_eth_hardhat = { path = "../../eth/hardhat" }
 fendermint_eth_deployer = { path = "../../eth/deployer" }
@@ -49,9 +51,11 @@ ipc-observability = { path = "../../../ipc/observability" }
 async-trait = { workspace = true }
 async-stm = { workspace = true }
 anyhow = { workspace = true }
+arc-swap = "1.6"
 base64 = { workspace = true }
 ethers = { workspace = true }
 hex = { workspace = true }
+num-bigint = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -85,11 +89,13 @@ quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
 merkle-tree-rs = { path = "../../../ext/merkle-tree-rs" }
+proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", rev = "45ed1e8c3f99c6055169be1b6812eeff2657f553" }
 
 [dev-dependencies]
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 tempfile = { workspace = true }
+actors-builtin-car = { path = "../../actors-builtin-car" }
 
 fendermint_vm_interpreter = { path = ".", features = ["arb"] }
 fendermint_vm_message = { path = "../message", features = ["arb"] }
