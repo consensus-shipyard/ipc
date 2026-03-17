@@ -11,7 +11,8 @@ use crate::commands::wallet::import::import_wallet;
 use crate::ipc_config_store::IpcConfigStore;
 
 use crate::commands::subnet::init::config::{
-    ActivateConfig, DeployConfig, SubnetCreateConfig, SubnetInitConfig, WalletImportArgs,
+    ActivateConfig, DeployConfig, NodeTopdownMode, SubnetCreateConfig, SubnetInitConfig,
+    WalletImportArgs,
 };
 use crate::{get_ipc_provider, GlobalArguments};
 use anyhow::{Context, Result};
@@ -20,6 +21,7 @@ use fendermint_vm_actor_interface::ipc::{self};
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::new_evm_keystore_from_config;
 use ipc_provider::IpcProvider;
+use fvm_shared::address::Payload;
 use ipc_types::EthAddress;
 use std::str::FromStr;
 use url::Url;
@@ -40,11 +42,27 @@ pub async fn handle_init(global: &GlobalArguments, init_cfg: &SubnetInitConfig) 
         deploy_contracts(deploy_cfg, &ipc_config_store).await?;
     }
 
+    let resolved_topdown_mode =
+        resolve_topdown_mode(init_cfg.node_topdown_mode, init_cfg.create.parent_filecoin_rpc.as_ref());
+
+    if matches!(resolved_topdown_mode, NodeTopdownMode::F3)
+        && init_cfg.create.parent_filecoin_rpc.is_none()
+    {
+        anyhow::bail!(
+            "node-topdown-mode=f3 requires create.parent-filecoin-rpc to capture deterministic F3 genesis data"
+        );
+    }
+
     let mut provider = get_ipc_provider(global)?;
 
     // 3) Create and approve subnet
-    let created =
-        create_and_approve_subnet(&init_cfg.create, &ipc_config_store, &mut provider).await?;
+    let created = create_and_approve_subnet(
+        &init_cfg.create,
+        resolved_topdown_mode,
+        &ipc_config_store,
+        &mut provider,
+    )
+    .await?;
 
     // 4) Optionally activate and generate genesis
     let created_genesis = if let Some(act_cfg) = &init_cfg.activate {
@@ -71,11 +89,16 @@ pub async fn handle_init(global: &GlobalArguments, init_cfg: &SubnetInitConfig) 
         // Use the global config directory
         let dir = global.config_dir();
 
+        let ipc_snapshot = ipc_config_store.snapshot().await;
+
         let node_config_path = generate_node_config(
             &created.subnet_id,
             &created.parent_subnet_id,
             &genesis.sealed,
             init_cfg.activate.as_ref(),
+            resolved_topdown_mode,
+            init_cfg.create.parent_filecoin_rpc.as_ref(),
+            &ipc_snapshot,
             &dir,
         )
         .await?;
@@ -92,7 +115,7 @@ pub async fn handle_init(global: &GlobalArguments, init_cfg: &SubnetInitConfig) 
         let subnet_info_path = generate_subnet_info(
             &created.subnet_id,
             &created.parent_subnet_id,
-            &ipc_config_store.snapshot().await,
+            &ipc_snapshot,
             genesis,
             gen_cfg,
             init_cfg.activate.as_ref(),
@@ -173,11 +196,19 @@ struct CreatedSubnet {
 /// Creates and approves the subnet on-chain.
 async fn create_and_approve_subnet(
     cfg: &SubnetCreateConfig,
+    topdown_mode: NodeTopdownMode,
     store: &IpcConfigStore,
     provider: &mut IpcProvider,
 ) -> Result<CreatedSubnet> {
     log::info!("Creating subnet");
-    let actor_addr = create_subnet_cmd(provider.clone(), cfg).await?;
+    let mut create_cfg = cfg.clone();
+    if matches!(topdown_mode, NodeTopdownMode::Legacy) {
+        // Legacy mode must not capture/store F3 instance ID in subnet actor.
+        create_cfg.parent_filecoin_rpc = None;
+        create_cfg.parent_filecoin_auth_token = None;
+    }
+
+    let actor_addr = create_subnet_cmd(provider.clone(), &create_cfg).await?;
 
     let parent_id = SubnetID::from_str(&cfg.parent)?;
     let parent = store
@@ -212,6 +243,22 @@ async fn create_and_approve_subnet(
     })
 }
 
+fn resolve_topdown_mode(
+    configured_mode: NodeTopdownMode,
+    parent_filecoin_rpc: Option<&url::Url>,
+) -> NodeTopdownMode {
+    match configured_mode {
+        NodeTopdownMode::Auto => {
+            if parent_filecoin_rpc.is_some() {
+                NodeTopdownMode::F3
+            } else {
+                NodeTopdownMode::Legacy
+            }
+        }
+        mode => mode,
+    }
+}
+
 /// Imports wallets into the IPC keystore
 fn import_wallets(all_imports: &Vec<WalletImportArgs>, provider: &IpcProvider) -> Result<()> {
     log::info!("Importing wallets");
@@ -229,9 +276,12 @@ pub async fn generate_node_config(
     parent_id: &SubnetID,
     genesis_path: &std::path::Path,
     activation_info: Option<&ActivateConfig>,
+    topdown_mode: NodeTopdownMode,
+    parent_filecoin_rpc: Option<&url::Url>,
+    ipc_config: &ipc_provider::config::Config,
     output_dir: &std::path::Path,
 ) -> anyhow::Result<std::path::PathBuf> {
-    use crate::commands::node::config::{GenesisSource, NodeInitConfig};
+    use crate::commands::node::config::{GenesisSource, NodeInitConfig, P2pPortsConfig};
     use crate::commands::subnet::init::config::JoinConfig;
     use crate::commands::wallet::import::WalletImportArgs;
 
@@ -288,9 +338,32 @@ pub async fn generate_node_config(
         })
     };
 
-    // Create basic node config with sensible defaults
+    let parent = ipc_config
+        .subnets
+        .get(parent_id)
+        .context("parent subnet not found in config")?;
+
+    let resolved_topdown_mode = resolve_topdown_mode(topdown_mode, parent_filecoin_rpc);
+
+    let default_home = default_node_home(output_dir);
+    let parent_http_endpoint = parent_filecoin_rpc
+        .map(|u| u.to_string())
+        .unwrap_or_else(|| parent.rpc_http().to_string());
+    let parent_registry = address_to_eth_hex(&parent.registry_addr())
+        .context("failed to convert parent registry address to ETH hex")?;
+    let parent_gateway = address_to_eth_hex(&parent.gateway_addr())
+        .context("failed to convert parent gateway address to ETH hex")?;
+    let fendermint_overrides = build_default_fendermint_overrides(
+        subnet_id,
+        resolved_topdown_mode,
+        &parent_http_endpoint,
+        &parent_registry,
+        &parent_gateway,
+    )?;
+
+    // Create basic node config with sensible defaults, ready to run.
     let node_config = NodeInitConfig {
-        home: "~/.node-ipc".into(),
+        home: default_home,
         subnet: subnet_id.to_string(),
         parent: parent_id.to_string(),
         genesis: genesis_source,
@@ -303,11 +376,14 @@ pub async fn generate_node_config(
         p2p: Some(crate::commands::node::config::P2pConfig {
             external_ip: Some("127.0.0.1".to_string()), // Default external IP for user to modify
             listen_ip: Some("0.0.0.0".to_string()), // Default listen IP (binds to all interfaces)
-            ports: None,                            // Let user configure ports
+            ports: Some(P2pPortsConfig {
+                cometbft: Some(26656),
+                resolver: Some(26655),
+            }),
             peers: None,                            // Let user configure peers
         }),
         cometbft_overrides: None,
-        fendermint_overrides: None,
+        fendermint_overrides: Some(fendermint_overrides),
     };
 
     // Serialize NodeInitConfig to YAML
@@ -325,6 +401,78 @@ pub async fn generate_node_config(
     );
 
     Ok(node_config_path)
+}
+
+fn address_to_eth_hex(addr: &fvm_shared::address::Address) -> anyhow::Result<String> {
+    let eth = match addr.payload() {
+        Payload::Delegated(inner) => {
+            let subaddr = inner.subaddress();
+            if subaddr.len() < 20 {
+                anyhow::bail!("delegated address subaddress too short for ETH conversion");
+            }
+            let mut bytes = [0u8; 20];
+            bytes.copy_from_slice(&subaddr[..20]);
+            EthAddress(bytes)
+        }
+        Payload::ID(id) => EthAddress::from_id(*id),
+        _ => anyhow::bail!("address is not convertible to ETH format"),
+    };
+
+    Ok(format!("0x{:?}", eth))
+}
+
+fn default_node_home(output_dir: &std::path::Path) -> std::path::PathBuf {
+    if let Some(home) = std::env::var_os("HOME") {
+        return std::path::PathBuf::from(home).join(".node-ipc");
+    }
+
+    output_dir
+        .parent()
+        .map(|p| p.join(".node-ipc"))
+        .unwrap_or_else(|| std::path::PathBuf::from(".node-ipc"))
+}
+
+fn build_default_fendermint_overrides(
+    subnet_id: &SubnetID,
+    topdown_mode: NodeTopdownMode,
+    parent_http_endpoint: &str,
+    parent_registry: &str,
+    parent_gateway: &str,
+) -> anyhow::Result<toml::Value> {
+    let mut overrides = format!(
+        r#"[ipc]
+subnet_id = "{subnet_id}"
+
+[ipc.topdown]
+chain_head_delay = 10
+proposal_delay = 2
+max_proposal_range = 100
+polling_interval = 10
+exponential_back_off = 5
+exponential_retry_limit = 5
+parent_http_endpoint = "{parent_http_endpoint}"
+parent_registry = "{parent_registry}"
+parent_gateway = "{parent_gateway}"
+"#
+    );
+
+    if matches!(topdown_mode, NodeTopdownMode::F3) {
+        overrides.push_str(&format!(
+            r#"
+[ipc.topdown.f3.proof_service]
+enabled = true
+polling_interval = "30s"
+parent_rpc_url = "{parent_http_endpoint}"
+gateway_id = "{parent_gateway}"
+
+[ipc.topdown.f3.proof_service.cache_config]
+lookahead_instances = 5
+retention_epochs = 100
+"#
+        ));
+    }
+
+    toml::from_str(&overrides).context("failed to create default Fendermint topdown overrides")
 }
 
 /// Generate subnet information JSON file

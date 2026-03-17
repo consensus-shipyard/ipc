@@ -51,15 +51,16 @@ fn serialize_toml_override<S>(value: &Option<toml::Value>, serializer: S) -> Res
 where
     S: serde::Serializer,
 {
-    // use serde::ser::Error; // Not needed for this implementation
+    use serde::ser::Error;
 
     match value {
         Some(value) => {
-            let s = value.to_string();
+            let s = toml::to_string_pretty(value).map_err(S::Error::custom)?;
             if s.trim().is_empty() {
                 serializer.serialize_none()
             } else {
-                serializer.serialize_str(&s)
+                // Keep the generated YAML as a TOML literal block string.
+                serializer.serialize_str(s.trim_end())
             }
         }
         None => serializer.serialize_none(),
