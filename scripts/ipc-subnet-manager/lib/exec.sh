@@ -18,6 +18,24 @@ exec_on_host() {
     fi
 }
 
+# Execute command as ipc user without login shell (avoids .profile/.bashrc blocking)
+# Use when sudo su - ipc hangs (e.g. ipc's login shell blocks)
+# Usage: exec_on_host_simple <validator_idx> <command>
+exec_on_host_simple() {
+    local validator_idx="$1"
+    shift
+    local cmd="$*"
+
+    if is_local_mode; then
+        local_exec "$validator_idx" "$cmd"
+    else
+        local ip=$(get_config_value "validators[$validator_idx].ip")
+        local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+        local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+        ssh_run_sudo "$ip" "$ssh_user" "sudo -u $ipc_user bash -c '$cmd'"
+    fi
+}
+
 # Execute command directly on validator (remote mode wrapper)
 # Usage: exec_on_host_direct <validator_idx> <command>
 exec_on_host_direct() {
@@ -136,7 +154,8 @@ check_process_running() {
     else
         local ip=$(get_config_value "validators[$validator_idx].ip")
         local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-        ssh_check_process "$ip" "$ssh_user" "$process_pattern"
+        local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+        ssh_check_process "$ip" "$ssh_user" "$ipc_user" "$process_pattern"
     fi
 }
 
@@ -155,8 +174,10 @@ kill_process() {
     else
         local ip=$(get_config_value "validators[$validator_idx].ip")
         local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" "pkill -f '$process_pattern' || true"
+        # Use sudo pkill - ipc user may not have permission to kill processes in some setups
+        # -n: non-interactive (fail fast if password needed, don't hang)
+        # || true: never fail init on kill - best-effort stop (no nodes may be running)
+        ssh_run_sudo "$ip" "$ssh_user" "sudo -n pkill -f '$process_pattern' 2>/dev/null || true" || true
     fi
 }
 

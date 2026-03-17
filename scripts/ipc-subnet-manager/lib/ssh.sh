@@ -14,8 +14,28 @@ ssh_exec() {
         return 0
     fi
 
-    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$ssh_user@$ip" \
-        "sudo su - $ipc_user -c '$cmd'" 2>&1
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+        -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
+        "$ssh_user@$ip" "sudo su - $ipc_user -c '$cmd'" 2>&1
+}
+
+# Execute long-running command with streaming output and extended keepalive
+# Use for builds (10-15 min) - prevents SSH timeout and shows progress
+ssh_exec_long() {
+    local ip="$1"
+    local ssh_user="$2"
+    local ipc_user="$3"
+    shift 3
+    local cmd="$*"
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would execute on $ip: $cmd"
+        return 0
+    fi
+
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+        -o ServerAliveInterval=30 -o ServerAliveCountMax=60 \
+        "$ssh_user@$ip" "sudo su - $ipc_user -c '$cmd'" 2>&1
 }
 
 # Execute command without sudo/su wrapping (for direct execution)
@@ -31,8 +51,27 @@ ssh_exec_direct() {
         return 0
     fi
 
-    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$ssh_user@$ip" \
-        "sudo su - $ipc_user -c 'bash -l -c \"$cmd\"'"
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+        -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
+        "$ssh_user@$ip" "sudo su - $ipc_user -c 'bash -l -c \"$cmd\"'"
+}
+
+# Execute command on remote host as SSH user directly (for sudo operations)
+# Use this when you need to run commands as the ssh_user, not as ipc_user
+ssh_run_sudo() {
+    local ip="$1"
+    local ssh_user="$2"
+    shift 2
+    local cmd="$*"
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would execute on $ip as $ssh_user: $cmd"
+        return 0
+    fi
+
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+        -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
+        "$ssh_user@$ip" "$cmd" 2>&1
 }
 
 # Test SSH connectivity
@@ -64,10 +103,11 @@ scp_to_host() {
 
     # Copy to temp location
     local temp_file="/tmp/$(basename "$local_file")"
-    scp -o StrictHostKeyChecking=no "$local_file" "$ssh_user@$ip:$temp_file" >/dev/null 2>&1
+    local ssh_opts="-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2"
+    scp $ssh_opts "$local_file" "$ssh_user@$ip:$temp_file" >/dev/null 2>&1
 
     # Move to final location with correct ownership
-    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+    ssh $ssh_opts "$ssh_user@$ip" \
         "sudo mv $temp_file $remote_path && sudo chown $ipc_user:$ipc_user $remote_path"
 }
 
@@ -86,13 +126,14 @@ scp_from_host() {
 
     # Copy to temp location first
     local temp_file="/tmp/$(basename "$remote_path")"
-    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+    local ssh_opts="-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2"
+    ssh $ssh_opts "$ssh_user@$ip" \
         "sudo cp $remote_path $temp_file && sudo chown $ssh_user:$ssh_user $temp_file"
 
-    scp -o StrictHostKeyChecking=no "$ssh_user@$ip:$temp_file" "$local_file" >/dev/null 2>&1
+    scp $ssh_opts "$ssh_user@$ip:$temp_file" "$local_file" >/dev/null 2>&1
 
     # Cleanup
-    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "rm -f $temp_file"
+    ssh $ssh_opts "$ssh_user@$ip" "rm -f $temp_file"
 }
 
 # Check if process is running on remote host

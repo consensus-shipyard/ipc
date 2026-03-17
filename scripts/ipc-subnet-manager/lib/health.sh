@@ -62,12 +62,39 @@ start_validator_node() {
     local name="${VALIDATORS[$validator_idx]}"
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local node_home=$(get_node_home "$validator_idx")
+    local resolver_port=$(get_resolver_port_for_validator "$validator_idx")
+    local subnet_id=$(get_config_value "subnet.id")
 
     log_info "Starting $name..."
 
-    # Start node in background
-    exec_on_host "$validator_idx" \
-        "nohup $ipc_binary node start --home $node_home > $node_home/node.log 2>&1 &"
+    # Use wrapper script to set env vars reliably (avoids SSH quoting issues with sudo su -c '...').
+    # resolver_enabled() requires: !listen_addr.is_empty() && subnet_id != UNDEF
+    local resolver_listen="/ip4/0.0.0.0/tcp/$resolver_port"
+    local start_script="$node_home/start-node.sh"
+
+    if is_local_mode; then
+        # Local: run directly with env vars
+        (
+            export FM_RESOLVER__CONNECTION__LISTEN_ADDR="$resolver_listen"
+            [ -n "$subnet_id" ] && export FM_IPC__SUBNET_ID="$subnet_id"
+            nohup "$ipc_binary" node start --home "$node_home" > "$node_home/node.log" 2>&1 &
+        )
+    else
+        # Remote: create script, copy, run (avoids ssh -c quoting of multiaddr/subnet_id)
+        local tmp_script=$(mktemp)
+        cat > "$tmp_script" << EOF
+#!/bin/bash
+export FM_RESOLVER__CONNECTION__LISTEN_ADDR="$resolver_listen"
+EOF
+        [ -n "$subnet_id" ] && echo "export FM_IPC__SUBNET_ID=\"$subnet_id\"" >> "$tmp_script"
+        cat >> "$tmp_script" << EOF
+
+nohup $ipc_binary node start --home $node_home > $node_home/node.log 2>&1 &
+EOF
+        copy_to_host "$validator_idx" "$tmp_script" "$start_script"
+        rm -f "$tmp_script"
+        exec_on_host "$validator_idx" "chmod +x $start_script && $start_script"
+    fi
 }
 
 initialize_primary_node() {
@@ -200,6 +227,15 @@ deploy_subnet() {
 
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local ipc_binary_expanded="${ipc_binary/#\~/$HOME}"
+    # Deploy runs locally - use ipc-cli from PATH if config path is for remote host
+    if ! is_local_mode && [[ "$ipc_binary_expanded" == /home/* ]] && [ ! -x "$ipc_binary_expanded" ]; then
+        ipc_binary_expanded=$(command -v ipc-cli 2>/dev/null || echo "")
+        if [ -z "$ipc_binary_expanded" ] || [ ! -x "$ipc_binary_expanded" ]; then
+            log_error "ipc-cli not found. Install locally: cd ipc && cargo build --release, or add to PATH. Config paths.ipc_binary is for remote hosts." >&2
+            exit 1
+        fi
+        log_info "Using local ipc-cli: $ipc_binary_expanded" >&2
+    fi
     local parent_rpc=$(get_config_value "subnet.parent_rpc")
     local parent_chain_id=$(get_config_value "subnet.parent_chain_id")
 
@@ -211,7 +247,7 @@ deploy_subnet() {
     # Extract Ethereum address from private key
     local from_address=$(yq eval ".validators[$primary_validator_idx].address // null" "$CONFIG_FILE")
 
-    # If no address in config, derive from known Anvil keys
+    # If no address in config, derive from known Anvil keys or use cast
     if [ "$from_address" = "null" ] || [ -z "$from_address" ]; then
         case "$primary_private_key" in
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
@@ -224,8 +260,12 @@ deploy_subnet() {
                 from_address="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
                 ;;
             *)
-                log_error "Cannot derive address from private key. Please add 'address' field to validator config." >&2
-                exit 1
+                from_address=$(cast wallet address --private-key "$primary_private_key" 2>/dev/null)
+                if [ -z "$from_address" ]; then
+                    log_error "Cannot derive address from private key. Install Foundry (cast) or add 'address' field to validator config." >&2
+                    exit 1
+                fi
+                log_info "Derived address from private key: $from_address" >&2
                 ;;
         esac
     fi
@@ -235,7 +275,10 @@ deploy_subnet() {
     # Get configuration values
     local permission_mode=$(get_config_value "init.permission_mode")
     local supply_source=$(get_config_value "init.subnet_supply_source_kind")
-    local min_validators=$(get_config_value "init.min_validators" 2>/dev/null || echo "$validator_count")
+    local min_validators=$(get_config_value "init.min_validators" 2>/dev/null)
+    if [ -z "$min_validators" ] || [ "$min_validators" = "null" ]; then
+        min_validators=$validator_count
+    fi
     local activate_subnet=$(get_config_value "init.activate_subnet" 2>/dev/null || echo "true")
 
     # Get subnet chain ID from config, or generate a unique one
@@ -305,6 +348,9 @@ EOF
                         "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a")
                             val_address="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
                             ;;
+                        *)
+                            val_address=$(cast wallet address --private-key "$val_private_key" 2>/dev/null)
+                            ;;
                     esac
                 fi
 
@@ -363,20 +409,18 @@ EOF
 
     if [ $exit_code -ne 0 ]; then
         log_error "Subnet deployment failed" >&2
-        echo ""
-        echo "Error output:"
-        echo "$init_output"
-        echo ""
-        log_info "Troubleshooting tips:" >&2
-        log_info "  1. Make sure Anvil is running: lsof -i :8545" >&2
-        log_info "  2. Check that parent gateway and registry addresses are correct" >&2
+        echo "" >&2
+        echo "Error output:" >&2
+        echo "$init_output" >&2
+        echo "" >&2
+        log_info "Troubleshooting: For Calibration, fund $from_address with test FIL. Ensure ipc-cli is in PATH." >&2
         rm -f "$subnet_init_config"
         exit 1
     fi
 
-    # Extract subnet ID from ~/.ipc/config.toml
-    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-    ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
+    # Extract subnet ID from config (use local path when deploy runs locally)
+    local ipc_config_dir
+    ipc_config_dir=$(get_local_ipc_config_dir)
     local ipc_config_file="$ipc_config_dir/config.toml"
 
     local subnet_id=$(grep '^id = ' "$ipc_config_file" | cut -d'"' -f2 | grep -E "^$parent_chain_id/t[a-z0-9]+" | head -1)
@@ -384,7 +428,7 @@ EOF
     if [ -z "$subnet_id" ]; then
         log_error "Could not extract subnet ID from IPC config at $ipc_config_file" >&2
         log_info "Full CLI output:" >&2
-        echo "$init_output"
+        echo "$init_output" >&2
         rm -f "$subnet_init_config"
         exit 1
     fi
@@ -408,30 +452,275 @@ EOF
 }
 
 # Create bootstrap genesis for non-activated subnets (Anvil/local development)
+# When ipc-cli subnet create-genesis fails (e.g. FunctionNotFound on Calibration),
+# fall back to fendermint genesis commands directly (no parent chain fetch).
 create_bootstrap_genesis() {
     local subnet_id="$1"
 
     log_info "Creating bootstrap genesis for non-activated subnet..."
 
-    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-    ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
+    local ipc_config_dir
+    ipc_config_dir=$(get_local_ipc_config_dir)
 
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local ipc_binary_expanded="${ipc_binary/#\~/$HOME}"
-
-    # Create genesis using ipc-cli subnet create-genesis
-    log_info "Generating genesis files..."
-    local genesis_output=$($ipc_binary_expanded subnet create-genesis --subnet "$subnet_id" 2>&1)
-    local exit_code=$?
-
-    if [ $exit_code -ne 0 ]; then
-        log_error "Genesis creation failed"
-        echo "$genesis_output"
+    if ! is_local_mode && [[ "$ipc_binary_expanded" == /home/* ]] && [ ! -x "$ipc_binary_expanded" ]; then
+        ipc_binary_expanded=$(command -v ipc-cli 2>/dev/null || echo "")
+    fi
+    if [ -z "$ipc_binary_expanded" ] || [ ! -x "$ipc_binary_expanded" ]; then
+        log_error "ipc-cli not found. Install: cd ipc && cargo build --release"
         return 1
     fi
 
-    log_success "Genesis files created successfully"
+    # Try ipc-cli subnet create-genesis first (fetches from parent chain)
+    log_info "Generating genesis files..."
+    local genesis_output
+    genesis_output=$($ipc_binary_expanded subnet create-genesis --subnet "$subnet_id" 2>&1)
+    local exit_code=$?
+
+    if [ $exit_code -eq 0 ]; then
+        log_success "Genesis files created successfully"
+        return 0
+    fi
+
+    # Fallback: parent chain fetch failed (e.g. subnet not activated, FunctionNotFound on Calibration)
+    # Use fendermint genesis commands directly - no parent chain required
+    if echo "$genesis_output" | grep -qi "FunctionNotFound\|failed to create\|reverted with error\|does not exist"; then
+        log_warn "Parent chain fetch failed, using fendermint bootstrap genesis (no parent chain)"
+        if create_bootstrap_genesis_fendermint "$subnet_id"; then
+            log_success "Bootstrap genesis created successfully"
+            return 0
+        fi
+    fi
+
+    log_error "Genesis creation failed"
+    echo "$genesis_output"
+    return 1
+}
+
+# Create genesis using fendermint directly (no parent chain - for Calibration FunctionNotFound workaround)
+create_bootstrap_genesis_fendermint() {
+    local subnet_id="$1"
+
+    # Subnet IDs with t-prefix addresses (e.g. /t410...) are Filecoin testnet; fendermint must use --network testnet
+    local fendermint_network=""
+    if [[ "$subnet_id" == *"/t"* ]]; then
+        fendermint_network="--network testnet"
+    fi
+
+    local fendermint_bin
+    fendermint_bin=$(command -v fendermint 2>/dev/null || echo "")
+    if [ -z "$fendermint_bin" ]; then
+        log_error "fendermint not found in PATH. Install with: cd ipc && cargo build --release"
+        return 1
+    fi
+
+    local ipc_config_dir
+    ipc_config_dir=$(get_local_ipc_config_dir)
+    local subnet_id_no_slash="${subnet_id#/}"
+    local genesis_json="$ipc_config_dir/genesis_${subnet_id_no_slash//\//_}.json"
+    local genesis_sealed="$ipc_config_dir/genesis_sealed_${subnet_id_no_slash//\//_}.json"
+
+    local base_fee=$(get_config_value_with_default "init.genesis.base_fee" "1000")
+    local power_scale=$(get_config_value_with_default "init.genesis.power_scale" "3")
+    local network_version=$(get_config_value_with_default "init.genesis.network_version" "21")
+
+    # Get primary validator address for ipc-contracts-owner
+    local primary_idx
+    primary_idx=$(get_primary_validator)
+    local from_address
+    from_address=$(yq eval ".validators[$primary_idx].address // null" "$CONFIG_FILE")
+    local primary_private_key
+    primary_private_key=$(get_config_value "validators[$primary_idx].private_key")
+    if [ "$from_address" = "null" ] || [ -z "$from_address" ]; then
+        from_address=$(cast wallet address --private-key "$primary_private_key" 2>/dev/null || echo "0x0000000000000000000000000000000000000000")
+    fi
+
+    local chain_name="${subnet_id_no_slash//\//_}"
+    local timestamp
+    timestamp=$(date +%s)
+
+    mkdir -p "$ipc_config_dir"
+
+    log_info "Creating genesis with fendermint..."
+    $fendermint_bin $fendermint_network genesis --genesis-file "$genesis_json" new \
+        --timestamp "$timestamp" \
+        --chain-name "$chain_name" \
+        --network-version "$network_version" \
+        --base-fee "$base_fee" \
+        --power-scale "$power_scale" \
+        --ipc-contracts-owner "$from_address" 2>&1 || return 1
+
+    if [ ! -f "$genesis_json" ]; then
+        log_error "Failed to create genesis file"
+        return 1
+    fi
+
+    # Set IPC gateway params (bottom-up disabled for federated - use large period)
+    $fendermint_bin $fendermint_network genesis --genesis-file "$genesis_json" ipc gateway \
+        --subnet-id "$subnet_id" \
+        --bottom-up-check-period 10000 \
+        --msg-fee 1000 \
+        --majority-percentage 51 2>&1 || return 1
+
+    # Add validators and accounts
+    for idx in "${!VALIDATORS[@]}"; do
+        local val_private_key
+        val_private_key=$(yq eval ".validators[$idx].private_key" "$CONFIG_FILE")
+        local val_address
+        val_address=$(yq eval ".validators[$idx].address // null" "$CONFIG_FILE")
+        if [ "$val_address" = "null" ] || [ -z "$val_address" ]; then
+            val_address=$(cast wallet address --private-key "$val_private_key" 2>/dev/null)
+        fi
+
+        local pubkey_raw
+        pubkey_raw=$(cast wallet pubkey --private-key "$val_private_key" 2>/dev/null)
+        local pubkey_hex="04${pubkey_raw#0x}"
+        local pubkey_file="/tmp/validator_${idx}_pubkey_b64.txt"
+        echo -n "$pubkey_hex" | xxd -r -p | base64 | tr -d '\n' > "$pubkey_file"
+
+        log_info "Adding validator ${VALIDATORS[$idx]}..."
+        $fendermint_bin $fendermint_network genesis --genesis-file "$genesis_json" add-validator \
+            --public-key "$pubkey_file" \
+            --power 100 2>&1 || true
+
+        $fendermint_bin $fendermint_network genesis --genesis-file "$genesis_json" add-account \
+            --public-key "$pubkey_file" \
+            --balance "1000" \
+            --kind ethereum 2>&1 || true
+
+        rm -f "$pubkey_file" 2>/dev/null
+    done
+
+    # Seal genesis
+    log_info "Sealing genesis..."
+    $fendermint_bin $fendermint_network genesis --genesis-file "$genesis_json" ipc seal-genesis \
+        --output-path "$genesis_sealed" 2>&1 || return 1
+
+    if [ ! -f "$genesis_sealed" ]; then
+        log_error "Failed to seal genesis"
+        return 1
+    fi
+
     return 0
+}
+
+# Copy genesis files from local to all remote validators (no-op for local mode)
+copy_genesis_to_remotes() {
+    local subnet_id="$1"
+
+    if is_local_mode; then
+        return 0
+    fi
+
+    local local_ipc_dir
+    local_ipc_dir=$(get_local_ipc_config_dir)
+    local subnet_id_no_slash="${subnet_id#/}"
+    local genesis_json="$local_ipc_dir/genesis_${subnet_id_no_slash//\//_}.json"
+    local genesis_sealed="$local_ipc_dir/genesis_sealed_${subnet_id_no_slash//\//_}.json"
+
+    if [ ! -f "$genesis_json" ] || [ ! -f "$genesis_sealed" ]; then
+        return 0
+    fi
+
+    log_info "Copying genesis files to remote validators..."
+    local remote_ipc_dir
+    remote_ipc_dir=$(get_config_value "paths.ipc_config_dir")
+
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        log_info "Copying genesis to $name..."
+        exec_on_host "$idx" "mkdir -p $remote_ipc_dir"
+        copy_to_host "$idx" "$genesis_json" "$remote_ipc_dir/$(basename "$genesis_json")"
+        copy_to_host "$idx" "$genesis_sealed" "$remote_ipc_dir/$(basename "$genesis_sealed")"
+        log_success "Genesis copied to $name"
+    done
+}
+
+# Detailed diagnostics for a validator (troubleshooting health check failures)
+diagnose_validator() {
+    local validator_idx="$1"
+
+    local name="${VALIDATORS[$validator_idx]}"
+    local node_home=$(get_node_home "$validator_idx")
+    local cometbft_port=$(get_config_value "network.cometbft_p2p_port")
+    local libp2p_port=$(get_resolver_port_for_validator "$validator_idx")
+    local eth_api_port=$(get_config_value "network.eth_api_port")
+
+    log_header "Diagnostics: $name"
+    echo ""
+    log_info "Expected ports: cometbft_p2p=$cometbft_port, libp2p=$libp2p_port, eth_api=$eth_api_port"
+    log_info "CometBFT RPC (for status/net_info): 26657"
+    echo ""
+
+    log_subsection "Listening ports"
+    exec_on_host_simple "$validator_idx" \
+        "netstat -an 2>/dev/null | grep LISTEN | head -25 || ss -tuln 2>/dev/null | head -25 || echo 'netstat/ss not found'" || true
+    echo ""
+
+    log_subsection "Expected ports check"
+    local ports_found
+    ports_found=$(exec_on_host_simple "$validator_idx" \
+        "netstat -an 2>/dev/null | grep LISTEN | grep -E \"[\.:]$cometbft_port|[\.:]$libp2p_port|[\.:]$eth_api_port\" || true")
+    if [ -n "$ports_found" ]; then
+        echo "$ports_found"
+    else
+        log_warn "None of the expected ports ($cometbft_port, $libp2p_port, $eth_api_port) found listening"
+        log_info "Trying 'ss' as fallback..."
+        exec_on_host_simple "$validator_idx" \
+            "ss -tuln 2>/dev/null | grep -E \"26656|26657|26654|26655|8545\" || true" || true
+    fi
+    echo ""
+
+    log_subsection "CometBFT RPC (localhost:26657)"
+    local status
+    status=$(exec_on_host_simple "$validator_idx" \
+        "curl -s --max-time 5 http://localhost:26657/status 2>/dev/null" || echo "{}")
+    if echo "$status" | jq -e '.result.sync_info' >/dev/null 2>&1; then
+        log_info "Block height: $(echo "$status" | jq -r '.result.sync_info.latest_block_height // "?"')"
+        log_info "Catching up: $(echo "$status" | jq -r '.result.sync_info.catching_up // "?"')"
+    else
+        log_warn "CometBFT RPC not responding - node may still be starting"
+        echo "$status" | head -3
+    fi
+    echo ""
+
+    log_subsection "CometBFT peers (net_info)"
+    local net_info
+    net_info=$(exec_on_host_simple "$validator_idx" \
+        "curl -s --max-time 5 http://localhost:26657/net_info 2>/dev/null" || echo "{}")
+    if echo "$net_info" | jq -e '.result.n_peers' >/dev/null 2>&1; then
+        log_info "Peers: $(echo "$net_info" | jq -r '.result.n_peers // "?"')"
+    else
+        log_warn "Could not get net_info"
+    fi
+    echo ""
+
+    log_subsection "Recent node log (last 15 lines)"
+    exec_on_host_simple "$validator_idx" \
+        "tail -15 $node_home/node.log 2>/dev/null || tail -15 $node_home/logs/*.log 2>/dev/null || echo 'No logs found'" || true
+    echo ""
+
+    log_subsection "Fendermint config (ABCI port 26658)"
+    local abci_config
+    abci_config=$(exec_on_host_simple "$validator_idx" \
+        "grep -r 26658 $node_home/fendermint/config/ 2>/dev/null || echo \"Config not found\"" || true)
+    if echo "$abci_config" | grep -q "26658"; then
+        log_info "ABCI port 26658 configured"
+    else
+        log_warn "ABCI port 26658 may not be configured - Fendermint must listen here for CometBFT"
+        echo "$abci_config" | head -5
+    fi
+    echo ""
+
+    log_info "Root cause: CometBFT cannot connect to Fendermint ABCI at 127.0.0.1:26658"
+    log_info "  Fendermint provides the ABCI app; CometBFT needs it before starting RPC."
+    log_info ""
+    log_info "Suggestions:"
+    log_info "  1. Run update-config to fix Fendermint/CometBFT config: ./ipc-manager update-config"
+    log_info "  2. If nodes were initialized before recent fixes, re-run init: ./ipc-manager init"
+    log_info "  3. Check full logs for Fendermint errors: ./ipc-manager logs $name"
+    log_info "  4. Restart after config fix: ./ipc-manager restart --yes"
 }
 
 # Health check for single validator
@@ -441,7 +730,7 @@ check_validator_health() {
     local name="${VALIDATORS[$validator_idx]}"
     local node_home=$(get_node_home "$validator_idx")
     local cometbft_port=$(get_config_value "network.cometbft_p2p_port")
-    local libp2p_port=$(get_config_value "network.libp2p_port")
+    local libp2p_port=$(get_resolver_port_for_validator "$validator_idx")
     local eth_api_port=$(get_config_value "network.eth_api_port")
 
     local healthy=true
@@ -456,18 +745,19 @@ check_validator_health() {
 
     # Check ports listening
     # Note: macOS netstat uses . as separator (e.g., *.8546), Linux uses : (e.g., *:8546)
-    local ports_check=$(exec_on_host "$validator_idx" \
+    local ports_check=$(exec_on_host_simple "$validator_idx" \
         "netstat -an 2>/dev/null | grep LISTEN | grep -E \"[\.:]$cometbft_port|[\.:]$libp2p_port|[\.:]$eth_api_port\" | wc -l")
 
     if [ -n "$ports_check" ] && [ "$ports_check" -ge 2 ] 2>/dev/null; then
         log_check "ok" "Ports listening ($ports_check/3)"
     else
-        log_check "fail" "Ports not listening (${ports_check:-0}/3)"
+        log_check "fail" "Ports not listening (${ports_check:-0}/3) [expected: $cometbft_port, $libp2p_port, $eth_api_port]"
+        [ "$DEBUG" = true ] && log_info "  Run 'diagnose' for details: ./ipc-manager diagnose $name"
         healthy=false
     fi
 
     # Check CometBFT peers
-    local comet_peers=$(exec_on_host "$validator_idx" \
+    local comet_peers=$(exec_on_host_simple "$validator_idx" \
         "curl -s http://localhost:26657/net_info 2>/dev/null | jq -r '.result.n_peers // 0' 2>/dev/null || echo 0")
 
     local expected_peers=$((${#VALIDATORS[@]} - 1))
@@ -481,7 +771,7 @@ check_validator_health() {
     fi
 
     # Check block height
-    local block_height=$(exec_on_host "$validator_idx" \
+    local block_height=$(exec_on_host_simple "$validator_idx" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null || echo 0")
 
     # Ensure block_height is a number
@@ -494,7 +784,7 @@ check_validator_health() {
     fi
 
     # Check for recent errors in logs
-    local recent_errors=$(exec_on_host "$validator_idx" \
+    local recent_errors=$(exec_on_host_simple "$validator_idx" \
         "tail -100 $node_home/logs/*.log 2>/dev/null | grep -i 'ERROR' | tail -5 || echo ''")
 
     if [ -z "$recent_errors" ]; then
@@ -597,14 +887,27 @@ measure_all_block_times() {
 }
 
 # Get chain ID from a validator
+# In remote mode: curl directly to validator IP (eth API may not be reachable via SSH/localhost)
+# In local mode: curl localhost via exec_on_host
 get_chain_id() {
     local validator_idx="${1:-0}"
 
     local eth_api_port=$(get_config_value "network.eth_api_port")
+    local rpc_url
+    local response
 
-    # Query eth_chainId via JSON-RPC
-    local response=$(exec_on_host "$validator_idx" \
-        "curl -s -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' http://localhost:${eth_api_port}" 2>/dev/null)
+    if is_local_mode; then
+        # Local mode: curl localhost on the validator
+        response=$(exec_on_host "$validator_idx" \
+            "curl -s -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' http://localhost:${eth_api_port}" 2>/dev/null)
+    else
+        # Remote mode: curl directly to validator's external IP (same path cast/wallets use)
+        local ip=$(get_config_value "validators[$validator_idx].ip")
+        rpc_url="http://${ip}:${eth_api_port}"
+        response=$(curl -s --max-time 5 -X POST -H "Content-Type: application/json" \
+            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+            "$rpc_url" 2>/dev/null)
+    fi
 
     local chain_id=$(echo "$response" | jq -r '.result // ""' 2>/dev/null)
 
@@ -720,7 +1023,8 @@ show_subnet_info() {
 
     # Check critical infrastructure for parent finality voting
     log_info "Libp2p Infrastructure (required for voting):"
-    local libp2p_port=$(get_config_value "network.libp2p_port")
+    # Use get_resolver_port_for_validator - node init uses libp2p_port-1 for resolver (port_offset pattern)
+    local libp2p_port=$(get_resolver_port_for_validator 0)
 
     # Check if libp2p port is listening and on correct address
     local libp2p_listening=$(exec_on_host 0 \
@@ -786,19 +1090,21 @@ show_subnet_info() {
     for idx in "${!VALIDATORS[@]}"; do
         local v_name="${VALIDATORS[$idx]}"
         local v_ip=$(get_config_value "validators[$idx].ip")
+        local v_peer_ip=$(get_peer_ip "$idx")
+        local v_resolver_port=$(get_resolver_port_for_validator "$idx")
         local v_node_home=$(get_node_home "$idx")
 
         log_info "  $v_name ($v_ip):"
 
-        # Get external_addresses
+        # Get external_addresses (config uses peer_ip/internal_ip for VPC, resolver_port for actual port)
         local ext_addrs=$(exec_on_host "$idx" \
             "grep external_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null" 2>/dev/null)
 
-        if [ -n "$ext_addrs" ] && echo "$ext_addrs" | grep -q "/ip4/$v_ip/tcp/$libp2p_port"; then
-            log_info "    ✓ external_addresses: Contains own IP ($v_ip)"
+        if [ -n "$ext_addrs" ] && echo "$ext_addrs" | grep -q "/ip4/$v_peer_ip/tcp/$v_resolver_port"; then
+            log_info "    ✓ external_addresses: Contains peer address ($v_peer_ip:$v_resolver_port)"
         elif [ -n "$ext_addrs" ]; then
             log_warn "    ✗ external_addresses: $(echo "$ext_addrs" | cut -c1-80)"
-            log_warn "      Expected to contain: /ip4/$v_ip/tcp/$libp2p_port"
+            log_warn "      Expected to contain: /ip4/$v_peer_ip/tcp/$v_resolver_port"
         else
             log_warn "    ✗ external_addresses: Not set or empty"
         fi
@@ -808,12 +1114,12 @@ show_subnet_info() {
             "grep static_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null" 2>/dev/null)
 
         if [ -n "$static_addrs" ]; then
-            # Count how many peer IPs are in static_addresses
+            # Count how many peer IPs are in static_addresses (use get_peer_ip for VPC internal IPs)
             local peer_count=0
             for peer_idx in "${!VALIDATORS[@]}"; do
                 if [ "$peer_idx" != "$idx" ]; then
-                    local peer_ip=$(get_config_value "validators[$peer_idx].ip")
-                    if echo "$static_addrs" | grep -q "/ip4/$peer_ip/tcp/$libp2p_port"; then
+                    local peer_ip=$(get_peer_ip "$peer_idx")
+                    if echo "$static_addrs" | grep -q "/ip4/$peer_ip/tcp/$v_resolver_port"; then
                         peer_count=$((peer_count + 1))
                     fi
                 fi
@@ -833,12 +1139,12 @@ show_subnet_info() {
 
         # Check if libp2p connections are actually established
         local libp2p_connections=$(exec_on_host "$idx" \
-            "ss -tn | grep :$libp2p_port | grep ESTAB | wc -l" 2>/dev/null | tr -d ' \n\r')
+            "ss -tn | grep :$v_resolver_port | grep ESTAB | wc -l" 2>/dev/null | tr -d ' \n\r')
 
         if [ -n "$libp2p_connections" ] && [ "$libp2p_connections" -gt 0 ] 2>/dev/null; then
             log_info "    ✓ Active libp2p connections: $libp2p_connections"
         else
-            log_warn "    ✗ No active libp2p connections (firewall blocking port $libp2p_port?)"
+            log_warn "    ✗ No active libp2p connections (firewall blocking port $v_resolver_port?)"
         fi
     done
     echo
@@ -1466,5 +1772,88 @@ show_voting_status() {
         "tail -20 $node_home/logs/*.consensus.log 2>/dev/null | grep -v 'received complete proposal' | tail -10" || true
 
     echo ""
+}
+
+# Update binaries on a single validator
+update_validator_binaries() {
+    local validator_idx="$1"
+    local branch="$2"
+
+    local name="${VALIDATORS[$validator_idx]}"
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+    local ipc_repo=$(get_config_value "paths.ipc_repo")
+
+    log_info "[$name] Updating binaries from branch '$branch'..."
+
+    local update_cmd="cd $ipc_repo && \
+        git fetch origin && \
+        git checkout $branch && \
+        git pull origin $branch && \
+        cargo clean && \
+        make"
+
+    log_info "[$name] Pulling latest changes and building... (this may take 10-15 min for full rebuild)"
+    if ! ssh_exec_long "$ip" "$ssh_user" "$ipc_user" "$update_cmd"; then
+        log_error "[$name] Build failed"
+        return 1
+    fi
+
+    log_success "[$name] Build completed successfully"
+
+    log_info "[$name] Verifying binaries..."
+    local ipc_version
+    ipc_version=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "test -f $ipc_repo/target/release/ipc-cli && $ipc_repo/target/release/ipc-cli --version 2>&1" 2>/dev/null | head -1)
+    if [ -n "$ipc_version" ]; then
+        log_info "[$name] $ipc_version"
+    fi
+
+    log_success "[$name] Binaries updated successfully"
+    return 0
+}
+
+# Update binaries on all validators
+update_all_binaries() {
+    local branch="${1:-main}"
+
+    log_header "Updating IPC Binaries"
+    log_info "Branch: $branch"
+    log_info "Validators: ${#VALIDATORS[@]}"
+    echo ""
+
+    local all_success=true
+    local results=()
+
+    for idx in "${!VALIDATORS[@]}"; do
+        update_validator_binaries "$idx" "$branch"
+        results[$idx]=$?
+        [ ${results[$idx]} -ne 0 ] && all_success=false
+    done
+
+    echo ""
+    log_section "Update Summary"
+
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        if [ ${results[$idx]} -eq 0 ]; then
+            log_success "✓ $name: Update successful"
+        else
+            log_error "✗ $name: Update failed"
+        fi
+    done
+
+    if [ "$all_success" = true ]; then
+        echo ""
+        log_success "✓ All validators updated successfully"
+        log_info "You may need to restart nodes for changes to take effect:"
+        log_info "  $0 restart"
+        return 0
+    else
+        echo ""
+        log_error "✗ Some validators failed to update"
+        return 1
+    fi
 }
 

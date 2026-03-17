@@ -26,6 +26,7 @@ source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/exec.sh"
 source "${SCRIPT_DIR}/lib/anvil.sh"
 source "${SCRIPT_DIR}/lib/health.sh"
+source "${SCRIPT_DIR}/lib/bootstrap.sh"
 source "${SCRIPT_DIR}/lib/dashboard.sh"
 
 # Global variables
@@ -42,10 +43,13 @@ IPC Subnet Manager - Manage IPC validator nodes
 Usage: $0 <command> [options]
 
 Commands:
+    bootstrap         Install Rust, Foundry, Node.js and build IPC on all hosts (run first on fresh hosts)
     init              Nuclear option - wipe and reinitialize all nodes
+    init --resume     Continue init from where it left off (after deploy failure)
     update-config     Update existing node configs without wiping data
     update-binaries   Pull latest code, build, and install binaries on all validators
     check             Comprehensive health check on all nodes
+    diagnose [name]   Detailed diagnostics for troubleshooting (all or one validator)
     restart           Graceful restart of all nodes
     info              Show subnet information (chain ID, validators, status)
     consensus-status  Show consensus state across all validators (heights, hashes, rounds)
@@ -66,7 +70,7 @@ Options:
     --dry-run            Preview actions without executing
     --yes                Skip confirmation prompts
     --debug              Show verbose debug output
-    --branch NAME        For update-binaries: git branch to pull from (default: main)
+    --branch NAME        For bootstrap/update-binaries: git branch to pull from (default: main)
     --duration SECONDS   For block-time: sample duration (default: 10)
     --help               Show this help message
 
@@ -83,7 +87,9 @@ Examples:
     $0 restart --mode local --yes              # Restart local subnet
 
     # Remote mode (multiple machines via SSH)
-    $0 init                                    # Initialize subnet from scratch
+    $0 bootstrap --branch main                 # First: bootstrap fresh hosts
+    $0 init                                    # Then: initialize subnet from scratch
+    $0 init --resume                           # Resume after deploy (skip wipe/deploy)
     $0 init --debug                            # Initialize with verbose debug output
     $0 check                                   # Run health checks
     $0 update-binaries --branch main           # Update binaries from main branch
@@ -129,9 +135,75 @@ confirm() {
     fi
 }
 
+# Bootstrap validator hosts - install deps and build IPC
+cmd_bootstrap() {
+    local branch="main"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --branch)
+                branch="$2"
+                shift 2
+                ;;
+            --config)
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            --help|-h)
+                cat << EOF
+Bootstrap validator hosts with IPC and dependencies
+
+Usage: $0 bootstrap [options]
+
+Options:
+    --branch NAME    Git branch to clone (default: main)
+    --config FILE    Path to config file
+    --dry-run        Preview without executing
+
+This will on each host:
+  1. Install system packages (build-essential, clang, cmake, etc.)
+  2. Create ipc user if needed
+  3. Install Rust and wasm32 target
+  4. Install Foundry
+  5. Install Node.js and pnpm
+  6. Clone IPC repo and build
+
+Run this first on fresh GCP/AWS VMs before 'init'.
+EOF
+                exit 0
+                ;;
+            --yes)
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    log_header "Bootstrap Validator Hosts"
+
+    if is_local_mode; then
+        log_error "Bootstrap is only for remote mode. Use --mode remote or configure deployment.mode: remote"
+        exit 1
+    fi
+
+    load_config
+    check_requirements
+    check_ssh_connectivity
+    check_config_validity
+
+    bootstrap_all_hosts "$branch"
+}
+
 # Initialize subnet (nuclear option)
 cmd_init() {
     local skip_confirm=false
+    local resume=false
 
     # Parse command-specific options
     while [[ $# -gt 0 ]]; do
@@ -142,6 +214,10 @@ cmd_init() {
                 ;;
             --yes)
                 skip_confirm=true
+                shift
+                ;;
+            --resume)
+                resume=true
                 shift
                 ;;
             --dry-run)
@@ -160,7 +236,11 @@ cmd_init() {
 
     log_header "IPC Subnet Initialization"
 
-    confirm "This will DESTROY all existing node data and reinitialize from scratch!" "$skip_confirm"
+    if [ "$resume" = true ]; then
+        log_info "Resume mode: skipping wipe, backup, and deploy steps"
+    else
+        confirm "This will DESTROY all existing node data and reinitialize from scratch!" "$skip_confirm"
+    fi
 
     # Load configuration
     log_info "Loading configuration from: $CONFIG_FILE"
@@ -177,66 +257,80 @@ cmd_init() {
     check_ssh_connectivity
     check_config_validity
 
-    # Stop all nodes
-    log_section "Stopping All Nodes"
-    stop_all_nodes
+    if [ "$resume" != true ]; then
+        # Stop all nodes
+        log_section "Stopping All Nodes"
+        stop_all_nodes
 
-    # Backup existing data
-    log_section "Creating Backups"
-    backup_all_nodes
+        # Backup existing data
+        log_section "Creating Backups"
+        backup_all_nodes
 
-    # Wipe node data
-    log_section "Wiping Node Data"
-    wipe_all_nodes
+        # Wipe node data
+        log_section "Wiping Node Data"
+        wipe_all_nodes
 
-    # Clean IPC CLI config directory to avoid corrupted files
-    # Preserve the EVM keystore which contains validator keys
-    log_info "Cleaning IPC CLI config directory (preserving keystore)..."
-    if is_local_mode; then
-        # Preserve keystore, only remove config.toml
-        rm -f ~/.ipc/config.toml
-    else
-        for idx in "${!VALIDATORS[@]}"; do
-            local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-            ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
+        # Clean IPC CLI config directory to avoid corrupted files
+        # Preserve the EVM keystore which contains validator keys
+        log_info "Cleaning IPC CLI config directory (preserving keystore)..."
+        if is_local_mode; then
             # Preserve keystore, only remove config.toml
-            exec_on_host "$idx" "rm -f $ipc_config_dir/config.toml"
-        done
+            rm -f ~/.ipc/config.toml
+        else
+            for idx in "${!VALIDATORS[@]}"; do
+                local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
+                ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
+                # Preserve keystore, only remove config.toml
+                exec_on_host "$idx" "rm -f $ipc_config_dir/config.toml"
+            done
+        fi
+
+        # Ensure EVM keystore exists with validator keys
+        log_section "Preparing EVM Keystore"
+        ensure_evm_keystore
+
+        # Update IPC CLI configs (must be done BEFORE subnet deployment)
+        log_section "Deploying IPC CLI Configuration"
+        log_info "Creating ~/.ipc/config.toml with parent subnet configuration..."
+        update_ipc_cli_configs
     fi
 
-    # Ensure EVM keystore exists with validator keys
-    log_section "Preparing EVM Keystore"
-    ensure_evm_keystore
-
-    # Update IPC CLI configs (must be done BEFORE subnet deployment)
-    log_section "Deploying IPC CLI Configuration"
-    log_info "Creating ~/.ipc/config.toml with parent subnet configuration..."
-    update_ipc_cli_configs
-
-    # Deploy subnet with gateway contracts if enabled
+    # Determine subnet ID: from deploy output or from config (resume mode)
+    local subnet_id=""
     local deploy_subnet_enabled=$(get_config_value "init.deploy_subnet")
-    log_info "Checking subnet deployment flag: deploy_subnet_enabled='$deploy_subnet_enabled'"
 
-    if [ "$deploy_subnet_enabled" = "true" ]; then
+    if [ "$resume" = true ]; then
+        subnet_id=$(get_config_value "subnet.id")
+        if [ -z "$subnet_id" ] || [ "$subnet_id" = "null" ]; then
+            log_error "Resume requires subnet.id in config. Add the subnet ID from the previous deploy."
+            exit 1
+        fi
+        log_info "Resume: using subnet ID from config: $subnet_id"
+    elif [ "$deploy_subnet_enabled" = "true" ]; then
         log_section "Deploying Subnet and Gateway Contracts"
         local deployed_subnet_output=$(deploy_subnet)
-        # Extract subnet ID from marker line
-        local deployed_subnet_id=$(echo "$deployed_subnet_output" | grep "^SUBNET_ID:" | cut -d: -f2-)
+        subnet_id=$(echo "$deployed_subnet_output" | grep "^SUBNET_ID:" | cut -d: -f2-)
 
-        if [ -z "$deployed_subnet_id" ]; then
+        if [ -z "$subnet_id" ]; then
             log_error "Failed to extract subnet ID from deployment output"
             exit 1
         fi
 
-        log_info "Subnet deployed with ID: $deployed_subnet_id"
+        log_info "Subnet deployed with ID: $subnet_id"
 
         # Reload configuration to pick up updated subnet ID
         load_config
+    else
+        log_info "Subnet deployment disabled (deploy_subnet='$deploy_subnet_enabled')"
+        subnet_id=$(get_config_value "subnet.id")
+        log_info "Assuming subnet already exists with ID: $subnet_id"
+    fi
 
+    if [ -n "$subnet_id" ]; then
         # Update child subnet provider_http to use correct port (8546 instead of default 8545)
         # ipc-cli subnet init writes provider_http with default port, but we need the configured port
         log_section "Updating IPC CLI Configuration"
-        update_child_subnet_provider "$deployed_subnet_id"
+        update_child_subnet_provider "$subnet_id"
 
         # Update YAML config with parent chain addresses for future deployments
         # ipc-cli subnet init deploys contracts on parent chain and updates ~/.ipc/config.toml
@@ -246,16 +340,18 @@ cmd_init() {
         # Create genesis using ipc-cli subnet create-genesis
         # This works for both activated and non-activated subnets
         log_section "Creating Genesis"
-        log_info "Creating genesis files for subnet $deployed_subnet_id..."
-        if create_bootstrap_genesis "$deployed_subnet_id"; then
+        log_info "Creating genesis files for subnet $subnet_id..."
+        if create_bootstrap_genesis "$subnet_id"; then
             log_success "Genesis created"
         else
             log_error "Failed to create genesis"
             exit 1
         fi
-    else
-        log_info "Subnet deployment disabled (deploy_subnet='$deploy_subnet_enabled')"
-        log_info "Assuming subnet already exists with ID: $(get_config_value 'subnet.id')"
+    fi
+
+    # Copy genesis files to remote validators (node init runs on remote; no-op if local or no genesis)
+    if [ -n "$subnet_id" ]; then
+        copy_genesis_to_remotes "$subnet_id"
     fi
 
     # Initialize primary node
@@ -276,6 +372,10 @@ cmd_init() {
     # Initialize secondary nodes
     log_section "Initializing Secondary Nodes"
     initialize_secondary_nodes "$primary_peer_info"
+
+    # Update Fendermint config for secondary nodes (they now have config from init)
+    log_section "Updating Fendermint Configuration"
+    update_fendermint_topdown_config
 
     # Collect peer information from peer-info.json (for libp2p and validator keys)
     log_section "Collecting Peer Information"
@@ -316,7 +416,8 @@ cmd_init() {
 
     # Health checks
     log_section "Running Health Checks"
-    sleep 10  # Give nodes time to start
+    log_info "Waiting 30s for nodes to fully start..."
+    sleep 30
     cmd_check
 
     log_success "✓ Subnet initialization complete!"
@@ -378,6 +479,7 @@ cmd_update_config() {
     load_config
 
     log_info "Collecting current peer information..."
+    collect_peer_ids_from_running_nodes
     collect_all_peer_info
 
     log_info "Fixing listen addresses..."
@@ -397,9 +499,23 @@ cmd_update_config() {
 
 # Comprehensive health check
 cmd_check() {
+    local wait_seconds=0
+
+    for arg in "$@"; do
+        case $arg in
+            --wait=*) wait_seconds="${arg#*=}" ;;
+            --wait) shift; wait_seconds="${1:-30}" ;;
+        esac
+    done
+
     log_header "Health Check"
 
     load_config
+
+    if [ "$wait_seconds" -gt 0 ] 2>/dev/null; then
+        log_info "Waiting ${wait_seconds}s for nodes to start..."
+        sleep "$wait_seconds"
+    fi
 
     local all_healthy=true
 
@@ -417,7 +533,43 @@ cmd_check() {
         return 0
     else
         log_error "✗ Some validators have issues"
+        log_info ""
+        log_info "Troubleshooting: Run 'diagnose' for detailed diagnostics:"
+        log_info "  ./ipc-manager diagnose              # All validators"
+        log_info "  ./ipc-manager diagnose validator-1  # Single validator"
+        log_info ""
+        log_info "If nodes just started, try: ./ipc-manager check --wait 45"
         return 1
+    fi
+}
+
+# Detailed diagnostics for troubleshooting health check failures
+cmd_diagnose() {
+    local validator_name="${1:-}"
+
+    log_header "Validator Diagnostics"
+
+    load_config
+
+    if [ -n "$validator_name" ]; then
+        local found=false
+        for validator_idx in "${!VALIDATORS[@]}"; do
+            if [ "${VALIDATORS[$validator_idx]}" = "$validator_name" ]; then
+                diagnose_validator "$validator_idx"
+                found=true
+                break
+            fi
+        done
+        if [ "$found" = false ]; then
+            log_error "Validator not found: $validator_name"
+            log_info "Available: ${VALIDATORS[*]}"
+            exit 1
+        fi
+    else
+        for validator_idx in "${!VALIDATORS[@]}"; do
+            diagnose_validator "$validator_idx"
+            echo ""
+        done
     fi
 }
 
@@ -563,13 +715,15 @@ cmd_logs() {
     fi
 
     log_info "Tailing logs from $validator_name..."
+    log_info "Tip: Pipe locally to filter, e.g. $0 logs $validator_name | grep -i error"
 
     local ip=$(get_config_value "validators[$validator_idx].ip")
     local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
     local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local node_home=$(get_config_value "paths.node_home")
 
-    ssh_exec_direct "$ip" "$ssh_user" "$ipc_user" "tail -f $node_home/logs/*.log | grep --line-buffered 'ParentFinality\|ERROR\|WARN'"
+    # Avoid grep over SSH - nested quoting causes pipe to be interpreted as shell pipe
+    ssh_exec_direct "$ip" "$ssh_user" "$ipc_user" "tail -f $node_home/node.log 2>/dev/null"
 }
 
 # Deploy binaries (stub)
@@ -707,6 +861,9 @@ main() {
 
     # Execute command
     case $command in
+        bootstrap)
+            cmd_bootstrap "$@"
+            ;;
         init)
             cmd_init "$@"
             ;;
@@ -718,6 +875,9 @@ main() {
             ;;
         check)
             cmd_check "$@"
+            ;;
+        diagnose)
+            cmd_diagnose "$@"
             ;;
         restart)
             cmd_restart "$@"

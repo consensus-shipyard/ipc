@@ -30,7 +30,7 @@ RED="\033[31m"
 CYAN="\033[36m"
 BLUE="\033[34m"
 
-# Initialize dashboard
+# Initialize dashboard (with defaults so we can draw immediately)
 initialize_dashboard() {
     # Hide cursor for cleaner display
     echo -ne "${CURSOR_HIDE}"
@@ -41,10 +41,22 @@ initialize_dashboard() {
         ERROR_SAMPLES[$category]=""
     done
 
-    # Initialize metrics
+    # Initialize metrics (defaults allow immediate draw before first fetch)
     METRICS[start_time]=$(date +%s)
     METRICS[last_height]=0
     METRICS[last_check]=0
+    METRICS[height]=0
+    METRICS[block_time]=""
+    METRICS[peers]=0
+    METRICS[mempool_size]=0
+    METRICS[mempool_bytes]=0
+    METRICS[mempool_max]=5000
+    METRICS[blocks_per_min]=0
+    METRICS[parent_height]=0
+    METRICS[parent_chain_height]=0
+    METRICS[finality_lag]=0
+    METRICS[finality_time]=""
+    METRICS[checkpoint_sigs]=0
 
     # Initialize recent events queue
     RECENT_EVENTS=()
@@ -136,7 +148,7 @@ fetch_metrics() {
     METRICS[mempool_bytes]=$(echo "$mempool" | jq -r '.result.total_bytes // 0' 2>/dev/null || echo "0")
 
     # Fetch mempool max size from CometBFT config (only fetch once if not already set)
-    if [ -z "${METRICS[mempool_max]}" ]; then
+    if [ -z "${METRICS[mempool_max]:-}" ]; then
         local mempool_max=$(exec_on_host "$validator_idx" \
             "grep -E '^size = [0-9]+' $node_home/cometbft/config/config.toml 2>/dev/null | head -1 | grep -oE '[0-9]+'" 2>/dev/null || echo "5000")
         METRICS[mempool_max]=${mempool_max:-5000}
@@ -146,12 +158,12 @@ fetch_metrics() {
     local current_time=$(date +%s)
     local time_diff=$((current_time - METRICS[last_check]))
 
-    if [ $time_diff -ge 60 ] && [ ${METRICS[last_height]} -gt 0 ]; then
+    if [ $time_diff -ge 15 ] && [ ${METRICS[last_height]:-0} -gt 0 ]; then
         local height_diff=$((METRICS[height] - METRICS[last_height]))
-        METRICS[blocks_per_min]=$height_diff
+        METRICS[blocks_per_min]=$((height_diff * 60 / time_diff))
         METRICS[last_height]=${METRICS[height]}
         METRICS[last_check]=$current_time
-    elif [ ${METRICS[last_height]} -eq 0 ]; then
+    elif [ ${METRICS[last_height]:-0} -eq 0 ]; then
         METRICS[last_height]=${METRICS[height]}
         METRICS[last_check]=$current_time
         METRICS[blocks_per_min]=0
@@ -160,7 +172,7 @@ fetch_metrics() {
     # Fetch parent finality from logs (recent)
     # Note: For local/Anvil deployments, parent finality tracking works via null finality provider (no F3 required)
     local finality=$(exec_on_host "$validator_idx" \
-        "grep ParentFinalityCommitted $node_home/logs/*.log 2>/dev/null | tail -1" 2>/dev/null || echo "")
+        "grep ParentFinalityCommitted $node_home/logs/*.log $node_home/node.log 2>/dev/null | tail -1" 2>/dev/null || echo "")
 
     if [ -n "$finality" ]; then
         METRICS[parent_height]=$(echo "$finality" | grep -oE 'block_height=[0-9]+' | grep -oE '[0-9]+' | head -1 || echo "0")
@@ -181,9 +193,9 @@ fetch_metrics() {
         METRICS[finality_lag]=0
     fi
 
-    # Scan recent logs for errors
+    # Scan recent logs for errors (support both logs/*.log and node.log)
     local errors=$(exec_on_host "$validator_idx" \
-        "tail -500 $node_home/logs/*.log 2>/dev/null | grep -E 'ERROR|WARN' 2>/dev/null | tail -100" 2>/dev/null || echo "")
+        "tail -500 $node_home/logs/*.log $node_home/node.log 2>/dev/null | grep -E 'ERROR|WARN' 2>/dev/null | tail -100" 2>/dev/null || echo "")
 
     # Process errors
     while IFS= read -r error_line; do
@@ -194,13 +206,44 @@ fetch_metrics() {
 
     # Count checkpoint signatures
     local signatures=$(exec_on_host "$validator_idx" \
-        "tail -100 $node_home/logs/*.log 2>/dev/null | grep -c 'broadcasted signature' 2>/dev/null" 2>/dev/null || echo "0")
+        "tail -100 $node_home/logs/*.log $node_home/node.log 2>/dev/null | grep -c 'broadcasted signature' 2>/dev/null" 2>/dev/null || echo "0")
     METRICS[checkpoint_sigs]=$(echo "$signatures" | tr -d ' \n')
 }
 
 # Format number with commas
 format_number() {
     printf "%'d" "$1" 2>/dev/null || echo "$1"
+}
+
+# Format ISO timestamp to relative time (e.g. "2m ago") or short time
+# CometBFT returns UTC timestamps like 2026-03-05T14:07:03.461765Z
+format_timestamp() {
+    local ts="$1"
+    [ -z "$ts" ] && echo "--" && return
+    if [[ "$ts" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2} ]]; then
+        local input="${ts:0:19}"
+        [[ "$ts" =~ Z$ ]] && input="${input}Z"
+        local epoch
+        epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$input" +%s 2>/dev/null)
+        [ -z "$epoch" ] && epoch=$(date -d "${ts:0:19}" +%s 2>/dev/null)
+        if [ -n "$epoch" ] && [ "$epoch" -gt 0 ] 2>/dev/null; then
+            local now=$(date +%s)
+            local diff=$((now - epoch))
+            if [ $diff -lt 0 ]; then
+                echo "${ts:11:8}"
+            elif [ $diff -lt 60 ]; then
+                echo "${diff}s ago"
+            elif [ $diff -lt 3600 ]; then
+                echo "$((diff / 60))m ago"
+            else
+                echo "${ts:11:8}"
+            fi
+        else
+            echo "${ts:11:8}"
+        fi
+    else
+        echo "${ts:0:8}"
+    fi
 }
 
 # Format bytes to human readable
@@ -272,29 +315,55 @@ draw_dashboard() {
     # Block Production
     local height=$(format_number ${METRICS[height]:-0})
     local blocks_per_min=${METRICS[blocks_per_min]:-0}
-    local block_status=$(get_status_indicator $blocks_per_min 30 10 true)
+    local expected_peers=$((${#VALIDATORS[@]} - 1))
+    local peers=${METRICS[peers]:-0}
+    # Status: when blocks_per_min not yet calculated, use height>0 and peers as proxy
+    local block_status
+    if [ $blocks_per_min -gt 0 ]; then
+        block_status=$(get_status_indicator $blocks_per_min 30 10 true)
+    elif [ ${METRICS[height]:-0} -gt 0 ] && [ $peers -ge $expected_peers ]; then
+        block_status=$(echo -e "${GREEN}✓${RESET}")
+    else
+        block_status=$(get_status_indicator $blocks_per_min 30 10 true)
+    fi
+    local avg_block_time="--"
+    local rate_display="--"
+    if [ $blocks_per_min -gt 0 ]; then
+        avg_block_time=$(printf "%.1fs" $(echo "scale=1; 60/$blocks_per_min" | bc 2>/dev/null || echo "0"))
+        rate_display="${blocks_per_min}/min"
+    fi
+    local last_block=$(format_timestamp "${METRICS[block_time]:-}")
 
     echo -e "${BOLD}┌─ BLOCK PRODUCTION ────────────────────────────────────────────────────┐${RESET}"
-    printf "│ Height: %-6s  (+%-3d in 1m)  Avg Block Time: --    Rate: --      │\n" "$height" "$blocks_per_min"
-    printf "│ Status: %b PRODUCING             Last Block: --                     │\n" "$block_status"
+    printf "│ Height: %-6s  (+%-3d in 1m)  Avg Block Time: %-6s  Rate: %-8s │\n" "$height" "$blocks_per_min" "$avg_block_time" "$rate_display"
+    printf "│ Status: %b PRODUCING             Last Block: %-24s │\n" "$block_status" "$last_block"
     echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
     echo ""
 
     # Parent Finality
-    local subnet_finality=$(format_number ${METRICS[parent_height]:-0})
+    local parent_height_val=${METRICS[parent_height]:-0}
+    local subnet_finality
+    if [ "$parent_height_val" -eq 0 ]; then
+        subnet_finality="N/A"
+    else
+        subnet_finality=$(format_number $parent_height_val)
+    fi
     local parent_chain=$(format_number ${METRICS[parent_chain_height]:-0})
     local lag=${METRICS[finality_lag]:-0}
     local finality_status=$(get_status_indicator $lag 30 100 false)
+    local last_commit=$(format_timestamp "${METRICS[finality_time]:-}")
 
-    # Check if F3 is disabled (Anvil/local development)
+    # Check if F3 is disabled (Anvil/local development) or topdown disabled (bootstrap)
     local finality_note=""
     if is_local_mode; then
         finality_note=" ${YELLOW}(Null Finality - F3 disabled)${RESET}"
+    elif [ "$parent_height_val" -eq 0 ]; then
+        finality_note=" ${YELLOW}(Topdown disabled - bootstrap subnet)${RESET}"
     fi
 
     echo -e "${BOLD}┌─ PARENT FINALITY ─────────────────────────────────────────────────────┐${RESET}"
     printf "│ Subnet: %-8s  Parent Chain: %-8s  Lag: %-4d blocks           │\n" "$subnet_finality" "$parent_chain" "$lag"
-    printf "│ Status: %b SYNCING               Last Commit: --                     │\n" "$finality_status"
+    printf "│ Status: %b SYNCING               Last Commit: %-24s │\n" "$finality_status" "$last_commit"
     if [ -n "$finality_note" ]; then
         printf "│ %b%-69s │\n" "$finality_note" ""
     fi
@@ -307,8 +376,10 @@ draw_dashboard() {
     local expected_peers=$((${#VALIDATORS[@]} - 1))
     local peer_status=$(get_status_indicator $peers $expected_peers 1 true)
 
+    # Libp2p peers: CometBFT net_info doesn't expose; show same as Comet for now (validator mesh)
+    local libp2p_display="${peers}"
     echo -e "${BOLD}┌─ NETWORK HEALTH ──────────────────────────────────────────────────────┐${RESET}"
-    printf "│ CometBFT Peers: %d/%d %b    Libp2p Peers: --    RPC: ${GREEN}✓${RESET} RESPONSIVE     │\n" "$peers" "$expected_peers" "$peer_status"
+    printf "│ CometBFT Peers: %d/%d %b    Libp2p Peers: %-3s    RPC: ${GREEN}✓${RESET} RESPONSIVE     │\n" "$peers" "$expected_peers" "$peer_status" "$libp2p_display"
     echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
     echo ""
 
@@ -347,9 +418,10 @@ draw_dashboard() {
 
     # Checkpoint Activity
     local checkpoint_sigs=${METRICS[checkpoint_sigs]:-0}
+    local checkpoint_last=$(format_timestamp "${METRICS[finality_time]:-}")
 
     echo -e "${BOLD}┌─ CHECKPOINT ACTIVITY (Last 5 min) ────────────────────────────────────┐${RESET}"
-    printf "│ Signatures: %-3d broadcast          Last: --                          │\n" "$checkpoint_sigs"
+    printf "│ Signatures: %-3d broadcast          Last: %-24s │\n" "$checkpoint_sigs" "$checkpoint_last"
     echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
     echo ""
 
@@ -427,6 +499,9 @@ run_dashboard() {
     echo ""
 
     initialize_dashboard
+
+    # Draw immediately with defaults so user sees something (avoids hang before first SSH fetch)
+    draw_dashboard "$name" || true
 
     # Main loop
     while true; do

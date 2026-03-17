@@ -54,6 +54,18 @@ get_validator_port_offset() {
     echo $((validator_idx * 100))
 }
 
+# Get resolver/libp2p port for a validator (must match get_ports_for_validator / node-init)
+# Uses same -1 offset as node init so external_addresses and static_addresses match listen_addr
+get_resolver_port_for_validator() {
+    local validator_idx="$1"
+    local port_offset=0
+    if is_local_mode; then
+        port_offset=$(get_validator_port_offset "$validator_idx")
+    fi
+    local libp2p_port=$(($(get_config_value_with_default "network.libp2p_port" "26655") + port_offset - 1))
+    get_validator_port "$validator_idx" "libp2p" "$libp2p_port"
+}
+
 # Load and validate configuration
 load_config() {
     if [ ! -f "$CONFIG_FILE" ]; then
@@ -80,6 +92,18 @@ load_config() {
     log_info "Loaded configuration for ${#VALIDATORS[@]} validators (mode: $DEPLOYMENT_MODE)"
 }
 
+# Get IPC config dir for local operations (deploy, keystore)
+# Config may have remote paths (/home/ipc/.ipc) - use $HOME/.ipc since these ops run on the host
+get_local_ipc_config_dir() {
+    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
+    ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
+    # Remote paths like /home/ipc/.ipc don't exist on the host - use $HOME/.ipc
+    if [[ "$ipc_config_dir" == /home/* ]] || [ ! -d "$ipc_config_dir" ]; then
+        ipc_config_dir="$HOME/.ipc"
+    fi
+    echo "$ipc_config_dir"
+}
+
 # Get config value with environment variable override
 get_config_value() {
     local key="$1"
@@ -93,6 +117,31 @@ get_config_value() {
 
     # Fall back to config file
     yq eval ".$key" "$CONFIG_FILE"
+}
+
+# Get config value with default (handles null/empty from yq)
+get_config_value_with_default() {
+    local key="$1"
+    local default="$2"
+    local val
+    val=$(get_config_value "$key" 2>/dev/null || true)
+    if [ -z "${val:-}" ] || [ "$val" = "null" ]; then
+        echo "$default"
+    else
+        echo "$val"
+    fi
+}
+
+# Get IP for peer-to-peer connections (internal_ip if set, else ip)
+# Use internal IPs for validators in same VPC to avoid firewall rules
+get_peer_ip() {
+    local validator_idx="$1"
+    local internal_ip=$(get_config_value "validators[$validator_idx].internal_ip" 2>/dev/null || true)
+    if [ -n "${internal_ip:-}" ] && [ "$internal_ip" != "null" ]; then
+        echo "$internal_ip"
+    else
+        get_config_value "validators[$validator_idx].ip"
+    fi
 }
 
 # Get validator index by name
@@ -268,17 +317,18 @@ generate_node_init_yml() {
     local parent_chain_id=$(get_config_value "subnet.parent_chain_id")
     local parent_rpc=$(get_config_value "subnet.parent_rpc")
 
-    # Read parent registry and gateway from IPC CLI config (updated by subnet init)
-    local ipc_config_file=$(get_config_value "paths.ipc_config_file")
-    ipc_config_file="${ipc_config_file/#\~/$HOME}"
-
     local parent_registry=$(get_config_value "subnet.parent_registry")
     local parent_gateway=$(get_config_value "subnet.parent_gateway")
 
-    # If IPC config exists, try to read the actual parent addresses from it
+    # If IPC config exists locally, try to read the actual parent addresses from it
+    local ipc_config_dir
+    ipc_config_dir=$(get_local_ipc_config_dir)
+    local ipc_config_file="$ipc_config_dir/config.toml"
     if [ -f "$ipc_config_file" ]; then
-        local actual_parent_registry=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "registry_addr" | head -1 | cut -d'"' -f2)
-        local actual_parent_gateway=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "gateway_addr" | head -1 | cut -d'"' -f2)
+        local actual_parent_registry
+        actual_parent_registry=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "registry_addr" | head -1 | cut -d'"' -f2)
+        local actual_parent_gateway
+        actual_parent_gateway=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "gateway_addr" | head -1 | cut -d'"' -f2)
 
         if [ -n "$actual_parent_registry" ]; then
             parent_registry="$actual_parent_registry"
@@ -309,15 +359,15 @@ generate_node_init_yml() {
         port_offset=$(get_validator_port_offset "$validator_idx")
     fi
 
-    # Calculate ports with offset
-    local cometbft_p2p_port=$(($(get_config_value "network.cometbft_p2p_port") + port_offset))
-    local cometbft_rpc_port=$(($(get_config_value "network.cometbft_rpc_port" 2>/dev/null || echo "26657") + port_offset))
-    local cometbft_abci_port=$(($(get_config_value "network.cometbft_abci_port" 2>/dev/null || echo "26658") + port_offset))
-    local cometbft_prometheus_port=$(($(get_config_value "network.cometbft_prometheus_port" 2>/dev/null || echo "26660") + port_offset))
-    local libp2p_port=$(($(get_config_value "network.libp2p_port") + port_offset - 1))  # -1 to match pattern
-    local eth_api_port=$(($(get_config_value "network.eth_api_port") + port_offset))
-    local eth_metrics_port=$(($(get_config_value "network.eth_metrics_port" 2>/dev/null || echo "9184") + port_offset))
-    local fendermint_metrics_port=$(($(get_config_value "network.fendermint_metrics_port" 2>/dev/null || echo "9185") + port_offset))
+    # Calculate ports with offset (use defaults when config keys are missing)
+    local cometbft_p2p_port=$(($(get_config_value_with_default "network.cometbft_p2p_port" "26656") + port_offset))
+    local cometbft_rpc_port=$(($(get_config_value_with_default "network.cometbft_rpc_port" "26657") + port_offset))
+    local cometbft_abci_port=$(($(get_config_value_with_default "network.cometbft_abci_port" "26658") + port_offset))
+    local cometbft_prometheus_port=$(($(get_config_value_with_default "network.cometbft_prometheus_port" "26660") + port_offset))
+    local libp2p_port=$(($(get_config_value_with_default "network.libp2p_port" "26655") + port_offset - 1))  # -1 to match pattern
+    local eth_api_port=$(($(get_config_value_with_default "network.eth_api_port" "8545") + port_offset))
+    local eth_metrics_port=$(($(get_config_value_with_default "network.eth_metrics_port" "9184") + port_offset))
+    local fendermint_metrics_port=$(($(get_config_value_with_default "network.fendermint_metrics_port" "9185") + port_offset))
 
     # Override with validator-specific ports if provided
     cometbft_p2p_port=$(get_validator_port "$validator_idx" "cometbft_p2p" "$cometbft_p2p_port")
@@ -338,7 +388,8 @@ generate_node_init_yml() {
     local vote_interval=$(get_config_value "init.ipc.vote_interval")
     local vote_timeout=$(get_config_value "init.ipc.vote_timeout")
 
-    # Topdown config
+    # Topdown config (disabled for bootstrap subnets - subnet not yet on parent chain)
+    local topdown_enabled=$(get_config_value_with_default "init.topdown.enabled" "true")
     local chain_head_delay=$(get_config_value "init.topdown.chain_head_delay")
     local proposal_delay=$(get_config_value "init.topdown.proposal_delay")
     local max_proposal_range=$(get_config_value "init.topdown.max_proposal_range")
@@ -418,22 +469,35 @@ EOF
     log_info "Current parent chain height: $current_parent_height (will be used as genesis timestamp)"
 
     # Check if genesis files exist (created by ipc-cli subnet create-genesis)
-    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-    ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
-    # ipc-cli subnet create-genesis creates files with format: genesis_r31337_... (removes leading /)
+    # Use local path for existence check - genesis is created locally
+    local local_ipc_dir
+    local_ipc_dir=$(get_local_ipc_config_dir)
     local subnet_id_no_slash="${subnet_id#/}"
-    local genesis_json="$ipc_config_dir/genesis_${subnet_id_no_slash//\//_}.json"
-    local genesis_sealed="$ipc_config_dir/genesis_sealed_${subnet_id_no_slash//\//_}.json"
+    local genesis_json_local="$local_ipc_dir/genesis_${subnet_id_no_slash//\//_}.json"
+    local genesis_sealed_local="$local_ipc_dir/genesis_sealed_${subnet_id_no_slash//\//_}.json"
 
-    if [ -f "$genesis_json" ] && [ -f "$genesis_sealed" ]; then
-        # Use existing genesis files
+    # Paths for node-init.yml: where init runs (local path for local mode, remote path for remote)
+    local genesis_json_yml genesis_sealed_yml
+    if is_local_mode; then
+        genesis_json_yml="$genesis_json_local"
+        genesis_sealed_yml="$genesis_sealed_local"
+    else
+        local remote_ipc_dir
+        remote_ipc_dir=$(get_config_value "paths.ipc_config_dir")
+        remote_ipc_dir="${remote_ipc_dir/#\~/$HOME}"
+        genesis_json_yml="$remote_ipc_dir/genesis_${subnet_id_no_slash//\//_}.json"
+        genesis_sealed_yml="$remote_ipc_dir/genesis_sealed_${subnet_id_no_slash//\//_}.json"
+    fi
+
+    if [ -f "$genesis_json_local" ] && [ -f "$genesis_sealed_local" ]; then
+        # Use existing genesis files (paths in yml must be where init runs - remote paths for remote mode)
         log_info "Found existing genesis files - using !path"
         cat >> "$output_file" << EOF
 
 # Genesis configuration - use existing genesis files
 genesis: !path
-  genesis: "$genesis_json"
-  sealed: "$genesis_sealed"
+  genesis: "$genesis_json_yml"
+  sealed: "$genesis_sealed_yml"
 
 # Join subnet configuration (for newly deployed subnets)
 # Note: This will be skipped if the subnet is already bootstrapped
@@ -461,14 +525,8 @@ EOF
 
 # Optional: CometBFT configuration overrides
 cometbft-overrides: |
-EOF
-
-    # Add local mode port overrides
-    if is_local_mode; then
-        cat >> "$output_file" << EOF
   proxy_app = "tcp://127.0.0.1:$cometbft_abci_port"
 EOF
-    fi
 
     cat >> "$output_file" << EOF
   [consensus]
@@ -514,11 +572,6 @@ EOF
 
 # Optional: Fendermint configuration overrides
 fendermint-overrides: |
-EOF
-
-    # Add local mode port overrides for fendermint
-    if is_local_mode; then
-        cat >> "$output_file" << EOF
   tendermint_rpc_url = "http://127.0.0.1:$cometbft_rpc_port"
   tendermint_websocket_url = "ws://127.0.0.1:$cometbft_rpc_port/websocket"
 
@@ -536,7 +589,6 @@ EOF
   port = $fendermint_metrics_port
 
 EOF
-    fi
 
     cat >> "$output_file" << EOF
   [resolver]
@@ -546,6 +598,12 @@ EOF
   subnet_id = "$subnet_id"
   vote_interval = $vote_interval
   vote_timeout = $vote_timeout
+
+EOF
+
+    # Only add [ipc.topdown] when enabled (omit for bootstrap subnets - subnet not on parent chain)
+    if [ "$topdown_enabled" = "true" ]; then
+        cat >> "$output_file" << EOF
 
   [ipc.topdown]
   chain_head_delay = $chain_head_delay
@@ -558,6 +616,11 @@ EOF
   parent_http_timeout = $parent_http_timeout
   parent_registry = "$parent_registry"
   parent_gateway = "$parent_gateway"
+
+EOF
+    fi
+
+    cat >> "$output_file" << EOF
 
   [resolver.connection]
 EOF
@@ -606,7 +669,7 @@ extract_peer_info() {
     fi
 
     # Get CometBFT peer info
-    local peer_info=$(exec_on_host "$validator_idx" "cat $node_home/peer-info.json 2>/dev/null || echo '{}'")
+    local peer_info=$(exec_on_host_simple "$validator_idx" "cat $node_home/peer-info.json 2>/dev/null || echo '{}'")
 
     if [ -z "$peer_info" ] || [ "$peer_info" = "{}" ]; then
         log_error "Failed to extract peer info from validator $validator_idx"
@@ -623,15 +686,16 @@ collect_peer_ids_from_running_nodes() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
         local ip=$(get_config_value "validators[$idx].ip")
+        local peer_ip=$(get_peer_ip "$idx")
         local ssh_user=$(get_config_value "validators[$idx].ssh_user")
         local cometbft_port=$(get_config_value "network.cometbft_p2p_port")
 
-        # Query CometBFT RPC for node info (contains node ID)
+        # Query CometBFT RPC for node info (contains node ID) - SSH uses external ip
         local node_id=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
             "curl -s http://127.0.0.1:26657/status 2>/dev/null | jq -r '.result.node_info.id // empty'" 2>/dev/null | tr -d '[:space:]')
 
         if [ -n "$node_id" ] && [ "$node_id" != "" ] && [ "$node_id" != "null" ]; then
-            COMETBFT_PEERS[$idx]="${node_id}@${ip}:${cometbft_port}"
+            COMETBFT_PEERS[$idx]="${node_id}@${peer_ip}:${cometbft_port}"
             log_info "$name CometBFT: ${COMETBFT_PEERS[$idx]}"
         else
             log_warn "Could not get CometBFT node ID for $name from RPC"
@@ -645,8 +709,8 @@ collect_all_peer_info() {
 
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-        local ip=$(get_config_value "validators[$idx].ip")
-        local libp2p_port=$(get_config_value "network.libp2p_port")
+        local peer_ip=$(get_peer_ip "$idx")
+        local libp2p_port=$(get_resolver_port_for_validator "$idx")
 
         # Get node home path (local or remote)
         local node_home
@@ -658,22 +722,21 @@ collect_all_peer_info() {
         fi
 
         # Get peer info from peer-info.json file for libp2p peer ID
-        local peer_json=$(exec_on_host "$idx" "cat $node_home/peer-info.json 2>/dev/null || echo '{}'")
+        local peer_json=$(exec_on_host_simple "$idx" "cat $node_home/peer-info.json 2>/dev/null || echo '{}'")
 
         # Parse libp2p peer ID locally (we'll reconstruct the multiaddr with correct IP)
         local libp2p_peer_id=$(echo "$peer_json" | jq -r '.fendermint.peer_id // empty' 2>/dev/null)
 
         if [ -n "$libp2p_peer_id" ] && [ "$libp2p_peer_id" != "null" ]; then
-            # Reconstruct multiaddr using the ACTUAL public IP from config (not from peer-info.json)
-            # This ensures we advertise the correct external IP even if peer-info.json has 127.0.0.1
-            LIBP2P_PEERS[$idx]="/ip4/$ip/tcp/$libp2p_port/p2p/$libp2p_peer_id"
+            # Use peer_ip (internal_ip if set) for validator-to-validator connections
+            LIBP2P_PEERS[$idx]="/ip4/$peer_ip/tcp/$libp2p_port/p2p/$libp2p_peer_id"
             log_info "$name libp2p: ${LIBP2P_PEERS[$idx]}"
         else
             log_warn "Could not get libp2p peer ID for $name"
         fi
 
         # Get validator public key from validator.pk file
-        local pubkey=$(exec_on_host "$idx" \
+        local pubkey=$(exec_on_host_simple "$idx" \
             "cat $node_home/fendermint/validator.pk 2>/dev/null || echo ''")
 
         if [ -z "$pubkey" ]; then
@@ -689,8 +752,6 @@ collect_all_peer_info() {
 fix_listen_addresses() {
     log_info "Fixing resolver listen addresses to bind to 0.0.0.0..."
 
-    local libp2p_port=$(get_config_value "network.libp2p_port")
-
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
 
@@ -705,17 +766,48 @@ fix_listen_addresses() {
 
         log_info "Fixing listen_addr for $name..."
 
-        # Change listen_addr from public IP to 0.0.0.0
         local config_file="$node_home/fendermint/config/default.toml"
-        exec_on_host "$idx" "sed -i.bak 's|listen_addr = .*/tcp/$libp2p_port\"|listen_addr = \"/ip4/0.0.0.0/tcp/$libp2p_port\"|' $config_file" >/dev/null 2>&1
 
-        # Verify the change
-        local listen_addr=$(exec_on_host "$idx" "grep 'listen_addr = ' $config_file | head -1" 2>/dev/null)
+        if is_local_mode; then
+            if [ -f "$config_file" ]; then
+                # Match any IP and port (port may differ per validator due to get_ports_for_validator)
+                sed -i.bak -e 's|listen_addr = "/ip4/[^"]*/tcp/\([0-9]*\)"|listen_addr = "/ip4/0.0.0.0/tcp/\1"|' \
+                    -e 's|listen_addr = ""|listen_addr = "/ip4/0.0.0.0/tcp/26655"|' "$config_file"
+            fi
+        else
+            # Remote: use temp script to avoid SSH quoting issues
+            # Handle both: listen_addr = "/ip4/X.X.X.X/tcp/PORT" and listen_addr = ""
+            local tmp_script
+            tmp_script=$(mktemp)
+            cat > "$tmp_script" << EOF
+if [ -f "$config_file" ]; then
+  # Match any IP and port (port may differ per validator due to get_ports_for_validator -1 offset)
+  sed -i.bak -e 's|listen_addr = "/ip4/[^"]*/tcp/\\([0-9]*\\)"|listen_addr = "/ip4/0.0.0.0/tcp/\\1"|' \\
+      -e 's|listen_addr = ""|listen_addr = "/ip4/0.0.0.0/tcp/26655"|' "$config_file"
+fi
+EOF
+            log_info "  Copying fix script to $name..."
+            if ! copy_to_host "$idx" "$tmp_script" "/tmp/fix_listen.sh"; then
+                log_warn "  ✗ Failed to copy fix script to $name (SSH/SCP timeout?)"
+                rm -f "$tmp_script"
+                continue
+            fi
+            log_info "  Running fix script on $name..."
+            if ! exec_on_host_simple "$idx" "bash /tmp/fix_listen.sh && rm -f /tmp/fix_listen.sh" >/dev/null 2>&1; then
+                log_warn "  ✗ Failed to run fix script on $name (SSH timeout?)"
+            fi
+            rm -f "$tmp_script"
+        fi
+
+        # Verify the change (use exec_on_host_simple to avoid ipc login shell blocking)
+        local listen_addr
+        listen_addr=$(exec_on_host_simple "$idx" "grep \"listen_addr = \" $config_file 2>/dev/null | head -1" 2>/dev/null)
 
         if echo "$listen_addr" | grep -q "0.0.0.0"; then
-            log_info "  ✓ $name now listening on 0.0.0.0:$libp2p_port"
+            local port=$(echo "$listen_addr" | grep -oE 'tcp/[0-9]+' | cut -d/ -f2)
+            log_info "  ✓ $name now listening on 0.0.0.0:${port:-?}"
         else
-            log_warn "  ✗ Failed to update listen_addr for $name"
+            log_warn "  ✗ Failed to update listen_addr for $name (current: ${listen_addr:-<not found>})"
         fi
     done
 }
@@ -781,33 +873,59 @@ update_validator_config() {
     comet_peers="${comet_peers%,}"
     libp2p_static_addrs="${libp2p_static_addrs%, }"
 
-    # Update CometBFT persistent_peers
-    if [ -n "$comet_peers" ]; then
-        log_info "Setting CometBFT persistent_peers for $name"
-        exec_on_host "$validator_idx" \
-            "sed -i.bak 's|^persistent_peers = .*|persistent_peers = \"$comet_peers\"|' $node_home/cometbft/config/config.toml" >/dev/null 2>&1
+    if is_local_mode; then
+        # Local: run sed directly
+        if [ -n "$comet_peers" ]; then
+            log_info "Setting CometBFT persistent_peers for $name"
+            sed -i.bak "s|^persistent_peers = .*|persistent_peers = \"$comet_peers\"|" "$node_home/cometbft/config/config.toml" 2>/dev/null || true
+        fi
+        if [ -n "$libp2p_static_addrs" ]; then
+            log_info "Setting libp2p static_addresses for $name"
+            local quoted_addrs=$(echo "$libp2p_static_addrs" | sed 's|/ip4/|"/ip4/|g' | sed 's|, |", |g')
+            quoted_addrs="${quoted_addrs}\""
+            sed -i.bak "/\[resolver.discovery\]/,/\[.*\]/ s|^static_addresses = .*|static_addresses = [$quoted_addrs]|" "$node_home/fendermint/config/default.toml" 2>/dev/null || true
+        fi
+        if [ -n "${LIBP2P_PEERS[$validator_idx]:-}" ]; then
+            log_info "Setting libp2p external_addresses for $name"
+            sed -i.bak "/\[resolver.connection\]/,/\[.*\]/ s|^external_addresses = .*|external_addresses = [\"${LIBP2P_PEERS[$validator_idx]}\"]|" "$node_home/fendermint/config/default.toml" 2>/dev/null || true
+        fi
+        grep -q '\[validator_key\]' "$node_home/fendermint/config/default.toml" 2>/dev/null || \
+            echo -e '\n[validator_key]\npath = "validator.sk"\nkind = "regular"' >> "$node_home/fendermint/config/default.toml" 2>/dev/null || true
+    else
+        # Remote: use temp script + args file to avoid SSH quoting issues
+        local tmp_script tmp_args
+        tmp_script=$(mktemp)
+        tmp_args=$(mktemp)
+        printf '%s\n' "$node_home" "$comet_peers" "$libp2p_static_addrs" "${LIBP2P_PEERS[$validator_idx]:-}" > "$tmp_args"
+        cat > "$tmp_script" << 'SCRIPT'
+#!/bin/bash
+read -r NODE_HOME
+read -r COMET_PEERS
+read -r LIBP2P_STATIC_ADDRS
+read -r EXTERNAL_ADDR
+[ -n "$COMET_PEERS" ] && sed -i.bak "s|^persistent_peers = .*|persistent_peers = \"$COMET_PEERS\"|" "$NODE_HOME/cometbft/config/config.toml"
+if [ -n "$LIBP2P_STATIC_ADDRS" ]; then
+  QUOTED=$(echo "$LIBP2P_STATIC_ADDRS" | sed 's|/ip4/|"/ip4/|g' | sed 's|, |", |g')
+  QUOTED="${QUOTED}\""
+  sed -i.bak "/\[resolver.discovery\]/,/\[.*\]/ s|^static_addresses = .*|static_addresses = [$QUOTED]|" "$NODE_HOME/fendermint/config/default.toml"
+fi
+[ -n "$EXTERNAL_ADDR" ] && sed -i.bak "/\[resolver.connection\]/,/\[.*\]/ s|^external_addresses = .*|external_addresses = [\"$EXTERNAL_ADDR\"]|" "$NODE_HOME/fendermint/config/default.toml"
+grep -q '\[validator_key\]' "$NODE_HOME/fendermint/config/default.toml" || echo -e '\n[validator_key]\npath = "validator.sk"\nkind = "regular"' >> "$NODE_HOME/fendermint/config/default.toml"
+SCRIPT
+        if [ -n "$comet_peers" ]; then
+            log_info "Setting CometBFT persistent_peers for $name"
+        fi
+        if [ -n "$libp2p_static_addrs" ]; then
+            log_info "Setting libp2p static_addresses for $name"
+        fi
+        if [ -n "${LIBP2P_PEERS[$validator_idx]:-}" ]; then
+            log_info "Setting libp2p external_addresses for $name"
+        fi
+        copy_to_host "$validator_idx" "$tmp_script" "/tmp/update_validator_config.sh"
+        copy_to_host "$validator_idx" "$tmp_args" "/tmp/update_validator_config.args"
+        exec_on_host_simple "$validator_idx" "bash /tmp/update_validator_config.sh < /tmp/update_validator_config.args && rm -f /tmp/update_validator_config.sh /tmp/update_validator_config.args" >/dev/null 2>&1
+        rm -f "$tmp_script" "$tmp_args"
     fi
-
-    # Update Fendermint libp2p config - static_addresses (peers to connect to)
-    if [ -n "$libp2p_static_addrs" ]; then
-        log_info "Setting libp2p static_addresses for $name"
-        # Add quotes around each multiaddr by transforming "addr1, addr2" to "\"addr1\", \"addr2\""
-        local quoted_addrs=$(echo "$libp2p_static_addrs" | sed 's|/ip4/|"/ip4/|g' | sed 's|, |", |g')
-        quoted_addrs="${quoted_addrs}\""  # Add trailing quote
-        exec_on_host "$validator_idx" \
-            "sed -i.bak '/\\[resolver.discovery\\]/,/\\[.*\\]/ s|^static_addresses = .*|static_addresses = [$quoted_addrs]|' $node_home/fendermint/config/default.toml" >/dev/null 2>&1
-    fi
-
-    # Update external_addresses (this node's advertised address)
-    if [ -n "${LIBP2P_PEERS[$validator_idx]:-}" ]; then
-        log_info "Setting libp2p external_addresses for $name"
-        exec_on_host "$validator_idx" \
-            "sed -i.bak '/\\[resolver.connection\\]/,/\\[.*\\]/ s|^external_addresses = .*|external_addresses = [\"${LIBP2P_PEERS[$validator_idx]}\"]|' $node_home/fendermint/config/default.toml" >/dev/null 2>&1
-    fi
-
-    # Ensure validator_key section exists
-    exec_on_host "$validator_idx" \
-        "grep -q '\\[validator_key\\]' $node_home/fendermint/config/default.toml || echo -e '\\n[validator_key]\\npath = \"validator.sk\"\\nkind = \"regular\"' >> $node_home/fendermint/config/default.toml" >/dev/null 2>&1
 }
 
 # Generate IPC CLI config file (~/.ipc/config.toml)
@@ -818,11 +936,15 @@ generate_ipc_cli_config() {
     local keystore_path=$(get_config_value "ipc_cli.keystore_path")
 
     # Parent subnet config
+    # Use subnet.parent_* as source of truth (single place for parent chain addresses)
     local parent_id=$(get_config_value "ipc_cli.parent.id")
     local parent_network_type=$(get_config_value "ipc_cli.parent.network_type")
     local parent_provider_http=$(get_config_value "ipc_cli.parent.provider_http")
-    local parent_registry=$(get_config_value "ipc_cli.parent.registry_addr")
-    local parent_gateway=$(get_config_value "ipc_cli.parent.gateway_addr")
+    local parent_registry=$(get_config_value "subnet.parent_registry")
+    local parent_gateway=$(get_config_value "subnet.parent_gateway")
+    # Fallback to ipc_cli.parent if subnet section lacks them (backwards compat)
+    [ -z "$parent_registry" ] || [ "$parent_registry" = "null" ] && parent_registry=$(get_config_value "ipc_cli.parent.registry_addr")
+    [ -z "$parent_gateway" ] || [ "$parent_gateway" = "null" ] && parent_gateway=$(get_config_value "ipc_cli.parent.gateway_addr")
 
     # Child subnet config
     local child_id=$(get_config_value "subnet.id")
@@ -849,8 +971,8 @@ EOF
 
 # Ensure EVM keystore exists with validator keys from config
 ensure_evm_keystore() {
-    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-    ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
+    local ipc_config_dir
+    ipc_config_dir=$(get_local_ipc_config_dir)
     local keystore_file="$ipc_config_dir/evm_keystore.json"
 
     # Create IPC directory if it doesn't exist
@@ -919,7 +1041,7 @@ update_ipc_cli_configs() {
         generate_ipc_cli_config "$temp_config"
 
         # Create directory if it doesn't exist
-        exec_on_host "$idx" "mkdir -p $ipc_config_dir"
+        exec_on_host_simple "$idx" "mkdir -p $ipc_config_dir"
 
         # Copy to target location
         copy_to_host "$idx" "$temp_config" "$ipc_config_file"
@@ -931,6 +1053,8 @@ update_ipc_cli_configs() {
 
 # Update child subnet provider_http in existing config.toml after subnet deployment
 # ipc-cli subnet init writes the child subnet with default port 8545, but we need to use the correct port
+# Strategy: Update local config (where deploy ran), then copy to all remotes. This avoids complex
+# quoting when running sed over SSH and ensures remotes get the full config (including child subnet).
 update_child_subnet_provider() {
     local subnet_id="$1"
 
@@ -939,50 +1063,46 @@ update_child_subnet_provider() {
     # Get the correct provider_http from config
     local child_provider_http=$(get_config_value "ipc_cli.child.provider_http")
 
-    for idx in "${!VALIDATORS[@]}"; do
-        local name="${VALIDATORS[$idx]}"
-        local ipc_config_file=$(get_config_value "paths.ipc_config_file")
-        ipc_config_file="${ipc_config_file/#\~/$HOME}"
+    # Use local config path - deploy_subnet runs locally and updates ~/.ipc/config.toml
+    local ipc_config_dir
+    ipc_config_dir=$(get_local_ipc_config_dir)
+    local local_config="$ipc_config_dir/config.toml"
+    local remote_config_file=$(get_config_value "paths.ipc_config_file")
 
-        log_info "Updating provider_http for $name..."
+    # Update local config (source of truth after deploy)
+    if [ -f "$local_config" ]; then
+        local subnet_line
+        subnet_line=$(grep -n "id = \"$subnet_id\"" "$local_config" | cut -d: -f1 | head -1)
 
-        # Use sed with line numbers for reliable inline editing
-        if is_local_mode; then
-            # For local mode, update the config file directly
-            if [ -f "$ipc_config_file" ]; then
-                # Find the line number of the subnet ID
-                local subnet_line=$(grep -n "id = \"$subnet_id\"" "$ipc_config_file" | cut -d: -f1 | head -1)
+        if [ -n "$subnet_line" ]; then
+            local provider_line
+            provider_line=$(tail -n +"$subnet_line" "$local_config" | head -10 | grep -n "^provider_http = " | head -1 | cut -d: -f1)
 
-                if [ -n "$subnet_line" ]; then
-                    # Find the provider_http line after the subnet ID (within next 10 lines)
-                    local provider_line=$(tail -n +$subnet_line "$ipc_config_file" | head -10 | grep -n "^provider_http = " | head -1 | cut -d: -f1)
-
-                    if [ -n "$provider_line" ]; then
-                        # Calculate absolute line number
-                        local abs_line=$((subnet_line + provider_line - 1))
-                        # Replace that specific line
-                        sed -i.bak "${abs_line}s|^provider_http = .*|provider_http = \"$child_provider_http\"|" "$ipc_config_file"
-                        log_success "Updated provider_http for $name (line $abs_line)"
-                    else
-                        log_warn "Could not find provider_http line after subnet ID"
-                    fi
-                else
-                    log_warn "Could not find subnet ID in config"
-                fi
+            if [ -n "$provider_line" ]; then
+                local abs_line=$((subnet_line + provider_line - 1))
+                sed -i.bak "${abs_line}s|^provider_http = .*|provider_http = \"$child_provider_http\"|" "$local_config"
+                log_success "Updated provider_http in local config (line $abs_line)"
+            else
+                log_warn "Could not find provider_http line after subnet ID"
             fi
         else
-            # For remote mode, use similar approach via exec_on_host
-            exec_on_host "$idx" "
-                subnet_line=\$(grep -n 'id = \"$subnet_id\"' $ipc_config_file | cut -d: -f1 | head -1)
-                if [ -n \"\$subnet_line\" ]; then
-                    provider_line=\$(tail -n +\$subnet_line $ipc_config_file | head -10 | grep -n '^provider_http = ' | head -1 | cut -d: -f1)
-                    if [ -n \"\$provider_line\" ]; then
-                        abs_line=\$((subnet_line + provider_line - 1))
-                        sed -i.bak \"\${abs_line}s|^provider_http = .*|provider_http = \\\"$child_provider_http\\\"|\" $ipc_config_file
-                    fi
-                fi
-            "
+            log_warn "Could not find subnet ID in config"
+        fi
+    else
+        log_warn "Local config not found at $local_config"
+    fi
 
+    # Copy updated config to all validators (remote mode) or no-op (local mode uses same file)
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        log_info "Updating provider_http for $name..."
+
+        if is_local_mode; then
+            log_success "Updated provider_http for $name"
+        else
+            # Copy local config to remote - includes child subnet and correct provider_http
+            exec_on_host_simple "$idx" "mkdir -p $(dirname "$remote_config_file")"
+            copy_to_host "$idx" "$local_config" "$remote_config_file"
             log_success "Updated provider_http for $name"
         fi
     done
@@ -993,19 +1113,22 @@ update_child_subnet_provider() {
 update_fendermint_topdown_config() {
     log_info "Updating Fendermint topdown parent contract addresses..."
 
-    # Get addresses from IPC config (updated by subnet init)
-    local ipc_config_file=$(get_config_value "paths.ipc_config_file")
-    ipc_config_file="${ipc_config_file/#\~/$HOME}"
+    # Read from local config (where deploy ran) - paths.ipc_config_file is remote path
+    local ipc_config_dir
+    ipc_config_dir=$(get_local_ipc_config_dir)
+    local ipc_config_file="$ipc_config_dir/config.toml"
 
     # The PARENT subnet config has the deployed gateway/registry addresses on the parent chain
     # Fendermint needs these to query the parent chain for topdown messages
     local parent_chain_id=$(get_config_value "subnet.parent_chain_id")
 
     # Read gateway and registry addresses from the PARENT subnet's config section
-    # Use grep to find the parent subnet section and extract addresses
-    local parent_gateway=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "gateway_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
-
-    local parent_registry=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "registry_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+    local parent_gateway=""
+    local parent_registry=""
+    if [ -f "$ipc_config_file" ]; then
+        parent_gateway=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "gateway_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+        parent_registry=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "registry_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+    fi
 
     # If extraction failed, fall back to YAML config
     if [ -z "$parent_gateway" ] || [ -z "$parent_registry" ]; then
@@ -1046,9 +1169,19 @@ update_fendermint_topdown_config() {
                 log_warn "Fendermint config not found at $fendermint_config"
             fi
         else
-            # For remote mode
-            exec_on_host "$idx" "sed -i.bak 's|parent_gateway = \"0x[a-fA-F0-9]*\"|parent_gateway = \"$parent_gateway\"|g' $fendermint_config"
-            exec_on_host "$idx" "sed -i.bak2 's|parent_registry = \"0x[a-fA-F0-9]*\"|parent_registry = \"$parent_registry\"|g' $fendermint_config"
+            # For remote mode: use temp script to avoid SSH quoting issues
+            # Skip if config doesn't exist yet (secondary nodes init after this step)
+            local tmp_script
+            tmp_script=$(mktemp)
+            cat > "$tmp_script" << EOF
+if [ -f $fendermint_config ]; then
+  sed -i.bak 's|parent_gateway = "0x[a-fA-F0-9]*"|parent_gateway = "$parent_gateway"|g' $fendermint_config
+  sed -i.bak2 's|parent_registry = "0x[a-fA-F0-9]*"|parent_registry = "$parent_registry"|g' $fendermint_config
+fi
+EOF
+            copy_to_host "$idx" "$tmp_script" "/tmp/update_fendermint.sh"
+            exec_on_host_simple "$idx" "bash /tmp/update_fendermint.sh && rm -f /tmp/update_fendermint.sh"
+            rm -f "$tmp_script"
             log_success "Updated topdown config for $name"
         fi
     done
@@ -1059,37 +1192,53 @@ update_fendermint_topdown_config() {
 update_yaml_with_parent_addresses() {
     log_info "Updating YAML config with deployed parent chain addresses..."
 
-    # Get addresses from IPC config (written by subnet init)
-    local ipc_config_file=$(get_config_value "paths.ipc_config_file")
-    ipc_config_file="${ipc_config_file/#\~/$HOME}"
+    # Read from local config (where deploy ran) - paths.ipc_config_file is remote path
+    local ipc_config_dir
+    ipc_config_dir=$(get_local_ipc_config_dir)
+    local ipc_config_file="$ipc_config_dir/config.toml"
 
     local parent_chain_id=$(get_config_value "subnet.parent_chain_id")
 
     # Read parent addresses from IPC config
-    local parent_gateway=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "gateway_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
-    local parent_registry=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "registry_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+    local parent_gateway=""
+    local parent_registry=""
+    if [ -f "$ipc_config_file" ]; then
+        parent_gateway=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "gateway_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+        parent_registry=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "registry_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+    fi
 
     if [ -z "$parent_gateway" ] || [ -z "$parent_registry" ]; then
-        log_warn "Could not extract parent addresses from IPC config"
+        log_warn "Could not extract parent addresses from IPC config, using YAML values"
+        parent_gateway=$(get_config_value "subnet.parent_gateway")
+        parent_registry=$(get_config_value "subnet.parent_registry")
+    fi
+
+    if [ -z "$parent_gateway" ] || [ -z "$parent_registry" ]; then
+        log_error "No parent addresses available"
         return 1
     fi
 
     log_info "Parent gateway: $parent_gateway"
     log_info "Parent registry: $parent_registry"
 
-    # Update the YAML config file
+    # Update the YAML config file (subnet and ipc_cli.parent - keep both in sync)
     local config_file="$CONFIG_FILE"
 
     # Use yq to update if available, otherwise use sed
     if command -v yq &> /dev/null; then
         yq eval ".subnet.parent_gateway = \"$parent_gateway\"" -i "$config_file"
         yq eval ".subnet.parent_registry = \"$parent_registry\"" -i "$config_file"
-        log_success "Updated YAML config with parent addresses"
+        yq eval ".ipc_cli.parent.gateway_addr = \"$parent_gateway\"" -i "$config_file"
+        yq eval ".ipc_cli.parent.registry_addr = \"$parent_registry\"" -i "$config_file"
+        log_success "Updated YAML config with parent addresses (subnet and ipc_cli.parent)"
     else
         # Fallback to sed
         sed -i.bak "s|parent_gateway:.*|parent_gateway: \"$parent_gateway\"|" "$config_file"
         sed -i.bak2 "s|parent_registry:.*|parent_registry: \"$parent_registry\"|" "$config_file"
-        log_success "Updated YAML config with parent addresses (using sed)"
+        # Update ipc_cli.parent (first occurrence is parent section)
+        sed -i.bak3 "0,/registry_addr:/s|registry_addr:.*|registry_addr: \"$parent_registry\"|" "$config_file"
+        sed -i.bak4 "0,/gateway_addr:/s|gateway_addr:.*|gateway_addr: \"$parent_gateway\"|" "$config_file"
+        log_success "Updated YAML config with parent addresses (subnet and ipc_cli.parent, using sed)"
     fi
 }
 
