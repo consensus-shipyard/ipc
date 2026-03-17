@@ -4,7 +4,8 @@
 # in the builder depending on whether we are building on CI or locally, but they are concatenated
 # just before the build.
 
-FROM debian:bookworm-slim
+# Use Ubuntu 24.04 to match glibc 2.39 required by binaries built on ubuntu-24.04 CI runner
+FROM ubuntu:24.04
 
 RUN apt-get update && \
   apt-get install -y libssl3 ca-certificates curl && \
