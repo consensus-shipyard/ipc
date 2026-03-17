@@ -887,14 +887,27 @@ measure_all_block_times() {
 }
 
 # Get chain ID from a validator
+# In remote mode: curl directly to validator IP (eth API may not be reachable via SSH/localhost)
+# In local mode: curl localhost via exec_on_host
 get_chain_id() {
     local validator_idx="${1:-0}"
 
     local eth_api_port=$(get_config_value "network.eth_api_port")
+    local rpc_url
+    local response
 
-    # Query eth_chainId via JSON-RPC
-    local response=$(exec_on_host "$validator_idx" \
-        "curl -s -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' http://localhost:${eth_api_port}" 2>/dev/null)
+    if is_local_mode; then
+        # Local mode: curl localhost on the validator
+        response=$(exec_on_host "$validator_idx" \
+            "curl -s -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' http://localhost:${eth_api_port}" 2>/dev/null)
+    else
+        # Remote mode: curl directly to validator's external IP (same path cast/wallets use)
+        local ip=$(get_config_value "validators[$validator_idx].ip")
+        rpc_url="http://${ip}:${eth_api_port}"
+        response=$(curl -s --max-time 5 -X POST -H "Content-Type: application/json" \
+            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+            "$rpc_url" 2>/dev/null)
+    fi
 
     local chain_id=$(echo "$response" | jq -r '.result // ""' 2>/dev/null)
 
