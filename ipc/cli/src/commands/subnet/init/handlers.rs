@@ -18,10 +18,10 @@ use crate::{get_ipc_provider, GlobalArguments};
 use anyhow::{Context, Result};
 use fendermint_vm_actor_interface::init::builtin_actor_eth_addr;
 use fendermint_vm_actor_interface::ipc::{self};
+use fvm_shared::address::Payload;
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::new_evm_keystore_from_config;
 use ipc_provider::IpcProvider;
-use fvm_shared::address::Payload;
 use ipc_types::EthAddress;
 use std::str::FromStr;
 use url::Url;
@@ -42,8 +42,10 @@ pub async fn handle_init(global: &GlobalArguments, init_cfg: &SubnetInitConfig) 
         deploy_contracts(deploy_cfg, &ipc_config_store).await?;
     }
 
-    let resolved_topdown_mode =
-        resolve_topdown_mode(init_cfg.node_topdown_mode, init_cfg.create.parent_filecoin_rpc.as_ref());
+    let resolved_topdown_mode = resolve_topdown_mode(
+        init_cfg.node_topdown_mode,
+        init_cfg.create.parent_filecoin_rpc.as_ref(),
+    );
 
     if matches!(resolved_topdown_mode, NodeTopdownMode::F3)
         && init_cfg.create.parent_filecoin_rpc.is_none()
@@ -380,7 +382,7 @@ pub async fn generate_node_config(
                 cometbft: Some(26656),
                 resolver: Some(26655),
             }),
-            peers: None,                            // Let user configure peers
+            peers: None, // Let user configure peers
         }),
         cometbft_overrides: None,
         fendermint_overrides: Some(fendermint_overrides),

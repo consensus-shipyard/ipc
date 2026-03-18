@@ -31,14 +31,6 @@ fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> StmResult<(), Err
     Ok(())
 }
 
-pub(crate) fn validator_changes(p: &ParentViewPayload) -> Vec<PowerChangeRequest> {
-    p.1.clone()
-}
-
-pub(crate) fn topdown_cross_msgs(p: &ParentViewPayload) -> Vec<IpcEnvelope> {
-    p.2.clone()
-}
-
 #[cfg(test)]
 mod tests {
     use crate::proxy::ParentQueryProxy;

@@ -95,20 +95,36 @@ where
                 break;
             }
 
-            first_non_null_parent_hash = match self
-                .poll_next(latest_height_fetched + 1, first_non_null_parent_hash)
+            let next_height = latest_height_fetched + 1;
+            match self
+                .poll_next(next_height, first_non_null_parent_hash.clone())
                 .await
             {
-                Ok(h) => h,
+                Ok(h) => {
+                    first_non_null_parent_hash = h;
+                    latest_height_fetched += 1;
+                }
                 Err(Error::ParentChainReorgDetected) => {
                     tracing::warn!("potential reorg detected, clear cache and retry");
                     self.reset().await?;
                     break;
                 }
+                // A concurrent commit can move the tracked height forward while this poll is in-flight.
+                // In that case, this height is stale and should be ignored rather than surfaced as error.
+                Err(e @ Error::NotSequential)
+                | Err(e @ Error::NonSequentialParentViewInsert(_)) => {
+                    if self.has_advanced_past(next_height).await {
+                        tracing::debug!(
+                            height = next_height,
+                            error = e.to_string(),
+                            "ignoring stale polled height after local state advanced"
+                        );
+                        break;
+                    }
+                    return Err(anyhow!(e));
+                }
                 Err(e) => return Err(anyhow!(e)),
-            };
-
-            latest_height_fetched += 1;
+            }
 
             if latest_height_fetched == chain_head {
                 tracing::debug!("reached the tip of the chain");
@@ -130,6 +146,21 @@ where
     async fn exceed_cache_size_limit(&self) -> bool {
         let max_cache_blocks = self.config.max_cache_blocks();
         atomically(|| self.provider.cached_blocks()).await > max_cache_blocks
+    }
+
+    /// Returns true if either the provider cache or voting tally already moved to `height` or beyond.
+    async fn has_advanced_past(&self, height: BlockHeight) -> bool {
+        let (provider_height, tally_height) = atomically(|| {
+            let provider_height = self.provider.latest_height()?;
+            let tally_height = self.vote_tally.latest_height()?;
+            Ok((provider_height, tally_height))
+        })
+        .await;
+
+        provider_height
+            .map(|cached_height| cached_height >= height)
+            .unwrap_or(false)
+            || tally_height >= height
     }
 
     /// Get the latest data stored in the cache to pull the next block

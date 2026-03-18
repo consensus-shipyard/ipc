@@ -84,6 +84,9 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 
 /// The majority vote percentage for checkpoint submission when creating a subnet.
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
+/// Maximum inclusive block span per `eth_getLogs` query for topdown ranges.
+/// Chunking large backfills avoids provider-side range caps/timeouts.
+const MAX_LOG_QUERY_RANGE: ChainEpoch = 500;
 
 pub struct EthSubnetManager {
     keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
@@ -142,37 +145,19 @@ impl TopDownFinalityQuery for EthSubnetManager {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
-        let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
+        let events = self.query_top_down_msgs_range(subnet_id, epoch, epoch).await?;
 
-        let topic1 = contract_address_from_subnet(subnet_id)?;
-        tracing::debug!(
-            "getting top down messages for subnet: {:?} with topic 1: {}",
-            subnet_id,
-            topic1,
-        );
-
-        let ev = gateway_contract
-            .event::<lib_gateway::NewTopDownMessageFilter>()
-            .from_block(epoch as u64)
-            .to_block(epoch as u64)
-            .topic1(topic1)
-            .address(ValueOrArray::Value(gateway_contract.address()));
-
-        let mut messages = vec![];
+        let mut messages = Vec::with_capacity(events.len());
         let mut hash = None;
-        for (event, meta) in query_with_meta(ev, gateway_contract.client()).await? {
+        for (event, event_hash) in events {
             if let Some(h) = hash {
-                if h != meta.block_hash {
+                if h != event_hash {
                     return Err(anyhow!("block hash not equal"));
                 }
             } else {
-                hash = Some(meta.block_hash);
+                hash = Some(event_hash);
             }
-
-            messages.push(IpcEnvelope::try_from(event.message)?);
+            messages.push(event);
         }
 
         let block_hash = if let Some(h) = hash {
@@ -184,6 +169,20 @@ impl TopDownFinalityQuery for EthSubnetManager {
             value: messages,
             block_hash,
         })
+    }
+
+    async fn get_top_down_msgs_range(
+        &self,
+        subnet_id: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> Result<Vec<IpcEnvelope>> {
+        Ok(self
+            .query_top_down_msgs_range(subnet_id, from, to)
+            .await?
+            .into_iter()
+            .map(|(msg, _)| msg)
+            .collect())
     }
 
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<GetBlockHashResult> {
@@ -209,31 +208,21 @@ impl TopDownFinalityQuery for EthSubnetManager {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        tracing::info!("querying validator changes in evm subnet contract: {address:}");
+        let events = self
+            .query_validator_changeset_range(subnet_id, epoch, epoch)
+            .await?;
 
-        let contract = subnet_actor_manager_facet::SubnetActorManagerFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-
-        let ev = contract
-            .event::<lib_power_change_log::NewPowerChangeRequestFilter>()
-            .from_block(epoch as u64)
-            .to_block(epoch as u64)
-            .address(ValueOrArray::Value(contract.address()));
-
-        let mut changes = vec![];
+        let mut changes = Vec::with_capacity(events.len());
         let mut hash = None;
-        for (event, meta) in query_with_meta(ev, contract.client()).await? {
+        for (event, event_hash) in events {
             if let Some(h) = hash {
-                if h != meta.block_hash {
+                if h != event_hash {
                     return Err(anyhow!("block hash not equal"));
                 }
             } else {
-                hash = Some(meta.block_hash);
+                hash = Some(event_hash);
             }
-            changes.push(PowerChangeRequest::try_from(event)?);
+            changes.push(event);
         }
 
         let block_hash = if let Some(h) = hash {
@@ -245,6 +234,20 @@ impl TopDownFinalityQuery for EthSubnetManager {
             value: changes,
             block_hash,
         })
+    }
+
+    async fn get_validator_changeset_range(
+        &self,
+        subnet_id: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> Result<Vec<PowerChangeRequest>> {
+        Ok(self
+            .query_validator_changeset_range(subnet_id, from, to)
+            .await?
+            .into_iter()
+            .map(|(change, _)| change)
+            .collect())
     }
 
     async fn latest_parent_finality(&self) -> Result<ChainEpoch> {
@@ -1102,6 +1105,109 @@ impl EthManager for EthSubnetManager {
 }
 
 impl EthSubnetManager {
+    async fn query_top_down_msgs_range(
+        &self,
+        subnet_id: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> Result<Vec<(IpcEnvelope, H256)>> {
+        if from > to {
+            return Ok(Vec::new());
+        }
+
+        let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let topic1 = contract_address_from_subnet(subnet_id)?;
+        tracing::debug!(
+            "getting top down messages for subnet: {:?} in range: [{}..={}] with topic 1: {}",
+            subnet_id,
+            from,
+            to,
+            topic1,
+        );
+
+        let mut messages = Vec::new();
+        let mut chunk_start = from;
+        while chunk_start <= to {
+            let chunk_end = chunk_start
+                .saturating_add(MAX_LOG_QUERY_RANGE.saturating_sub(1))
+                .min(to);
+            tracing::debug!(
+                subnet = %subnet_id,
+                chunk_start,
+                chunk_end,
+                "querying top down messages chunk"
+            );
+
+            let ev = gateway_contract
+                .event::<lib_gateway::NewTopDownMessageFilter>()
+                .from_block(chunk_start as u64)
+                .to_block(chunk_end as u64)
+                .topic1(topic1)
+                .address(ValueOrArray::Value(gateway_contract.address()));
+
+            for (event, meta) in query_with_meta(ev, gateway_contract.client()).await? {
+                messages.push((IpcEnvelope::try_from(event.message)?, meta.block_hash));
+            }
+
+            chunk_start = chunk_end.saturating_add(1);
+        }
+        Ok(messages)
+    }
+
+    async fn query_validator_changeset_range(
+        &self,
+        subnet_id: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> Result<Vec<(PowerChangeRequest, H256)>> {
+        if from > to {
+            return Ok(Vec::new());
+        }
+
+        let address = contract_address_from_subnet(subnet_id)?;
+        tracing::info!(
+            "querying validator changes in evm subnet contract: {address:} in range: [{}..={}]",
+            from,
+            to
+        );
+
+        let contract = subnet_actor_manager_facet::SubnetActorManagerFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let mut changes = Vec::new();
+        let mut chunk_start = from;
+        while chunk_start <= to {
+            let chunk_end = chunk_start
+                .saturating_add(MAX_LOG_QUERY_RANGE.saturating_sub(1))
+                .min(to);
+            tracing::debug!(
+                subnet = %subnet_id,
+                chunk_start,
+                chunk_end,
+                "querying validator changes chunk"
+            );
+
+            let ev = contract
+                .event::<lib_power_change_log::NewPowerChangeRequestFilter>()
+                .from_block(chunk_start as u64)
+                .to_block(chunk_end as u64)
+                .address(ValueOrArray::Value(contract.address()));
+
+            for (event, meta) in query_with_meta(ev, contract.client()).await? {
+                changes.push((PowerChangeRequest::try_from(event)?, meta.block_hash));
+            }
+
+            chunk_start = chunk_end.saturating_add(1);
+        }
+        Ok(changes)
+    }
+
     pub fn new(
         gateway_addr: ethers::types::Address,
         registry_addr: ethers::types::Address,

@@ -40,6 +40,38 @@ pub trait ParentQueryProxy {
         &self,
         height: BlockHeight,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<PowerChangeRequest>>>;
+
+    /// Get top down messages in an inclusive range.
+    async fn get_top_down_msgs_range(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+    ) -> anyhow::Result<Vec<IpcEnvelope>> {
+        if from > to {
+            return Ok(Vec::new());
+        }
+        let mut out = Vec::new();
+        for height in from..=to {
+            out.extend(self.get_top_down_msgs(height).await?.value);
+        }
+        Ok(out)
+    }
+
+    /// Get validator changes in an inclusive range.
+    async fn get_validator_changes_range(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+    ) -> anyhow::Result<Vec<PowerChangeRequest>> {
+        if from > to {
+            return Ok(Vec::new());
+        }
+        let mut out = Vec::new();
+        for height in from..=to {
+            out.extend(self.get_validator_changes(height).await?.value);
+        }
+        Ok(out)
+    }
 }
 
 /// The proxy to the subnet's parent
@@ -116,6 +148,32 @@ impl ParentQueryProxy for IPCProviderProxy {
                 v
             })
     }
+
+    async fn get_top_down_msgs_range(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+    ) -> anyhow::Result<Vec<IpcEnvelope>> {
+        let mut msgs = self
+            .ipc_provider
+            .get_top_down_msgs_range(&self.child_subnet, from as ChainEpoch, to as ChainEpoch)
+            .await?;
+        msgs.sort_by(|a, b| a.local_nonce.cmp(&b.local_nonce));
+        Ok(msgs)
+    }
+
+    async fn get_validator_changes_range(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+    ) -> anyhow::Result<Vec<PowerChangeRequest>> {
+        let mut changes = self
+            .ipc_provider
+            .get_validator_changeset_range(&self.child_subnet, from as ChainEpoch, to as ChainEpoch)
+            .await?;
+        changes.sort_by(|a, b| a.configuration_number.cmp(&b.configuration_number));
+        Ok(changes)
+    }
 }
 
 // TODO - create a macro for this
@@ -183,6 +241,34 @@ impl ParentQueryProxy for IPCProviderProxyWithLatency {
             &self.inner.parent_subnet.to_string(),
             "get_validator_changeset",
             || async { self.inner.get_validator_changes(height).await },
+        )
+        .await
+    }
+
+    #[instrument(skip(self))]
+    async fn get_top_down_msgs_range(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+    ) -> anyhow::Result<Vec<IpcEnvelope>> {
+        emit_event_with_latency(
+            &self.inner.parent_subnet.to_string(),
+            "get_top_down_msgs_range",
+            || async { self.inner.get_top_down_msgs_range(from, to).await },
+        )
+        .await
+    }
+
+    #[instrument(skip(self))]
+    async fn get_validator_changes_range(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+    ) -> anyhow::Result<Vec<PowerChangeRequest>> {
+        emit_event_with_latency(
+            &self.inner.parent_subnet.to_string(),
+            "get_validator_changeset_range",
+            || async { self.inner.get_validator_changes_range(from, to).await },
         )
         .await
     }

@@ -72,18 +72,21 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
         from: BlockHeight,
         to: BlockHeight,
     ) -> anyhow::Result<Vec<PowerChangeRequest>> {
-        let mut v = vec![];
-        for h in from..=to {
-            let mut r = self.validator_changes(h).await?;
-            tracing::debug!(
-                number_of_messages = r.len(),
-                height = h,
-                "fetched validator change set",
-            );
-            v.append(&mut r);
-        }
-
-        Ok(v)
+        let r = retry!(
+            self.config.exponential_back_off,
+            self.config.exponential_retry_limit,
+            self.parent_client
+                .get_validator_changes_range(from, to)
+                .await
+        );
+        let changes = handle_null_round(r, Vec::new)?;
+        tracing::debug!(
+            from,
+            to,
+            number_of_messages = changes.len(),
+            "fetched validator change set range",
+        );
+        Ok(changes)
     }
 
     /// Get top down message in the range `from` to `to`, both inclusive. For the check to be valid, one
@@ -94,17 +97,19 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
         from: BlockHeight,
         to: BlockHeight,
     ) -> anyhow::Result<Vec<IpcEnvelope>> {
-        let mut v = vec![];
-        for h in from..=to {
-            let mut r = self.top_down_msgs(h).await?;
-            tracing::debug!(
-                number_of_top_down_messages = r.len(),
-                height = h,
-                "obtained topdown messages",
-            );
-            v.append(&mut r);
-        }
-        Ok(v)
+        let r = retry!(
+            self.config.exponential_back_off,
+            self.config.exponential_retry_limit,
+            self.parent_client.get_top_down_msgs_range(from, to).await
+        );
+        let msgs = handle_null_round(r, Vec::new)?;
+        tracing::debug!(
+            from,
+            to,
+            number_of_top_down_messages = msgs.len(),
+            "obtained topdown messages range",
+        );
+        Ok(msgs)
     }
 }
 
@@ -125,6 +130,35 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
 }
 
 impl<T: ParentQueryProxy + Send + Sync + 'static> CachedFinalityProvider<T> {
+    /// Query parent RPC directly for the latest non-null finalized parent view,
+    /// independent from local cache catch-up speed.
+    pub async fn latest_finalized_parent_view(&self) -> anyhow::Result<Option<IPCParentFinality>> {
+        let chain_head = self.parent_client.get_chain_head_height().await?;
+        if chain_head < self.config.chain_head_delay {
+            return Ok(None);
+        }
+
+        // Align to the same finality window as the syncer.
+        let mut height = chain_head - self.config.chain_head_delay;
+        loop {
+            match self.parent_client.get_block_hash(height).await {
+                Ok(res) => {
+                    return Ok(Some(IPCParentFinality {
+                        height,
+                        block_hash: res.block_hash,
+                    }));
+                }
+                Err(e) if crate::is_null_round_str(&e.to_string()) => {
+                    if height == 0 {
+                        return Ok(None);
+                    }
+                    height -= 1;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
     /// Creates an uninitialized provider
     /// We need this because `fendermint` has yet to be initialized and might
     /// not be able to provide an existing finality from the storage. This provider requires an
@@ -134,50 +168,6 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> CachedFinalityProvider<T> {
         Ok(Self::new(config, genesis, None, parent_client))
     }
 
-    /// Should always return the top down messages, only when ipc parent_client is down after exponential
-    /// retries
-    async fn validator_changes(
-        &self,
-        height: BlockHeight,
-    ) -> anyhow::Result<Vec<PowerChangeRequest>> {
-        let r = self.inner.validator_changes(height).await?;
-
-        if let Some(v) = r {
-            return Ok(v);
-        }
-
-        let r = retry!(
-            self.config.exponential_back_off,
-            self.config.exponential_retry_limit,
-            self.parent_client
-                .get_validator_changes(height)
-                .await
-                .map(|r| r.value)
-        );
-
-        handle_null_round(r, Vec::new)
-    }
-
-    /// Should always return the top down messages, only when ipc parent_client is down after exponential
-    /// retries
-    async fn top_down_msgs(&self, height: BlockHeight) -> anyhow::Result<Vec<IpcEnvelope>> {
-        let r = self.inner.top_down_msgs(height).await?;
-
-        if let Some(v) = r {
-            return Ok(v);
-        }
-
-        let r = retry!(
-            self.config.exponential_back_off,
-            self.config.exponential_retry_limit,
-            self.parent_client
-                .get_top_down_msgs(height)
-                .await
-                .map(|r| r.value)
-        );
-
-        handle_null_round(r, Vec::new)
-    }
 }
 
 impl<T> CachedFinalityProvider<T> {

@@ -251,9 +251,7 @@ async fn import_and_store_key(
             return load_default_evm_validator_key(provider);
         }
 
-        bail!(
-            "validator key source missing; set key.private-key or key.path in node config"
-        );
+        bail!("validator key source missing; set key.private-key or key.path in node config");
     }
 
     let imported_wallet = import_wallet(provider, key_config)
@@ -535,12 +533,14 @@ async fn ensure_resolver_network_key(fendermint_home: &Path) -> Result<()> {
         return Ok(());
     }
 
-    tokio::fs::create_dir_all(&keys_dir).await.with_context(|| {
-        format!(
-            "failed to create Fendermint resolver keys directory at {}",
-            keys_dir.display()
-        )
-    })?;
+    tokio::fs::create_dir_all(&keys_dir)
+        .await
+        .with_context(|| {
+            format!(
+                "failed to create Fendermint resolver keys directory at {}",
+                keys_dir.display()
+            )
+        })?;
 
     let mut rng = thread_rng();
     let network_key = SecretKey::random(&mut rng);
@@ -551,10 +551,7 @@ async fn ensure_resolver_network_key(fendermint_home: &Path) -> Result<()> {
         )
     })?;
 
-    log::info!(
-        "Generated resolver network key at {}",
-        network_sk.display()
-    );
+    log::info!("Generated resolver network key at {}", network_sk.display());
     Ok(())
 }
 

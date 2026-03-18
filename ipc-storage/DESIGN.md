@@ -75,11 +75,13 @@ All data is encrypted on the client before chunking and distribution. Storage no
 
 ### Encryption Scheme
 
-| Component | Algorithm | Description |
-|-----------|-----------|-------------|
-| **Symmetric encryption** | AES-256-GCM | Encrypts the actual data |
-| **Key derivation** | HKDF-SHA256 | Derives encryption key from master secret |
-| **Key encryption** | ECIES / RSA-OAEP | Encrypts DEK for storage/sharing |
+
+| Component                | Algorithm        | Description                               |
+| ------------------------ | ---------------- | ----------------------------------------- |
+| **Symmetric encryption** | AES-256-GCM      | Encrypts the actual data                  |
+| **Key derivation**       | HKDF-SHA256      | Derives encryption key from master secret |
+| **Key encryption**       | ECIES / RSA-OAEP | Encrypts DEK for storage/sharing          |
+
 
 ### Encryption Flow
 
@@ -177,11 +179,13 @@ Data is organized in a three-level hierarchy. All operations occur on **encrypte
 
 ### Terminology
 
-| Term | Description | Typical Size |
-|------|-------------|--------------|
-| **Chunk** | A segment of encrypted data before/after erasure encoding | 1-64 MB |
-| **Piece** | A subdivision of an encoded chunk | 256 KB - 1 MB |
-| **Leaf** | The smallest unit for Merkle tree construction | 256 bytes - 1 KB |
+
+| Term      | Description                                               | Typical Size     |
+| --------- | --------------------------------------------------------- | ---------------- |
+| **Chunk** | A segment of encrypted data before/after erasure encoding | 1-64 MB          |
+| **Piece** | A subdivision of an encoded chunk                         | 256 KB - 1 MB    |
+| **Leaf**  | The smallest unit for Merkle tree construction            | 256 bytes - 1 KB |
+
 
 ---
 
@@ -192,28 +196,33 @@ IPC Storage uses Reed-Solomon erasure coding, similar to [Storj](https://storj.i
 ### How Reed-Solomon Works
 
 Reed-Solomon encoding transforms `k` data shards into `k + m` total shards (where `m` = parity), such that:
+
 - Any `k` of the `k + m` shards are sufficient to reconstruct the original data
 - Up to `m` shards can be lost without data loss
 
 ### Encoding Parameters
 
-| Parameter | Symbol | Description | Example |
-|-----------|--------|-------------|---------|
-| Data shards | k | Number of original data shards per chunk | 15 |
-| Parity shards | m | Number of redundancy shards per chunk | 8 |
-| Total shards | n | k + m = total shards per chunk | 23 |
-| Max chunk size | — | Maximum bytes per chunk before RS encoding | 16 MiB |
-| Expansion factor | n/k | Storage overhead ratio | 1.53x |
+
+| Parameter        | Symbol | Description                                | Example |
+| ---------------- | ------ | ------------------------------------------ | ------- |
+| Data shards      | k      | Number of original data shards per chunk   | 15      |
+| Parity shards    | m      | Number of redundancy shards per chunk      | 8       |
+| Total shards     | n      | k + m = total shards per chunk             | 23      |
+| Max chunk size   | —      | Maximum bytes per chunk before RS encoding | 16 MiB  |
+| Expansion factor | n/k    | Storage overhead ratio                     | 1.53x   |
+
 
 ### Architecture
 
 The crate is built around three core traits:
 
-| Trait | Purpose |
-|-------|---------|
-| `Encoder` | Splits raw bytes into `k` padded shards and computes `m` parity shards |
-| `Decoder` | Recovers original data from any `k` of `k + m` shards |
-| `NodeAssigner` | Maps each shard to a storage node |
+
+| Trait          | Purpose                                                                |
+| -------------- | ---------------------------------------------------------------------- |
+| `Encoder`      | Splits raw bytes into `k` padded shards and computes `m` parity shards |
+| `Decoder`      | Recovers original data from any `k` of `k + m` shards                  |
+| `NodeAssigner` | Maps each shard to a storage node                                      |
+
 
 All trait methods are stateless (no `&self`) with an associated `Shard` type. Repair is simply decode followed by encode — no separate `Repairer` trait is needed.
 
@@ -387,11 +396,13 @@ All Chunk Merkle Roots form the leaves of the File Merkle Tree:
 
 ### Summary
 
-| Level | Input | Output | Count |
-|-------|-------|--------|-------|
-| 1 | Leaf data (encrypted bytes) | Piece Merkle Root (PMR) | leaves_per_piece leaves → 1 PMR |
-| 2 | PMRs for one chunk | Chunk Merkle Root (CMR) | pieces_per_chunk PMRs → 1 CMR |
-| 3 | CMRs for all chunks | File Merkle Root (FMR) | n CMRs → 1 FMR |
+
+| Level | Input                       | Output                  | Count                           |
+| ----- | --------------------------- | ----------------------- | ------------------------------- |
+| 1     | Leaf data (encrypted bytes) | Piece Merkle Root (PMR) | leaves_per_piece leaves → 1 PMR |
+| 2     | PMRs for one chunk          | Chunk Merkle Root (CMR) | pieces_per_chunk PMRs → 1 CMR   |
+| 3     | CMRs for all chunks         | File Merkle Root (FMR)  | n CMRs → 1 FMR                  |
+
 
 ---
 
@@ -415,6 +426,7 @@ struct StorageCommitment {
 ```
 
 Everything else is derivable from these fields:
+
 - `num_chunks = originalLen.div_ceil(MAX_CHUNK_SIZE)`
 - `chunk_data_len(i) = min(MAX_CHUNK_SIZE, originalLen - i * MAX_CHUNK_SIZE)`
 - Shard→node mapping: deterministic rotation over the epoch's node list
@@ -546,11 +558,13 @@ struct ChallengeProof {
 
 ### Challenge Timing
 
-| Parameter | Description | Typical Value |
-|-----------|-------------|---------------|
-| Challenge interval | Time between challenges per commitment | 1 hour |
-| Response deadline | Time allowed for proof submission | 10 minutes |
-| Consecutive failures | Failures before slashing | 3 |
+
+| Parameter            | Description                            | Typical Value |
+| -------------------- | -------------------------------------- | ------------- |
+| Challenge interval   | Time between challenges per commitment | 1 hour        |
+| Response deadline    | Time allowed for proof submission      | 10 minutes    |
+| Consecutive failures | Failures before slashing               | 3             |
+
 
 **Important**: Response deadline must be shorter than the time required to reconstruct a chunk from other nodes (to prevent lazy node attacks).
 
@@ -624,13 +638,15 @@ function computeMerkleRoot(
 
 ### Proof Size Analysis
 
-| Level | Proof Elements | Size per Element | Typical Total |
-|-------|---------------|------------------|---------------|
-| Leaf → PMR | log₂(leaves_per_piece) | 32 bytes | ~320 bytes (10 levels) |
-| PMR → CMR | log₂(pieces_per_chunk) | 32 bytes | ~256 bytes (8 levels) |
-| CMR → FMR | log₂(num_chunks) | 32 bytes | ~224 bytes (7 levels) |
-| Leaf data | 1 | leaf_size | ~256 bytes |
-| **Total** | | | **~1 KB** |
+
+| Level      | Proof Elements         | Size per Element | Typical Total          |
+| ---------- | ---------------------- | ---------------- | ---------------------- |
+| Leaf → PMR | log₂(leaves_per_piece) | 32 bytes         | ~320 bytes (10 levels) |
+| PMR → CMR  | log₂(pieces_per_chunk) | 32 bytes         | ~256 bytes (8 levels)  |
+| CMR → FMR  | log₂(num_chunks)       | 32 bytes         | ~224 bytes (7 levels)  |
+| Leaf data  | 1                      | leaf_size        | ~256 bytes             |
+| **Total**  |                        |                  | **~1 KB**              |
+
 
 ---
 
@@ -638,30 +654,35 @@ function computeMerkleRoot(
 
 ### Attack Vectors and Mitigations
 
-| Attack | Description | Mitigation |
-|--------|-------------|------------|
-| **Data withholding** | Node claims to store data but doesn't | Random challenges require actual data |
-| **Lazy node** | Node reconstructs data on-demand from peers instead of storing | Response deadline < reconstruction time |
-| **Proof precomputation** | Precompute all possible proofs | Large leaf count makes this infeasible |
-| **Collusion** | Nodes share data only for challenges | Unpredictable VRF-based challenge timing |
-| **Sybil attack** | Single entity runs multiple nodes | Stake requirements, reputation system |
-| **Grinding** | Manipulate random challenge selection | Verifiable Random Functions (VRF) |
-| **Data exposure** | Storage nodes read user data | Client-side encryption (AES-256-GCM) |
+
+| Attack                   | Description                                                    | Mitigation                               |
+| ------------------------ | -------------------------------------------------------------- | ---------------------------------------- |
+| **Data withholding**     | Node claims to store data but doesn't                          | Random challenges require actual data    |
+| **Lazy node**            | Node reconstructs data on-demand from peers instead of storing | Response deadline < reconstruction time  |
+| **Proof precomputation** | Precompute all possible proofs                                 | Large leaf count makes this infeasible   |
+| **Collusion**            | Nodes share data only for challenges                           | Unpredictable VRF-based challenge timing |
+| **Sybil attack**         | Single entity runs multiple nodes                              | Stake requirements, reputation system    |
+| **Grinding**             | Manipulate random challenge selection                          | Verifiable Random Functions (VRF)        |
+| **Data exposure**        | Storage nodes read user data                                   | Client-side encryption (AES-256-GCM)     |
+
 
 ### Lazy Node Attack - Detailed Mitigation
 
 A malicious node could attempt to:
+
 1. Not store its assigned chunk
 2. When challenged, download `k` chunks from other nodes
 3. Reconstruct its chunk using Reed-Solomon decoding
 4. Respond to challenge with reconstructed data
 
 **Mitigation**: Set response deadline such that:
+
 ```
 deadline < time_to_download_k_chunks + time_to_decode
 ```
 
 For a 16 MB chunk with k=64:
+
 - Download 64 × 16 MB = 1 GB from network
 - At 100 Mbps: ~80 seconds download time
 - Decoding: ~5-10 seconds
@@ -695,12 +716,14 @@ Challenge randomness must be unpredictable and unbiasable:
 
 ### Cryptographic Assumptions
 
-| Component | Algorithm | Security Level |
-|-----------|-----------|----------------|
-| Data encryption | AES-256-GCM | 256-bit |
-| Hash function | Keccak-256 | 128-bit collision resistance |
-| Randomness | VRF (e.g., ECVRF) | Unpredictable, verifiable |
-| Erasure coding | Reed-Solomon GF(2^8) | Information-theoretic |
+
+| Component       | Algorithm            | Security Level               |
+| --------------- | -------------------- | ---------------------------- |
+| Data encryption | AES-256-GCM          | 256-bit                      |
+| Hash function   | Keccak-256           | 128-bit collision resistance |
+| Randomness      | VRF (e.g., ECVRF)    | Unpredictable, verifiable    |
+| Erasure coding  | Reed-Solomon GF(2^8) | Information-theoretic        |
+
 
 ### Slashing Conditions
 
@@ -741,11 +764,13 @@ Users pay upfront to store data on the network. The cost is determined by the si
 write_cost = price_per_mb × file_size_in_mb × duration
 ```
 
-| Parameter | Description |
-|-----------|-------------|
-| `price_per_mb` | Network-determined price per megabyte per unit time |
-| `file_size_in_mb` | Total size of the stored file in megabytes |
-| `duration` | Storage duration (e.g., in epochs or blocks) |
+
+| Parameter         | Description                                         |
+| ----------------- | --------------------------------------------------- |
+| `price_per_mb`    | Network-determined price per megabyte per unit time |
+| `file_size_in_mb` | Total size of the stored file in megabytes          |
+| `duration`        | Storage duration (e.g., in epochs or blocks)        |
+
 
 The user locks this payment into the storage contract when submitting their on-chain storage commitment.
 
@@ -757,11 +782,13 @@ Node operators earn rewards by proving they continue to store their assigned dat
 node_reward = data_size_stored_in_mb × price_per_mb × duration_since_last_claim
 ```
 
-| Parameter | Description |
-|-----------|-------------|
-| `data_size_stored_in_mb` | Size of data this node is responsible for (its encoded chunk) |
-| `price_per_mb` | Same per-MB rate from the storage commitment |
-| `duration_since_last_claim` | Time elapsed since the node's last successful claim |
+
+| Parameter                   | Description                                                   |
+| --------------------------- | ------------------------------------------------------------- |
+| `data_size_stored_in_mb`    | Size of data this node is responsible for (its encoded chunk) |
+| `price_per_mb`              | Same per-MB rate from the storage commitment                  |
+| `duration_since_last_claim` | Time elapsed since the node's last successful claim           |
+
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -794,10 +821,12 @@ Reading data uses an off-chain **payment ticket** model. Anyone who wants to ret
 read_cost = read_price_per_mb × file_size_in_mb
 ```
 
-| Parameter | Description |
-|-----------|-------------|
+
+| Parameter           | Description                                               |
+| ------------------- | --------------------------------------------------------- |
 | `read_price_per_mb` | Network or market-determined price per megabyte for reads |
-| `file_size_in_mb` | Size of the data being read in megabytes |
+| `file_size_in_mb`   | Size of the data being read in megabytes                  |
+
 
 #### Payment Ticket Flow
 
@@ -838,10 +867,12 @@ Batch redemption lets node operators amortize on-chain transaction costs by subm
 
 ### Summary
 
-| Payment Type | Payer | Recipient | Pricing | Settlement |
-|-------------|-------|-----------|---------|------------|
-| **Write** | Data owner | Storage nodes | `price_per_mb × size × duration` | On-chain claims (challenge-gated) |
-| **Read** | Data reader | Serving node | `read_price_per_mb × size` | Off-chain tickets, redeemed on-chain |
+
+| Payment Type | Payer       | Recipient     | Pricing                          | Settlement                           |
+| ------------ | ----------- | ------------- | -------------------------------- | ------------------------------------ |
+| **Write**    | Data owner  | Storage nodes | `price_per_mb × size × duration` | On-chain claims (challenge-gated)    |
+| **Read**     | Data reader | Serving node  | `read_price_per_mb × size`       | Off-chain tickets, redeemed on-chain |
+
 
 ---
 
@@ -1087,12 +1118,14 @@ If deadline exceeded:
 
 Guardians are a **trusted, permissioned set** registered at the protocol level:
 
-| Requirement | Description |
-|-------------|-------------|
-| **Staked Collateral** | Guardians must stake tokens to participate |
-| **Registration** | Protocol governance approves guardian additions |
-| **Slashing** | Guardians can be slashed for malicious behavior |
-| **Reputation** | Track record of successful repairs visible on-chain |
+
+| Requirement           | Description                                         |
+| --------------------- | --------------------------------------------------- |
+| **Staked Collateral** | Guardians must stake tokens to participate          |
+| **Registration**      | Protocol governance approves guardian additions     |
+| **Slashing**          | Guardians can be slashed for malicious behavior     |
+| **Reputation**        | Track record of successful repairs visible on-chain |
+
 
 This trusted model avoids DDoS and sybil attack vectors on the repair mechanism.
 
@@ -1113,21 +1146,17 @@ This is the client's responsibility. The protocol does not provide automatic fal
 ## References
 
 1. **Storj Whitepaper**: [https://storj.io/storj.pdf](https://storj.io/storj.pdf)
-   - Reed-Solomon erasure coding parameters
-   - Distributed storage architecture
-
+  - Reed-Solomon erasure coding parameters
+  - Distributed storage architecture
 2. **Filecoin Spec - Proof of Data Possession**: [https://spec.filecoin.io/](https://spec.filecoin.io/)
-   - PDP challenge-response protocol
-   - Merkle tree construction for storage proofs
-
+  - PDP challenge-response protocol
+  - Merkle tree construction for storage proofs
 3. **Reed-Solomon Error Correction**: [https://en.wikipedia.org/wiki/Reed–Solomon_error_correction](https://en.wikipedia.org/wiki/Reed–Solomon_error_correction)
-   - Mathematical foundations of erasure coding
-
+  - Mathematical foundations of erasure coding
 4. **Merkle Trees**: [https://en.wikipedia.org/wiki/Merkle_tree](https://en.wikipedia.org/wiki/Merkle_tree)
-   - Hash tree structure and verification
-
+  - Hash tree structure and verification
 5. **ECVRF (Verifiable Random Functions)**: [https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-vrf](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-vrf)
-   - VRF specification for unpredictable randomness
+  - VRF specification for unpredictable randomness
 
 ---
 
@@ -1165,3 +1194,4 @@ Shard→node mapping:     Deterministic (no storage cost)
 Challenge response deadline: 30 seconds
   (Reconstruction time at 100 Mbps: ~90 seconds)
 ```
+

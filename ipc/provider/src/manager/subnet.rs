@@ -254,6 +254,13 @@ pub trait TopDownFinalityQuery: Send + Sync {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> Result<TopDownQueryPayload<Vec<IpcEnvelope>>>;
+    /// Returns top down messages in an inclusive range.
+    async fn get_top_down_msgs_range(
+        &self,
+        subnet_id: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> Result<Vec<IpcEnvelope>>;
     /// Get the block hash
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<GetBlockHashResult>;
     /// Get the validator change set from start to end block.
@@ -262,6 +269,13 @@ pub trait TopDownFinalityQuery: Send + Sync {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> Result<TopDownQueryPayload<Vec<PowerChangeRequest>>>;
+    /// Returns validator changes in an inclusive range.
+    async fn get_validator_changeset_range(
+        &self,
+        subnet_id: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> Result<Vec<PowerChangeRequest>>;
     /// Returns the latest parent finality committed in a child subnet
     async fn latest_parent_finality(&self) -> Result<ChainEpoch>;
 }

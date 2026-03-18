@@ -20,6 +20,9 @@ use crate::types::AppliedMessage;
 use ipc_api::cross::IpcEnvelope;
 use ipc_observability::emit;
 
+/// Maximum inclusive parent-height span processed per legacy topdown chunk.
+const LEGACY_TOPDOWN_CHUNK_SIZE: BlockHeight = 200;
+
 #[derive(Clone, Debug)]
 pub struct F3ExecutionCacheRetryConfig {
     pub backoff_initial: std::time::Duration,
@@ -399,41 +402,75 @@ where
         // be _at least_ 1 height behind.
         let (execution_fr, execution_to) = (prev_height + 1, finality.height);
 
-        // error happens if we cannot get the validator set from ipc agent after retries
-        let validator_changes = legacy
-            .validator_changes_from(execution_fr, execution_to)
-            .await
-            .context("failed to fetch validator changes")?;
+        let mut total_validator_changes = 0usize;
+        let mut total_topdown_msgs = 0usize;
+        let mut ret: Option<AppliedMessage> = None;
+        let mut chunk_start = execution_fr;
+        while chunk_start <= execution_to {
+            let chunk_end = chunk_start
+                .saturating_add(LEGACY_TOPDOWN_CHUNK_SIZE.saturating_sub(1))
+                .min(execution_to);
+
+            // error happens if we cannot get the validator set from ipc agent after retries
+            let validator_changes = legacy
+                .validator_changes_from(chunk_start, chunk_end)
+                .await
+                .context("failed to fetch validator changes")?;
+            total_validator_changes += validator_changes.len();
+
+            tracing::debug!(
+                chunk_start,
+                chunk_end,
+                changes = validator_changes.len(),
+                "chain interpreter received validator changes chunk"
+            );
+
+            self.inner
+                .gateway_caller
+                .store_validator_changes(state, validator_changes)
+                .context("failed to store validator changes")?;
+
+            // error happens if we cannot get the cross messages from ipc agent after retries
+            let msgs = legacy
+                .top_down_msgs_from(chunk_start, chunk_end)
+                .await
+                .context("failed to fetch top down messages")?;
+            total_topdown_msgs += msgs.len();
+
+            tracing::debug!(
+                chunk_start,
+                chunk_end,
+                number_of_messages = msgs.len(),
+                "chain interpreter received topdown messages chunk",
+            );
+
+            if !msgs.is_empty() {
+                ret = Some(
+                    self.execute_topdown_msgs(state, msgs)
+                        .await
+                        .context("failed to execute top down messages")?,
+                );
+            }
+
+            chunk_start = chunk_end.saturating_add(1);
+        }
 
         tracing::debug!(
-            from = execution_fr,
-            to = execution_to,
-            msgs = validator_changes.len(),
-            "chain interpreter received total validator changes"
-        );
-
-        self.inner
-            .gateway_caller
-            .store_validator_changes(state, validator_changes)
-            .context("failed to store validator changes")?;
-
-        // error happens if we cannot get the cross messages from ipc agent after retries
-        let msgs = legacy
-            .top_down_msgs_from(execution_fr, execution_to)
-            .await
-            .context("failed to fetch top down messages")?;
-
-        tracing::debug!(
-            number_of_messages = msgs.len(),
             start = execution_fr,
             end = execution_to,
-            "chain interpreter received topdown msgs",
+            total_validator_changes,
+            total_topdown_msgs,
+            "chain interpreter processed topdown effects in chunks",
         );
 
-        let ret = self
-            .execute_topdown_msgs(state, msgs)
-            .await
-            .context("failed to execute top down messages")?;
+        // Preserve previous behavior: return an AppliedMessage even when there are no topdown msgs.
+        let ret = if let Some(ret) = ret {
+            ret
+        } else {
+            self.execute_topdown_msgs(state, Vec::<IpcEnvelope>::new())
+                .await
+                .context("failed to execute empty top down messages batch")?
+        };
 
         tracing::debug!("chain interpreter applied topdown msgs");
 
