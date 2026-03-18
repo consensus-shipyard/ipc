@@ -50,6 +50,9 @@ paths:
   ipc_repo: "/home/ipc/ipc"
   # Path to ipc-cli binary on remote hosts
   ipc_binary: "/home/ipc/ipc/target/release/ipc-cli"
+  # Path to IPC repo for local builds (update-binaries --compile local)
+  # Default: auto-detect from script location (parent of scripts/ipc-subnet-manager)
+  # local_ipc_repo: "/path/to/ipc"
   # Node home directory (will be created)
   node_home: "/home/ipc/.ipc-node"
   # Node init config path
