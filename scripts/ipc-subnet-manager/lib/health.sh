@@ -1788,6 +1788,9 @@ update_validator_binaries() {
     log_info "[$name] Updating binaries from branch '$branch'..."
 
     local update_cmd="cd $ipc_repo && \
+        source ~/.cargo/env 2>/dev/null; \
+        source ~/.bashrc 2>/dev/null; \
+        export PATH=\"\$HOME/.cargo/bin:\$HOME/.foundry/bin:\$HOME/.npm-global/bin:\$PATH\" && \
         git fetch origin && \
         git checkout $branch && \
         git pull origin $branch && \
@@ -1814,15 +1817,159 @@ update_validator_binaries() {
     return 0
 }
 
+# Build IPC binaries locally (with cross-compilation for macOS->Linux)
+# On success, writes binary directory path to $3 (result file). Returns 0/1.
+build_ipc_locally() {
+    local branch="${1:-main}"
+    local local_repo="$2"
+    local result_file="$3"
+
+    log_info "Building IPC locally (branch: $branch)..."
+    log_info "Repository: $local_repo"
+
+    # Git fetch and checkout
+    if ! (cd "$local_repo" && git fetch origin && git checkout "$branch" && git pull origin "$branch"); then
+        log_error "Failed to update git repository"
+        return 1
+    fi
+
+    # Contracts codegen (requires pnpm)
+    log_info "Running contracts codegen..."
+    if ! (cd "$local_repo/contracts" && make gen 2>&1); then
+        log_error "Contracts codegen failed (ensure pnpm is installed)"
+        return 1
+    fi
+
+    local target_triple=""
+    local binary_dir=""
+    local os_name
+    os_name=$(uname -s)
+
+    if [ "$os_name" = "Darwin" ]; then
+        # Cross-compile for Linux (validators are typically x86_64 Linux)
+        target_triple="x86_64-unknown-linux-gnu"
+        binary_dir="$local_repo/target/$target_triple/release"
+
+        if ! command -v cross &>/dev/null; then
+            log_error "cross not found. Install with: cargo install cross"
+            log_info "Required for macOS->Linux cross-compilation"
+            return 1
+        fi
+
+        log_info "Cross-compiling for $target_triple (macOS -> Linux)..."
+        if ! (cd "$local_repo" && cross build --release --target "$target_triple" 2>&1); then
+            log_error "Cross-compilation failed"
+            return 1
+        fi
+    else
+        # Native build (Linux or same-arch)
+        binary_dir="$local_repo/target/release"
+        log_info "Building natively..."
+        if ! (cd "$local_repo" && cargo build --release 2>&1); then
+            log_error "Build failed"
+            return 1
+        fi
+    fi
+
+    if [ ! -f "$binary_dir/ipc-cli" ] || [ ! -f "$binary_dir/fendermint" ]; then
+        log_error "Binaries not found in $binary_dir"
+        return 1
+    fi
+
+    echo "$binary_dir" > "$result_file"
+    return 0
+}
+
+# Deploy locally-built binaries to a single validator
+deploy_binaries_to_validator() {
+    local validator_idx="$1"
+    local binary_dir="$2"
+
+    local name="${VALIDATORS[$validator_idx]}"
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+    local ipc_repo=$(get_config_value "paths.ipc_repo")
+    local remote_release="$ipc_repo/target/release"
+
+    log_info "[$name] Deploying binaries..."
+
+    # Ensure remote directory exists
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$ssh_user@$ip" \
+        "sudo mkdir -p $remote_release && sudo chown $ipc_user:$ipc_user $remote_release" 2>/dev/null || true
+
+    if ! scp_to_host "$ip" "$ssh_user" "$ipc_user" "$binary_dir/ipc-cli" "$remote_release/ipc-cli"; then
+        log_error "[$name] Failed to copy ipc-cli"
+        return 1
+    fi
+    if ! scp_to_host "$ip" "$ssh_user" "$ipc_user" "$binary_dir/fendermint" "$remote_release/fendermint"; then
+        log_error "[$name] Failed to copy fendermint"
+        return 1
+    fi
+
+    log_success "[$name] Binaries deployed"
+    return 0
+}
+
 # Update binaries on all validators
 update_all_binaries() {
     local branch="${1:-main}"
+    local compile_mode="${2:-remote}"
 
     log_header "Updating IPC Binaries"
     log_info "Branch: $branch"
+    log_info "Compile mode: $compile_mode"
     log_info "Validators: ${#VALIDATORS[@]}"
     echo ""
 
+    if [ "$compile_mode" = "local" ]; then
+        # Build once locally, deploy to all validators
+        local local_repo
+        local_repo=$(get_config_value "paths.local_ipc_repo" 2>/dev/null || true)
+        if [ -z "$local_repo" ] || [ "$local_repo" = "null" ]; then
+            # Default: repo root (script is in scripts/ipc-subnet-manager/)
+            local_repo=$(cd "${SCRIPT_DIR}/../.." && pwd)
+        fi
+        if [ ! -d "$local_repo/.git" ]; then
+            log_error "Not a git repository: $local_repo"
+            log_info "Set paths.local_ipc_repo in config to point to IPC repo"
+            return 1
+        fi
+
+        local result_file="/tmp/ipc-manager-build-result.$$"
+        trap "rm -f $result_file" EXIT
+        if ! build_ipc_locally "$branch" "$local_repo" "$result_file"; then
+            rm -f "$result_file"
+            return 1
+        fi
+        local binary_dir
+        binary_dir=$(cat "$result_file")
+        rm -f "$result_file"
+
+        log_success "Build complete. Deploying to validators..."
+        echo ""
+
+        local all_success=true
+        for idx in "${!VALIDATORS[@]}"; do
+            if ! deploy_binaries_to_validator "$idx" "$binary_dir"; then
+                all_success=false
+            fi
+        done
+
+        if [ "$all_success" = true ]; then
+            echo ""
+            log_success "✓ All validators updated successfully"
+            log_info "You may need to restart nodes for changes to take effect:"
+            log_info "  $0 restart"
+            return 0
+        else
+            echo ""
+            log_error "✗ Some validators failed to update"
+            return 1
+        fi
+    fi
+
+    # Remote compile (original behavior)
     local all_success=true
     local results=()
 
