@@ -1850,15 +1850,33 @@ build_ipc_locally() {
         target_triple="x86_64-unknown-linux-gnu"
         binary_dir="$local_repo/target/$target_triple/release"
 
-        if ! command -v cross &>/dev/null; then
-            log_error "cross not found. Install with: cargo install cross"
-            log_info "Required for macOS->Linux cross-compilation"
-            return 1
-        fi
-
-        log_info "Cross-compiling for $target_triple (macOS -> Linux)..."
-        if ! (cd "$local_repo" && cross build --release --target "$target_triple" 2>&1); then
-            log_error "Cross-compilation failed"
+        # Prefer cargo-zigbuild (no Docker needed); fall back to cross
+        if command -v cargo-zigbuild &>/dev/null && command -v zig &>/dev/null; then
+            log_info "Cross-compiling for $target_triple using cargo-zigbuild (macOS -> Linux)..."
+            rustup target add "$target_triple" 2>/dev/null || true
+            if ! (cd "$local_repo" && cargo zigbuild --release --target "$target_triple" 2>&1); then
+                log_error "cargo-zigbuild failed"
+                return 1
+            fi
+        elif command -v cross &>/dev/null; then
+            log_info "Cross-compiling for $target_triple using cross (macOS -> Linux)..."
+            local cross_output
+            cross_output=$(cd "$local_repo" && cross build --release --target "$target_triple" 2>&1)
+            local cross_exit=$?
+            if [ $cross_exit -ne 0 ]; then
+                echo "$cross_output" | tail -20
+                log_error "Cross-compilation failed"
+                if echo "$cross_output" | grep -q "couldn't install toolchain"; then
+                    log_info "Tip: cross 0.2.5 has a bug on macOS. Try one of:"
+                    log_info "  1. cargo install cross --git https://github.com/cross-rs/cross"
+                    log_info "  2. cargo install cargo-zigbuild && brew install zig  (no Docker needed)"
+                fi
+                return 1
+            fi
+        else
+            log_error "No cross-compiler found. Install one of:"
+            log_info "  cargo-zigbuild (recommended, no Docker): cargo install cargo-zigbuild && brew install zig"
+            log_info "  cross (needs Docker): cargo install cross --git https://github.com/cross-rs/cross"
             return 1
         fi
     else

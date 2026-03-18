@@ -462,7 +462,7 @@ Compile modes:
           Rust, Foundry on each host.
   local   Build on this machine and SCP binaries to validators. If you're on
           macOS and validators are Linux, cross-compiles to x86_64-unknown-linux-gnu.
-          Requires: cross (cargo install cross) for macOS->Linux.
+          Requires: cargo-zigbuild + zig (recommended) or cross (needs Docker).
 
 Examples:
     $0 update-binaries --branch main
