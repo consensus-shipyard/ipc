@@ -48,6 +48,7 @@ Commands:
     init --resume     Continue init from where it left off (after deploy failure)
     update-config     Update existing node configs without wiping data
     update-binaries   Pull latest code, build, and install binaries on all validators
+    deploy-binaries   Copy existing binaries to validators (no build)
     check             Comprehensive health check on all nodes
     diagnose [name]   Detailed diagnostics for troubleshooting (all or one validator)
     restart           Graceful restart of all nodes
@@ -95,6 +96,7 @@ Examples:
     $0 check                                   # Run health checks
     $0 update-binaries --branch main           # Update binaries from main branch
     $0 update-binaries -C local --branch main  # Build locally, deploy to validators
+    $0 deploy-binaries --path ./target/release # Copy binaries to all validators
     $0 watch-finality                          # Monitor parent finality progress
     $0 watch-blocks                            # Monitor block production
     $0 logs validator-1                        # View logs from validator-1
@@ -486,6 +488,81 @@ EOF
     update_all_binaries "$branch" "$compile_mode"
 }
 
+# Deploy binaries to validators (copy only, no build)
+cmd_deploy_binaries() {
+    local binary_path=""
+    local target_validator=""
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --path)
+                binary_path="$2"
+                shift 2
+                ;;
+            --help|-h)
+                cat << EOF
+Copy ipc-cli and fendermint binaries to validators (no build)
+
+Usage: $0 deploy-binaries [options] [validator-name]
+
+Options:
+    --path DIR    Path to directory containing ipc-cli and fendermint
+    --help        Show this help message
+
+If --path is omitted, auto-detects from local IPC repo:
+  - target/release/ (native build)
+  - target/x86_64-unknown-linux-gnu/release/ (cross-compiled)
+
+Examples:
+    $0 deploy-binaries --path ./target/release
+    $0 deploy-binaries --path ./target/x86_64-unknown-linux-gnu/release
+    $0 deploy-binaries validator-2   # Deploy to single validator (uses auto-detect path)
+EOF
+                exit 0
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                target_validator="$1"
+                shift
+                ;;
+        esac
+    done
+
+    load_config
+
+    # Auto-detect path if not specified
+    if [ -z "$binary_path" ]; then
+        local local_repo
+        local_repo=$(get_config_value "paths.local_ipc_repo" 2>/dev/null || true)
+        if [ -z "$local_repo" ] || [ "$local_repo" = "null" ]; then
+            local_repo=$(cd "${SCRIPT_DIR}/../.." && pwd)
+        fi
+        if [ -f "$local_repo/target/release/ipc-cli" ]; then
+            binary_path="$local_repo/target/release"
+        elif [ -f "$local_repo/target/x86_64-unknown-linux-gnu/release/ipc-cli" ]; then
+            binary_path="$local_repo/target/x86_64-unknown-linux-gnu/release"
+        else
+            log_error "Binaries not found. Specify --path or run from IPC repo with built binaries."
+            log_info "Expected: target/release/ or target/x86_64-unknown-linux-gnu/release/"
+            exit 1
+        fi
+        log_info "Using binaries from: $binary_path"
+    fi
+
+    binary_path=$(cd "$binary_path" 2>/dev/null && pwd)
+    if [ -z "$binary_path" ]; then
+        log_error "Invalid path"
+        exit 1
+    fi
+
+    log_header "Deploying Binaries"
+    deploy_binaries_only "$binary_path" "$target_validator"
+}
+
 # Update existing node configs
 cmd_update_config() {
     log_header "Updating Node Configurations"
@@ -868,7 +945,7 @@ main() {
 
     # Acquire lock for destructive operations
     case $command in
-        init|restart|update-binaries)
+        init|restart|update-binaries|deploy-binaries)
             acquire_lock
             ;;
     esac
@@ -886,6 +963,9 @@ main() {
             ;;
         update-binaries)
             cmd_update_binaries "$@"
+            ;;
+        deploy-binaries)
+            cmd_deploy_binaries "$@"
             ;;
         check)
             cmd_check "$@"

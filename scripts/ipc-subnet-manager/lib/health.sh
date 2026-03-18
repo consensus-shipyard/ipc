@@ -1898,7 +1898,7 @@ build_ipc_locally() {
     return 0
 }
 
-# Deploy locally-built binaries to a single validator
+# Deploy binaries to a single validator (used by update-binaries --compile local and deploy-binaries)
 deploy_binaries_to_validator() {
     local validator_idx="$1"
     local binary_dir="$2"
@@ -1927,6 +1927,57 @@ deploy_binaries_to_validator() {
 
     log_success "[$name] Binaries deployed"
     return 0
+}
+
+# Deploy binaries to validators (copy only, no build)
+# Usage: deploy_binaries_only <binary_dir> [validator_name]
+deploy_binaries_only() {
+    local binary_dir="$1"
+    local target_validator="${2:-}"
+
+    if [ ! -f "$binary_dir/ipc-cli" ] || [ ! -f "$binary_dir/fendermint" ]; then
+        log_error "Binaries not found in $binary_dir (need ipc-cli and fendermint)"
+        return 1
+    fi
+
+    if [ -n "$target_validator" ]; then
+        local found=false
+        for name in "${VALIDATORS[@]}"; do
+            [ "$name" = "$target_validator" ] && found=true && break
+        done
+        if [ "$found" != true ]; then
+            log_error "Unknown validator: $target_validator"
+            log_info "Valid: ${VALIDATORS[*]}"
+            return 1
+        fi
+    fi
+
+    local all_success=true
+    local deployed=0
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        if [ -n "$target_validator" ] && [ "$name" != "$target_validator" ]; then
+            continue
+        fi
+        deployed=1
+        if ! deploy_binaries_to_validator "$idx" "$binary_dir"; then
+            all_success=false
+        fi
+    done
+
+    if [ "$deployed" -eq 0 ]; then
+        log_error "No validators matched"
+        return 1
+    fi
+
+    if [ "$all_success" = true ]; then
+        log_success "✓ All binaries deployed successfully"
+        log_info "You may need to restart nodes: $0 restart"
+        return 0
+    else
+        log_error "✗ Some validators failed to receive binaries"
+        return 1
+    fi
 }
 
 # Update binaries on all validators
