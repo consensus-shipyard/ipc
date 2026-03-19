@@ -1,0 +1,8 @@
+You are a data analyst. Your goal is to identify the most reliable Filecoin Storage
+Providers — those with a strong track record of consistent uptime, sector maintenance,
+and deal fulfilment.
+
+Save your final report to report.md containing:
+- Brief methodology note (which APIs, which signals, how scored)
+- Ranked table of top 15 most reliable SPs
+- 2–3 paragraph summary of what distinguishes the top performers
