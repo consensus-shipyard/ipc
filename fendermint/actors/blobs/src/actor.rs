@@ -18,6 +18,7 @@ use crate::{
 };
 
 mod admin;
+mod execution;
 mod metrics;
 mod system;
 mod user;
@@ -78,6 +79,30 @@ impl BlobsActor {
             let operators = Self::get_active_operators(rt)?;
             let output_data = sol_blobs::encode_get_active_operators_output(operators.operators)?;
             Ok(InvokeContractReturn { output_data })
+        } else if sol_blobs::is_create_job_call(&input_data) {
+            let params = sol_blobs::parse_create_job_input(&input_data)?;
+            let _ = Self::create_job(rt, params.into())?;
+            Ok(InvokeContractReturn {
+                output_data: Vec::new(),
+            })
+        } else if sol_blobs::is_claim_job_call(&input_data) {
+            let params = sol_blobs::parse_claim_job_input(&input_data)?;
+            let _ = Self::claim_job(rt, params.into())?;
+            Ok(InvokeContractReturn {
+                output_data: Vec::new(),
+            })
+        } else if sol_blobs::is_complete_job_call(&input_data) {
+            let params = sol_blobs::parse_complete_job_input(&input_data)?;
+            let _ = Self::complete_job(rt, params.into())?;
+            Ok(InvokeContractReturn {
+                output_data: Vec::new(),
+            })
+        } else if sol_blobs::is_fail_job_call(&input_data) {
+            let params = sol_blobs::parse_fail_job_input(&input_data)?;
+            let _ = Self::fail_job(rt, params.into())?;
+            Ok(InvokeContractReturn {
+                output_data: Vec::new(),
+            })
         } else if sol_blobs::can_handle(&input_data) {
             let output_data = match sol_blobs::parse_input(&input_data)? {
                 sol_blobs::Calls::addBlob(call) => {
@@ -238,6 +263,14 @@ impl ActorCode for BlobsActor {
         RegisterNodeOperator => register_node_operator,
         GetOperatorInfo => get_operator_info,
         GetActiveOperators => get_active_operators,
+
+        // Execution methods (MVP)
+        CreateJob => create_job,
+        ClaimJob => claim_job,
+        CompleteJob => complete_job,
+        FailJob => fail_job,
+        GetJob => get_job,
+        ListJobs => list_jobs,
 
         _ => fallback,
     }

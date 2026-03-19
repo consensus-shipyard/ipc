@@ -12,11 +12,13 @@ use fvm_shared::econ::TokenAmount;
 pub mod accounts;
 pub mod blobs;
 pub mod credit;
+pub mod execution;
 pub mod operators;
 
 use accounts::Accounts;
 use blobs::{Blobs, DeleteBlobStateParams};
 use credit::Credits;
+use execution::ExecutionState;
 use operators::Operators;
 
 /// The state represents all accounts and stored blobs.
@@ -30,6 +32,8 @@ pub struct State {
     pub blobs: Blobs,
     /// Registry of node operators for blob storage.
     pub operators: Operators,
+    /// Minimal execution jobs state (MVP).
+    pub execution: ExecutionState,
 }
 
 impl State {
@@ -40,6 +44,7 @@ impl State {
             accounts: Accounts::new(store)?,
             blobs: Blobs::new(store)?,
             operators: Operators::new(store)?,
+            execution: ExecutionState::default(),
         })
     }
 

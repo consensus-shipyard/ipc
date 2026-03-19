@@ -8,6 +8,10 @@ use fendermint_actor_blobs_shared::{
         TrimBlobExpiriesParams,
     },
     bytes::B256,
+    execution::{
+        ClaimJobParams, CompleteJobParams, CreateJobParams, FailJobParams, CLAIM_JOB_SELECTOR,
+        COMPLETE_JOB_SELECTOR, CREATE_JOB_SELECTOR, FAIL_JOB_SELECTOR,
+    },
     operators::OperatorInfo,
     GetStatsReturn,
 };
@@ -126,6 +130,31 @@ pub struct GetOperatorInfoInvokeCall {
     pub address: Address,
 }
 
+pub struct CreateJobInvokeCall {
+    pub binary_ref: String,
+    pub input_refs: Vec<String>,
+    pub args: Vec<String>,
+    pub env: Vec<(String, String)>,
+    pub timeout_secs: u64,
+}
+
+pub struct ClaimJobInvokeCall {
+    pub job_id: u64,
+}
+
+pub struct CompleteJobInvokeCall {
+    pub job_id: u64,
+    pub output_refs: Vec<String>,
+    pub output_commitment: B256,
+    pub exit_code: i32,
+}
+
+pub struct FailJobInvokeCall {
+    pub job_id: u64,
+    pub error: String,
+    pub exit_code: i32,
+}
+
 pub fn is_register_node_operator_call(input: &ipc_storage_actor_sdk::evm::InputData) -> bool {
     input.selector() == REGISTER_NODE_OPERATOR_SELECTOR
 }
@@ -136,6 +165,22 @@ pub fn is_get_operator_info_call(input: &ipc_storage_actor_sdk::evm::InputData) 
 
 pub fn is_get_active_operators_call(input: &ipc_storage_actor_sdk::evm::InputData) -> bool {
     input.selector() == GET_ACTIVE_OPERATORS_SELECTOR
+}
+
+pub fn is_create_job_call(input: &ipc_storage_actor_sdk::evm::InputData) -> bool {
+    input.selector() == CREATE_JOB_SELECTOR
+}
+
+pub fn is_claim_job_call(input: &ipc_storage_actor_sdk::evm::InputData) -> bool {
+    input.selector() == CLAIM_JOB_SELECTOR
+}
+
+pub fn is_complete_job_call(input: &ipc_storage_actor_sdk::evm::InputData) -> bool {
+    input.selector() == COMPLETE_JOB_SELECTOR
+}
+
+pub fn is_fail_job_call(input: &ipc_storage_actor_sdk::evm::InputData) -> bool {
+    input.selector() == FAIL_JOB_SELECTOR
 }
 
 pub fn parse_register_node_operator_input(
@@ -176,6 +221,131 @@ pub fn parse_get_operator_info_input(
     }
     let address: Address = H160::from_slice(&word[12..32]).into();
     Ok(GetOperatorInfoInvokeCall { address })
+}
+
+pub fn parse_create_job_input(
+    input: &ipc_storage_actor_sdk::evm::InputData,
+) -> Result<CreateJobInvokeCall, ActorError> {
+    let calldata = input.calldata();
+    if calldata.len() < 32 * 5 {
+        return Err(actor_error!(illegal_argument, "invalid call: input too short"));
+    }
+
+    let binary_ref = decode_dynamic_string(calldata, decode_offset(calldata, 0)?)?;
+    let input_refs = decode_dynamic_string_array(calldata, decode_offset(calldata, 32)?)?;
+    let args = decode_dynamic_string_array(calldata, decode_offset(calldata, 64)?)?;
+    let env_raw = decode_dynamic_string_array(calldata, decode_offset(calldata, 96)?)?;
+    let timeout_secs = decode_u64_word(calldata, 128)?;
+
+    let mut env = Vec::with_capacity(env_raw.len());
+    for entry in env_raw {
+        let (k, v) = entry.split_once('=').ok_or_else(|| {
+            actor_error!(
+                illegal_argument,
+                "invalid call: env entries must be formatted as KEY=VALUE"
+            )
+        })?;
+        env.push((k.to_string(), v.to_string()));
+    }
+
+    Ok(CreateJobInvokeCall {
+        binary_ref,
+        input_refs,
+        args,
+        env,
+        timeout_secs,
+    })
+}
+
+pub fn parse_claim_job_input(
+    input: &ipc_storage_actor_sdk::evm::InputData,
+) -> Result<ClaimJobInvokeCall, ActorError> {
+    let calldata = input.calldata();
+    if calldata.len() < 32 {
+        return Err(actor_error!(illegal_argument, "invalid call: input too short"));
+    }
+    Ok(ClaimJobInvokeCall {
+        job_id: decode_u64_word(calldata, 0)?,
+    })
+}
+
+pub fn parse_complete_job_input(
+    input: &ipc_storage_actor_sdk::evm::InputData,
+) -> Result<CompleteJobInvokeCall, ActorError> {
+    let calldata = input.calldata();
+    if calldata.len() < 32 * 4 {
+        return Err(actor_error!(illegal_argument, "invalid call: input too short"));
+    }
+
+    let job_id = decode_u64_word(calldata, 0)?;
+    let output_refs = decode_dynamic_string_array(calldata, decode_offset(calldata, 32)?)?;
+    let output_commitment = decode_b256_word(calldata, 64)?;
+    let exit_code = decode_i32_word(calldata, 96)?;
+
+    Ok(CompleteJobInvokeCall {
+        job_id,
+        output_refs,
+        output_commitment,
+        exit_code,
+    })
+}
+
+pub fn parse_fail_job_input(
+    input: &ipc_storage_actor_sdk::evm::InputData,
+) -> Result<FailJobInvokeCall, ActorError> {
+    let calldata = input.calldata();
+    if calldata.len() < 32 * 3 {
+        return Err(actor_error!(illegal_argument, "invalid call: input too short"));
+    }
+
+    let job_id = decode_u64_word(calldata, 0)?;
+    let error = decode_dynamic_string(calldata, decode_offset(calldata, 32)?)?;
+    let exit_code = decode_i32_word(calldata, 64)?;
+
+    Ok(FailJobInvokeCall {
+        job_id,
+        error,
+        exit_code,
+    })
+}
+
+impl From<CreateJobInvokeCall> for CreateJobParams {
+    fn from(value: CreateJobInvokeCall) -> Self {
+        CreateJobParams {
+            binary_ref: value.binary_ref,
+            input_refs: value.input_refs,
+            args: value.args,
+            env: value.env,
+            timeout_secs: value.timeout_secs,
+        }
+    }
+}
+
+impl From<ClaimJobInvokeCall> for ClaimJobParams {
+    fn from(value: ClaimJobInvokeCall) -> Self {
+        ClaimJobParams { id: value.job_id }
+    }
+}
+
+impl From<CompleteJobInvokeCall> for CompleteJobParams {
+    fn from(value: CompleteJobInvokeCall) -> Self {
+        CompleteJobParams {
+            id: value.job_id,
+            output_refs: value.output_refs,
+            output_commitment: value.output_commitment,
+            exit_code: value.exit_code,
+        }
+    }
+}
+
+impl From<FailJobInvokeCall> for FailJobParams {
+    fn from(value: FailJobInvokeCall) -> Self {
+        FailJobParams {
+            id: value.job_id,
+            reason: value.error,
+            exit_code: value.exit_code,
+        }
+    }
 }
 
 pub fn encode_get_operator_info_output(info: Option<OperatorInfo>) -> Result<Vec<u8>, ActorError> {
@@ -259,6 +429,82 @@ fn decode_dynamic_bytes(calldata: &[u8], offset: usize) -> Result<Vec<u8>, Actor
     }
 
     Ok(calldata[start..end].to_vec())
+}
+
+fn decode_dynamic_string(calldata: &[u8], offset: usize) -> Result<String, ActorError> {
+    let bytes = decode_dynamic_bytes(calldata, offset)?;
+    String::from_utf8(bytes)
+        .map_err(|e| actor_error!(illegal_argument, format!("invalid call: bad UTF-8: {}", e)))
+}
+
+fn decode_dynamic_string_array(calldata: &[u8], offset: usize) -> Result<Vec<String>, ActorError> {
+    if offset + 32 > calldata.len() {
+        return Err(actor_error!(
+            illegal_argument,
+            "invalid call: dynamic offset out of bounds"
+        ));
+    }
+
+    let count = decode_offset(calldata, offset)?;
+    let head_start = offset + 32;
+    let head_size = count
+        .checked_mul(32)
+        .ok_or_else(|| actor_error!(illegal_argument, "invalid call: overflow"))?;
+    let head_end = head_start
+        .checked_add(head_size)
+        .ok_or_else(|| actor_error!(illegal_argument, "invalid call: overflow"))?;
+
+    if head_end > calldata.len() {
+        return Err(actor_error!(
+            illegal_argument,
+            "invalid call: array head out of bounds"
+        ));
+    }
+
+    let mut out = Vec::with_capacity(count);
+    for i in 0..count {
+        let relative = decode_offset(calldata, head_start + i * 32)?;
+        let string_offset = head_start
+            .checked_add(relative)
+            .ok_or_else(|| actor_error!(illegal_argument, "invalid call: overflow"))?;
+        out.push(decode_dynamic_string(calldata, string_offset)?);
+    }
+    Ok(out)
+}
+
+fn decode_u64_word(calldata: &[u8], at: usize) -> Result<u64, ActorError> {
+    let end = at + 32;
+    if end > calldata.len() {
+        return Err(actor_error!(illegal_argument, "invalid call: malformed word"));
+    }
+    let word = &calldata[at..end];
+    if word[..24].iter().any(|b| *b != 0) {
+        return Err(actor_error!(illegal_argument, "invalid call: integer too large"));
+    }
+    let mut n = [0u8; 8];
+    n.copy_from_slice(&word[24..32]);
+    Ok(u64::from_be_bytes(n))
+}
+
+fn decode_i32_word(calldata: &[u8], at: usize) -> Result<i32, ActorError> {
+    let end = at + 32;
+    if end > calldata.len() {
+        return Err(actor_error!(illegal_argument, "invalid call: malformed word"));
+    }
+    let word = &calldata[at..end];
+    let mut n = [0u8; 4];
+    n.copy_from_slice(&word[28..32]);
+    Ok(i32::from_be_bytes(n))
+}
+
+fn decode_b256_word(calldata: &[u8], at: usize) -> Result<B256, ActorError> {
+    let end = at + 32;
+    if end > calldata.len() {
+        return Err(actor_error!(illegal_argument, "invalid call: malformed word"));
+    }
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&calldata[at..end]);
+    Ok(B256(out))
 }
 
 fn abi_word_from_usize(value: usize) -> [u8; 32] {
