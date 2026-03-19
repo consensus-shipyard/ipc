@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPC Developer Reputation Dashboard</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <h1>IPC Developer Reputation</h1>
+        <p>Verifiable off-chain scoring with Basin evidence and IPC on-chain anchoring.</p>
+      </header>
+
+      <section id="leaderboard-view" class="card">
+        <div class="search-row">
+          <input id="handle-input" placeholder="GitHub username" />
+          <input id="wallet-input" placeholder="Wallet address (0x...)" />
+          <button id="score-btn">Score Developer</button>
+        </div>
+        <p id="job-status" class="muted"></p>
+        <table id="leaderboard-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Avatar</th>
+              <th>Handle</th>
+              <th>Score</th>
+              <th>Tier</th>
+              <th>Effective PRs</th>
+              <th>Inflation Removed</th>
+              <th>Last Updated</th>
+              <th>Basin CID</th>
+              <th>Verify</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+      </section>
+
+      <section id="profile-view" class="card hidden">
+        <div id="profile-header"></div>
+        <div id="summary-row" class="summary-row"></div>
+        <div id="breakdown-bars" class="bars"></div>
+        <h3>Pull Requests</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>PR</th>
+              <th>Diff</th>
+              <th>Score</th>
+              <th>Weight</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="pr-table-body"></tbody>
+        </table>
+        <div id="flags-wrap" class="hidden">
+          <h3>Anti-gaming Flags</h3>
+          <ul id="flags-list"></ul>
+        </div>
+        <h3>Audit Trail</h3>
+        <div id="audit"></div>
+        <button id="back-btn">Back to leaderboard</button>
+      </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha3/0.9.3/sha3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
