@@ -1,5 +1,99 @@
 # Bucket Storage Guide (Path-Based Access)
 
+## Quickstart (Subnet + Storage)
+
+This section is the shortest end-to-end setup for local testing with `ipc-cli`.
+
+### 0) Build the right binaries
+
+`ipc-storage` actors are only present when `ipc-storage` feature is enabled.
+
+```bash
+# IPC CLI + node stack (must include ipc-storage feature)
+cargo build --release -p ipc-cli --features ipc-storage
+
+# Storage node/gateway binaries
+cargo build --release -p ipc-decentralized-storage --bin node --bin gateway
+```
+
+### 1) Create subnet from YAML
+
+Use your subnet config (for example `init-sub.yaml`):
+
+Before running `subnet init`, make sure YAML placeholders are replaced:
+- `import-wallets[].private-key` (or `path`) for the account you control
+- `create.from` and `create.genesis-subnet-ipc-contracts-owner`
+- `activate.validator-pubkeys` with your validator public key(s)
+
+If the generated `~/.ipc/node_<SUBNET_ID>.yaml` contains a validator key placeholder, fill `validator.private-key` before `node init`.
+The validator private key in `node_<SUBNET_ID>.yaml` must correspond to one of the pubkeys in `activate.validator-pubkeys`; otherwise `node start` runs but that validator identity is not the one activated on-chain.
+
+Quick check:
+
+```bash
+# Derive uncompressed pubkey from the validator private key you put in node_<SUBNET_ID>.yaml
+cast wallet public-key --private-key <VALIDATOR_PRIVATE_KEY_HEX>
+
+# Ensure this exactly matches an entry in activate.validator-pubkeys from subnet-init YAML.
+```
+
+```bash
+./target/release/ipc-cli subnet init --config /absolute/path/to/init-sub.yaml
+```
+
+This generates `node_<SUBNET_ID>.yaml` in `~/.ipc/`.
+
+### 2) Initialize and start the validator node
+
+```bash
+# Use the generated node config path from previous step:
+./target/release/ipc-cli node init --config ~/.ipc/node_<SUBNET_ID>.yaml
+
+# Start your local subnet node
+./target/release/ipc-cli node start --home ~/.node-ipc
+```
+
+### 3) Initialize storage config (creates dedicated operator key)
+
+```bash
+./target/release/ipc-cli storage init \
+  --node-config ~/.ipc/node_<SUBNET_ID>.yaml
+```
+
+This prints:
+- `operator secret key file` (defaults to `~/.node-ipc/storage/operator.sk`)
+- delegated operator address `t410...` (**fund this one**)
+- native address `t1...` (diagnostic only)
+
+### 4) Fund the delegated operator address
+
+Use the `t410...` printed by `storage init`:
+
+```bash
+./target/release/ipc-cli cross-msg fund \
+  --subnet "<SUBNET_ID>" \
+  --from <PARENT_FUNDING_ADDRESS> \
+  --to <OPERATOR_T410_ADDRESS> \
+  1
+```
+
+### 5) Register operator and run storage
+
+```bash
+./target/release/ipc-cli storage run \
+  --config ~/.ipc/storage_<SUBNET_ID>.yaml \
+  --register-operator
+```
+
+Expected healthy logs:
+- `Successfully registered as node operator`
+- node/gateway started
+- gateway uses delegated sender (`t410...`)
+
+### 6) Important note about object uploads
+
+`POST /v1/objects` uploads bytes to Iroh, but on-chain object registration is a separate step (for example `addObject(...)` via `cast`/dropbox). If registration is skipped, gateway can keep showing `Found 0 added blobs`.
+
 ## Configuration
 
 ```bash
