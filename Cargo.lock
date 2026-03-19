@@ -82,6 +82,7 @@ dependencies = [
  "fendermint_actor_adm",
  "fendermint_actor_blob_reader",
  "fendermint_actor_blobs",
+ "fendermint_actor_bridge_relay",
  "fendermint_actor_bucket",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
@@ -4003,6 +4004,27 @@ dependencies = [
  "iroh-blobs",
  "rand 0.8.5",
  "tracing-subscriber 0.3.20",
+]
+
+[[package]]
+name = "fendermint_actor_bridge_relay"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.11.1",
+ "fil_actors_runtime",
+ "frc42_dispatch 8.0.0",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_ipld_hamt",
+ "fvm_shared",
+ "hex",
+ "log",
+ "num-derive 0.4.2",
+ "num-traits",
+ "serde",
+ "serde_tuple 0.5.0",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
