@@ -7,6 +7,11 @@ use crate::CommandLineHandler;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Args;
+use fendermint_crypto::{to_b64, SecretKey};
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fvm_shared::address::{set_current_network, Address, Network};
+use rand::thread_rng;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 pub(crate) struct InitStorage;
@@ -47,7 +52,24 @@ impl CommandLineHandler for InitStorage {
         let secret_key_file = args
             .secret_key_file
             .clone()
-            .unwrap_or_else(|| node_home.join("fendermint/validator.sk"));
+            .unwrap_or_else(|| storage_dir.join("operator.sk"));
+        ensure_operator_secret_key(&secret_key_file)?;
+
+        // Storage tooling defaults to testnet addressing unless explicitly overridden at runtime.
+        set_current_network(Network::Testnet);
+        let operator_sk = read_operator_secret_key(&secret_key_file).with_context(|| {
+            format!(
+                "failed to read operator key from {}",
+                secret_key_file.display()
+            )
+        })?;
+        let operator_pk = operator_sk.public_key();
+        let operator_f1 = Address::new_secp256k1(&operator_pk.serialize())
+            .context("failed to derive operator f1 address")?;
+        let operator_f410_eth = EthAddress::new_secp256k1(&operator_pk.serialize())
+            .context("failed to derive operator delegated address")?;
+        let operator_f410 = Address::new_delegated(10, &operator_f410_eth.0)
+            .context("failed to construct operator f410 address")?;
         let storage_cfg = StorageConfig {
             node_home: node_home.clone(),
             node_config: args.node_config.clone(),
@@ -84,6 +106,18 @@ impl CommandLineHandler for InitStorage {
             "Using operator secret key file: {}",
             storage_cfg.secret_key_file.display()
         );
+        log::info!("Operator funding addresses:");
+        log::info!("  - delegated (fund this): {}", operator_f410);
+        log::info!("  - native (diagnostic only): {}", operator_f1);
+        log::info!(
+            "Recommendation: cross-fund the delegated operator address above before `storage run --register-operator`."
+        );
+        log::info!("Example:");
+        log::info!(
+            "  ipc-cli cross-msg fund --subnet \"{}\" --from <PARENT_FUNDING_ADDR> --to {} 1",
+            node_cfg.subnet,
+            operator_f410
+        );
         log::info!(
             "Run storage services with `ipc-cli storage run --config {}`",
             out.display()
@@ -101,7 +135,7 @@ pub struct InitStorageArgs {
     pub out: Option<PathBuf>,
     #[arg(
         long,
-        help = "Path to operator secp256k1 secret key file (base64). Defaults to <node-home>/fendermint/validator.sk"
+        help = "Path to operator secp256k1 secret key file (base64). Defaults to <node-home>/storage/operator.sk"
     )]
     pub secret_key_file: Option<PathBuf>,
 }
@@ -119,4 +153,34 @@ fn workspace_root() -> PathBuf {
         .and_then(|p| p.parent())
         .unwrap_or_else(|| Path::new("."))
         .to_path_buf()
+}
+
+fn ensure_operator_secret_key(path: &Path) -> Result<()> {
+    if path.exists() {
+        return Ok(());
+    }
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create operator key directory at {}",
+                parent.display()
+            )
+        })?;
+    }
+
+    let mut rng = thread_rng();
+    let sk = SecretKey::random(&mut rng);
+    let sk_bytes = sk.serialize();
+    let sk_b64 = to_b64(sk_bytes.as_ref());
+    fs::write(path, sk_b64)
+        .with_context(|| format!("failed to write operator key to {}", path.display()))?;
+    log::info!("Generated dedicated operator key at {}", path.display());
+    Ok(())
+}
+
+fn read_operator_secret_key(path: &Path) -> Result<SecretKey> {
+    let sk = fendermint_rpc::message::SignedMessageFactory::read_secret_key(path)
+        .with_context(|| format!("failed to parse secret key at {}", path.display()))?;
+    Ok(sk)
 }

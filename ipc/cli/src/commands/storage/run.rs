@@ -199,6 +199,40 @@ async fn preflight(cfg: &StorageConfig) -> Result<()> {
             cfg.secret_key_file.display()
         );
     }
+    if !cfg.bls_key_file.exists() {
+        if let Some(parent) = cfg.bls_key_file.parent() {
+            tokio::fs::create_dir_all(parent).await.with_context(|| {
+                format!(
+                    "failed to create BLS key directory at {}",
+                    parent.display()
+                )
+            })?;
+        }
+        let node_bin = resolve_bin_path(&cfg.storage_node_bin, "node")?;
+        log::info!(
+            "BLS key file not found at {}; generating one now",
+            cfg.bls_key_file.display()
+        );
+        let status = Command::new(&node_bin)
+            .arg("generate-bls-key")
+            .arg("--output")
+            .arg(&cfg.bls_key_file)
+            .status()
+            .with_context(|| {
+                format!(
+                    "failed to generate BLS key via {}",
+                    node_bin.display()
+                )
+            })?;
+        if !status.success() {
+            bail!(
+                "failed to generate BLS key at {} (exit status {})",
+                cfg.bls_key_file.display(),
+                status
+            );
+        }
+        log::info!("Generated BLS key at {}", cfg.bls_key_file.display());
+    }
     if cfg
         .secret_key_file
         .ends_with(std::path::Path::new("fendermint/validator.sk"))

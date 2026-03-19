@@ -51,6 +51,11 @@ export SECRET_KEY_FILE=./test-network/keys/alice.sk
 
 ```
 
+Notes:
+- `register-operator` now supports delegated (`t410...`) operator keys through the blobs actor `InvokeContract` facade path.
+- Operator query methods are also available through the same facade path: `getOperatorInfo(address)` and `getActiveOperators()`.
+- Storage node and gateway use delegated (`t410...`) sender path for on-chain interactions; fund delegated operator address before running.
+
 ## 3. Launch ipc-dropbox
 Launch `ipc-dropbox` in `ipc-storage/ipc-dropbox` with `npm run dev`.
 

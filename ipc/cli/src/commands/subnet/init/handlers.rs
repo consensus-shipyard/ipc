@@ -446,10 +446,10 @@ fn build_default_fendermint_overrides(
 subnet_id = "{subnet_id}"
 
 [ipc.topdown]
-chain_head_delay = 10
+chain_head_delay = 2
 proposal_delay = 2
 max_proposal_range = 100
-polling_interval = 10
+polling_interval = 2
 exponential_back_off = 5
 exponential_retry_limit = 5
 parent_http_endpoint = "{parent_http_endpoint}"

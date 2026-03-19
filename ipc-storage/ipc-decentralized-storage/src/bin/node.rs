@@ -3,19 +3,20 @@
 
 //! Binary for running a decentralized storage node
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
+use bytes::Bytes;
 use clap::{Parser, Subcommand};
+use ethers::abi::{encode as abi_encode, Token as AbiToken};
 use ethers::types::Address as EthAddress;
-use fendermint_actor_blobs_shared::method::Method;
 use fendermint_actor_blobs_shared::operators::RegisterNodeOperatorParams;
 use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
 use fendermint_rpc::message::{GasParams, SignedMessageFactory};
 use fendermint_rpc::tx::{TxClient, TxCommit};
 use fendermint_rpc::FendermintClient;
 use fendermint_rpc::QueryClient;
+use fendermint_vm_actor_interface::eam::EthAddress as FvmEthAddress;
 use fendermint_vm_message::query::FvmQueryHeight;
-use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::{set_current_network, Address, Network};
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
@@ -26,6 +27,8 @@ use std::str::FromStr;
 use std::time::Duration;
 use tendermint_rpc::Url;
 use tracing::info;
+
+const REGISTER_NODE_OPERATOR_SELECTOR: [u8; 4] = [0x71, 0x3b, 0x10, 0xcf];
 
 #[derive(Parser, Debug)]
 #[command(name = "ipc-storage-node")]
@@ -307,11 +310,13 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         .context("failed to read secret key")?;
 
     let pk = sk.public_key();
-    // Use f1 address (secp256k1) instead of f410 (delegated/ethereum) because we're calling
-    // a native FVM actor with CBOR params, not an EVM contract with calldata
-    let from_addr =
-        Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
-    info!("Sender address: {}", from_addr);
+    let from_f1 = Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
+    let from_eth = FvmEthAddress::new_secp256k1(&pk.serialize())
+        .context("failed to derive delegated address from secret key")?;
+    let from_f410 =
+        Address::new_delegated(10, &from_eth.0).context("failed to create f410 address")?;
+    info!("Sender f1 address: {}", from_f1);
+    info!("Sender f410 address: {}", from_f410);
 
     // Parse chain RPC URL
     let chain_rpc_url =
@@ -321,10 +326,17 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
     let client = FendermintClient::new_http(chain_rpc_url, None)
         .context("failed to create Fendermint client")?;
 
-    // Query the account nonce from the state
-    let sequence = get_sequence(&client, &from_addr)
+    // Ensure blobs actor exists on this subnet.
+    let blobs_actor_state = client
+        .actor_state(&BLOBS_ACTOR_ADDR, FvmQueryHeight::default())
         .await
-        .context("failed to get account sequence")?;
+        .context("failed to query blobs actor state")?;
+    if blobs_actor_state.value.is_none() {
+        anyhow::bail!(
+            "blobs actor {} is not deployed on this subnet. Recreate/start the subnet with ipc-storage enabled (fendermint_app built with --features ipc-storage), then retry register-operator.",
+            BLOBS_ACTOR_ADDR
+        );
+    }
 
     // Query the chain ID
     let chain_id = client
@@ -335,22 +347,12 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         .chain_id;
 
     info!("Chain ID: {}", chain_id);
-    info!("Account sequence: {}", sequence);
-
-    // Create signed message factory
-    let mf = SignedMessageFactory::new(sk, from_addr, sequence, ChainID::from(chain_id));
-
-    // Bind the client with the message factory
-    let mut client = client.bind(mf);
 
     // Prepare registration parameters
     let params = RegisterNodeOperatorParams {
         bls_pubkey: bls_pubkey.clone(),
         rpc_url: args.operator_rpc_url.clone(),
     };
-
-    let params_bytes =
-        RawBytes::serialize(params).context("failed to serialize RegisterNodeOperatorParams")?;
 
     // Gas params
     let gas_params = GasParams {
@@ -359,36 +361,47 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         gas_premium: TokenAmount::from_atto(100),
     };
 
-    info!("Sending RegisterNodeOperator transaction...");
-
-    // Send the transaction
-    let res = TxClient::<TxCommit>::transaction(
-        &mut client,
-        BLOBS_ACTOR_ADDR,
-        Method::RegisterNodeOperator as u64,
-        params_bytes,
-        TokenAmount::from_atto(0),
-        gas_params,
-    )
-    .await
-    .context("failed to send RegisterNodeOperator transaction")?;
-
-    if res.response.check_tx.code.is_err() {
+    let tx_hash = if let Some(sequence) = get_sequence_opt(&client, &from_f410)
+        .await
+        .context("failed to get delegated account sequence")?
+    {
+        info!("Using delegated sender (f410) via InvokeContract facade");
+        info!("Account sequence: {}", sequence);
+        let mf = SignedMessageFactory::new(sk, from_f410, sequence, ChainID::from(chain_id));
+        let mut client = client.bind(mf);
+        let calldata = encode_register_node_operator_calldata(&params);
+        let res = TxClient::<TxCommit>::fevm_invoke(
+            &mut client,
+            BLOBS_ACTOR_ADDR,
+            calldata,
+            TokenAmount::from_atto(0),
+            gas_params,
+        )
+        .await
+        .context("failed to send delegated RegisterNodeOperator transaction")?;
+        if res.response.check_tx.code.is_err() {
+            anyhow::bail!(
+                "RegisterNodeOperator check_tx failed: {}",
+                res.response.check_tx.log
+            );
+        }
+        if res.response.deliver_tx.code.is_err() {
+            anyhow::bail!(
+                "RegisterNodeOperator deliver_tx failed: code={:?}, log={}, info={}, gas_used={}",
+                res.response.deliver_tx.code,
+                res.response.deliver_tx.log,
+                res.response.deliver_tx.info,
+                res.response.deliver_tx.gas_used
+            );
+        }
+        info!("Sent RegisterNodeOperator transaction with delegated path");
+        res.response.hash.to_string()
+    } else {
         anyhow::bail!(
-            "RegisterNodeOperator check_tx failed: {}",
-            res.response.check_tx.log
+            "delegated sender {} not found on-chain; cross-fund this delegated address and retry (native f1 {} is intentionally not used)",
+            from_f410, from_f1
         );
-    }
-
-    if res.response.deliver_tx.code.is_err() {
-        anyhow::bail!(
-            "RegisterNodeOperator deliver_tx failed: code={:?}, log={}, info={}, gas_used={}",
-            res.response.deliver_tx.code,
-            res.response.deliver_tx.log,
-            res.response.deliver_tx.info,
-            res.response.deliver_tx.gas_used
-        );
-    }
+    };
 
     info!("✓ Successfully registered as node operator!");
     info!(
@@ -396,22 +409,33 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         hex::encode(bls_private_key.public_key().as_bytes())
     );
     info!("  RPC URL: {}", args.operator_rpc_url);
-    info!("  Tx hash: {}", res.response.hash);
+    info!("  Tx hash: {}", tx_hash);
 
     Ok(())
 }
 
-/// Get the next sequence number (nonce) of an account.
-async fn get_sequence(client: &impl QueryClient, addr: &Address) -> Result<u64> {
+/// Get the next sequence number (nonce) of an account if it exists.
+async fn get_sequence_opt(client: &impl QueryClient, addr: &Address) -> Result<Option<u64>> {
     let state = client
         .actor_state(addr, FvmQueryHeight::default())
         .await
         .context("failed to get actor state")?;
 
     match state.value {
-        Some((_id, state)) => Ok(state.sequence),
-        None => Err(anyhow!("cannot find actor {addr}")),
+        Some((_id, state)) => Ok(Some(state.sequence)),
+        None => Ok(None),
     }
+}
+
+fn encode_register_node_operator_calldata(params: &RegisterNodeOperatorParams) -> Bytes {
+    let args = abi_encode(&[
+        AbiToken::Bytes(params.bls_pubkey.clone()),
+        AbiToken::String(params.rpc_url.clone()),
+    ]);
+    let mut calldata = Vec::with_capacity(4 + args.len());
+    calldata.extend_from_slice(&REGISTER_NODE_OPERATOR_SELECTOR);
+    calldata.extend_from_slice(&args);
+    Bytes::from(calldata)
 }
 
 /// Generate a new BLS private key and save it to a file.
