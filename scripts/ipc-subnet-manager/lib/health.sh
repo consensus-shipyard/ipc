@@ -1904,23 +1904,19 @@ deploy_binaries_to_validator() {
     local binary_dir="$2"
 
     local name="${VALIDATORS[$validator_idx]}"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local ipc_repo=$(get_config_value "paths.ipc_repo")
     local remote_release="$ipc_repo/target/release"
 
     log_info "[$name] Deploying binaries..."
 
-    # Ensure remote directory exists
-    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$ssh_user@$ip" \
-        "sudo mkdir -p $remote_release && sudo chown $ipc_user:$ipc_user $remote_release" 2>/dev/null || true
+    # Ensure directory exists (exec_on_host handles local/remote via is_local_mode)
+    exec_on_host "$validator_idx" "mkdir -p $remote_release" >/dev/null 2>&1 || true
 
-    if ! scp_to_host "$ip" "$ssh_user" "$ipc_user" "$binary_dir/ipc-cli" "$remote_release/ipc-cli"; then
+    if ! copy_to_host "$validator_idx" "$binary_dir/ipc-cli" "$remote_release/ipc-cli"; then
         log_error "[$name] Failed to copy ipc-cli"
         return 1
     fi
-    if ! scp_to_host "$ip" "$ssh_user" "$ipc_user" "$binary_dir/fendermint" "$remote_release/fendermint"; then
+    if ! copy_to_host "$validator_idx" "$binary_dir/fendermint" "$remote_release/fendermint"; then
         log_error "[$name] Failed to copy fendermint"
         return 1
     fi
