@@ -64,8 +64,8 @@ paths:
 # Initialization Settings
 init:
   # Deploy new subnet and gateway contracts (set true for fresh deployment)
-  deploy_subnet: false
-  activate_subnet: false
+  deploy_subnet: true
+  activate_subnet: true
   # node-topdown-mode passed to `ipc-cli subnet init` (legacy | f3 | auto)
   node_topdown_mode: "legacy"
   # Supply source (native or ERC20)

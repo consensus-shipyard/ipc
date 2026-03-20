@@ -227,6 +227,60 @@ storage_should_run_on_validator() {
     [ "$run_on" = "$validator_name" ]
 }
 
+storage_preflight_checks() {
+    local validator_idx="$1"
+    local validator_name="$2"
+    local eth_api_port="$3"
+    local storage_node_bin="$4"
+    local storage_gateway_bin="$5"
+    local storage_actor_addr="0xff00000000000000000000000000000000000042"
+
+    if ! exec_on_host_simple "$validator_idx" "command -v yq >/dev/null 2>&1"; then
+        log_error "$validator_name: missing required dependency 'yq'"
+        log_info "Install it on $validator_name and retry:"
+        log_info "  sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && sudo chmod +x /usr/local/bin/yq"
+        return 1
+    fi
+
+    if ! exec_on_host_simple "$validator_idx" "[ -x $storage_node_bin ]"; then
+        log_error "$validator_name: storage node binary not found/executable: $storage_node_bin"
+        log_info "Build and deploy storage binaries, then retry start-storage."
+        return 1
+    fi
+
+    if ! exec_on_host_simple "$validator_idx" "[ -x $storage_gateway_bin ]"; then
+        log_error "$validator_name: storage gateway binary not found/executable: $storage_gateway_bin"
+        log_info "Build and deploy storage binaries, then retry start-storage."
+        return 1
+    fi
+
+    local actor_probe
+    actor_probe=$(exec_on_host "$validator_idx" \
+        "resp=\$(curl -sS --max-time 8 -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$storage_actor_addr\",\"latest\"],\"id\":1}' http://127.0.0.1:$eth_api_port 2>/dev/null || true); \
+         if echo \"\$resp\" | grep -q '\"result\":\"0x\"'; then echo MISSING; \
+         elif echo \"\$resp\" | grep -q '\"result\":\"0x0\"'; then echo MISSING; \
+         elif echo \"\$resp\" | grep -q '\"result\":\"0x'; then echo OK; \
+         else echo UNKNOWN; fi")
+
+    if echo "$actor_probe" | grep -q "MISSING"; then
+        log_error "$validator_name: storage actor (ID 66 / $storage_actor_addr) is not deployed on this subnet"
+        log_info "Preflight failed to avoid starting storage against a chain without storage actors."
+        log_info "Next steps:"
+        log_info "  1) Keep init.deploy_subnet=true and init.activate_subnet=true in ipc-subnet-config.yml"
+        log_info "  2) Re-run: ./ipc-manager init --yes"
+        log_info "  3) After init succeeds, run: ./ipc-manager start-storage --register-operator --yes"
+        return 1
+    fi
+
+    if echo "$actor_probe" | grep -q "UNKNOWN"; then
+        log_error "$validator_name: unable to verify storage actor deployment via http://127.0.0.1:$eth_api_port"
+        log_info "Ensure the subnet node is up and the eth RPC endpoint is reachable, then retry."
+        return 1
+    fi
+
+    return 0
+}
+
 start_storage_services() {
     local register_operator="${1:-false}"
     local started=0
@@ -279,6 +333,10 @@ start_storage_services() {
         ipc_repo=$(get_config_value "paths.ipc_repo")
         local storage_node_bin="$ipc_repo/target/release/node"
         local storage_gateway_bin="$ipc_repo/target/release/gateway"
+
+        if ! storage_preflight_checks "$idx" "$name" "$eth_api_port" "$storage_node_bin" "$storage_gateway_bin"; then
+            continue
+        fi
 
         exec_on_host_simple "$idx" "yq eval \".\\\"objects-listen-addr\\\" = \\\"$objects_listen_addr\\\"\" -i $storage_cfg_path"
         exec_on_host_simple "$idx" "yq eval \".\\\"node-rpc-bind-addr\\\" = \\\"$node_rpc_bind_addr\\\"\" -i $storage_cfg_path"
