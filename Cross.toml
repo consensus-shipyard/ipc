@@ -1,0 +1,8 @@
+[target.x86_64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main"
+# Install OpenSSL headers/pkg-config inside the cross container so crates that
+# depend on native-tls/openssl-sys can compile.
+pre-build = [
+  "dpkg --add-architecture $CROSS_DEB_ARCH",
+  "apt-get update && apt-get --assume-yes install pkg-config libssl-dev:$CROSS_DEB_ARCH"
+]

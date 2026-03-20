@@ -100,6 +100,8 @@ init:
   # Deploy subnet and gateway contracts automatically
   # Set to true to run `ipc-cli subnet init` before node initialization
   deploy_subnet: true
+  # node-topdown-mode passed to `ipc-cli subnet init` (legacy | f3 | auto)
+  node_topdown_mode: "legacy"
   # Activate subnet during deployment
   # Set to true to activate the subnet and create genesis from parent chain
   # Set to false to create bootstrap genesis locally (for development/testing)
@@ -179,6 +181,15 @@ relayer:
   checkpoint_interval: 10
   # Maximum parallel checkpoint submissions
   max_parallelism: 1
+# Storage service configuration (ipc-cli storage init/run)
+storage:
+  run_on: "primary"
+  run_mode: "both"
+  objects_listen_addr: "127.0.0.1:8080"
+  node_rpc_bind_addr: "127.0.0.1:8081"
+  operator_rpc_url: "http://127.0.0.1:8081"
+  iroh_node_v4_addr: "0.0.0.0:11204"
+  iroh_gateway_v4_addr: "0.0.0.0:11205"
 # Usage Instructions:
 #
 # 1. Start local deployment:

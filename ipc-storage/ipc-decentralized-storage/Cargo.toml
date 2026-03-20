@@ -29,7 +29,8 @@ urlencoding.workspace = true
 blake3.workspace = true
 
 # HTTP client dependencies
-reqwest = { version = "0.11", features = ["json"] }
+# Use rustls to avoid OpenSSL target sysroot issues during macOS -> Linux cross compilation.
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 
 # CLI dependencies
 clap = { workspace = true, features = ["derive"] }
@@ -54,7 +55,8 @@ fendermint_crypto = { path = "../../fendermint/crypto" }
 
 # IPC dependencies for address parsing
 ipc-api = { path = "../../ipc/api" }
-ethers.workspace = true
+# Keep ethers minimal here to avoid pulling native-tls/OpenSSL in local cross-compiles.
+ethers = { workspace = true, default-features = false, features = ["rustls"] }
 
 # FVM dependencies
 fvm_shared.workspace = true

@@ -33,9 +33,33 @@ stop_all_nodes() {
 
         log_info "Stopping $name..."
         kill_process "$idx" "ipc-cli node start"
+        # Also stop child processes that can keep RocksDB LOCK files open.
+        kill_process "$idx" "/target/release/fendermint"
+        kill_process "$idx" "fendermint/app/src/service/node.rs"
+        kill_process "$idx" "cometbft start"
+        kill_process "$idx" "/cometbft"
+
+        # Best-effort systemd stop (some hosts run ipc-node service directly).
+        if ! is_local_mode; then
+            local ip
+            ip=$(get_config_value "validators[$idx].ip")
+            local ssh_user
+            ssh_user=$(get_config_value "validators[$idx].ssh_user")
+            ssh_run_sudo "$ip" "$ssh_user" \
+                "sudo -n systemctl stop ipc-node >/dev/null 2>&1 || sudo -n systemctl --user stop ipc-node >/dev/null 2>&1 || true" || true
+        fi
 
         # Wait a moment for graceful shutdown
         sleep 2
+    done
+}
+
+stop_all_storage_nodes() {
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        log_info "Stopping storage services on $name..."
+        kill_process "$idx" "ipc-cli storage run"
+        sleep 1
     done
 }
 
@@ -103,6 +127,7 @@ initialize_primary_node() {
     local name="${VALIDATORS[$validator_idx]}"
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local node_init_config=$(get_config_value "paths.node_init_config")
+    local node_init_config_expanded="${node_init_config/#\~/$HOME}"
 
     log_info "Initializing $name (primary)..."
 
@@ -116,7 +141,7 @@ initialize_primary_node() {
 
     # Run init
     local init_output=$(exec_on_host "$validator_idx" \
-        "$ipc_binary node init --config $node_init_config 2>&1")
+        "$ipc_binary node init --config $node_init_config_expanded 2>&1")
 
     if echo "$init_output" | grep -q "Error\|error\|failed"; then
         log_error "Initialization failed for $name"
@@ -146,6 +171,7 @@ initialize_secondary_node() {
     local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local node_init_config=$(get_config_value "paths.node_init_config")
+    local node_init_config_expanded="${node_init_config/#\~/$HOME}"
 
     log_info "Initializing $name..."
 
@@ -171,7 +197,7 @@ initialize_secondary_node() {
 
     # Run init
     local init_output=$(exec_on_host "$validator_idx" \
-        "$ipc_binary node init --config $node_init_config 2>&1")
+        "$ipc_binary node init --config $node_init_config_expanded 2>&1")
 
     if echo "$init_output" | grep -q "Error\|error\|failed"; then
         log_error "Initialization failed for $name"
@@ -180,6 +206,123 @@ initialize_secondary_node() {
     fi
 
     log_success "$name initialized successfully"
+}
+
+storage_should_run_on_validator() {
+    local validator_idx="$1"
+    local run_on=$(get_config_value_with_default "storage.run_on" "primary")
+
+    if [ "$run_on" = "all" ]; then
+        return 0
+    fi
+
+    if [ "$run_on" = "primary" ]; then
+        local primary_idx
+        primary_idx=$(get_primary_validator)
+        [ "$validator_idx" = "$primary_idx" ]
+        return $?
+    fi
+
+    local validator_name="${VALIDATORS[$validator_idx]}"
+    [ "$run_on" = "$validator_name" ]
+}
+
+start_storage_services() {
+    local register_operator="${1:-false}"
+    local started=0
+
+    for idx in "${!VALIDATORS[@]}"; do
+        if ! storage_should_run_on_validator "$idx"; then
+            continue
+        fi
+
+        local name="${VALIDATORS[$idx]}"
+        local ipc_binary=$(get_config_value "paths.ipc_binary")
+        local node_home
+        node_home=$(get_node_home "$idx")
+        local node_init_config
+        node_init_config=$(get_config_value "paths.node_init_config")
+        node_init_config="${node_init_config/#\~/$HOME}"
+
+        log_info "Preparing storage config on $name..."
+        local init_cmd="$ipc_binary storage init --node-config $node_init_config"
+        if ! exec_on_host "$idx" "$init_cmd >/dev/null 2>&1"; then
+            log_error "Failed to generate storage config on $name"
+            continue
+        fi
+
+        local subnet_id
+        subnet_id=$(get_config_value "subnet.id")
+        local safe_subnet_id="${subnet_id//\//_}"
+        safe_subnet_id="${safe_subnet_id//:/_}"
+        local ipc_config_dir
+        ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
+        ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
+        local storage_cfg_path="$ipc_config_dir/storage_${safe_subnet_id}.yaml"
+
+        # Tune runtime addresses from manager config.
+        local objects_listen_addr
+        objects_listen_addr=$(get_config_value_with_default "storage.objects_listen_addr" "0.0.0.0:8080")
+        local node_rpc_bind_addr
+        node_rpc_bind_addr=$(get_config_value_with_default "storage.node_rpc_bind_addr" "0.0.0.0:8081")
+        local operator_rpc_url
+        operator_rpc_url=$(get_config_value_with_default "storage.operator_rpc_url" "http://127.0.0.1:8081")
+        local iroh_node_v4_addr
+        iroh_node_v4_addr=$(get_config_value_with_default "storage.iroh_node_v4_addr" "0.0.0.0:11204")
+        local iroh_gateway_v4_addr
+        iroh_gateway_v4_addr=$(get_config_value_with_default "storage.iroh_gateway_v4_addr" "0.0.0.0:11205")
+        local run_mode
+        run_mode=$(get_config_value_with_default "storage.run_mode" "both")
+        local eth_api_port
+        eth_api_port=$(get_validator_port "$idx" "eth_api" "$(get_config_value_with_default "network.eth_api_port" "8545")")
+
+        exec_on_host "$idx" "yq eval \".\\\"objects-listen-addr\\\" = \\\"$objects_listen_addr\\\"\" -i $storage_cfg_path"
+        exec_on_host "$idx" "yq eval \".\\\"node-rpc-bind-addr\\\" = \\\"$node_rpc_bind_addr\\\"\" -i $storage_cfg_path"
+        exec_on_host "$idx" "yq eval \".\\\"operator-rpc-url\\\" = \\\"$operator_rpc_url\\\"\" -i $storage_cfg_path"
+        exec_on_host "$idx" "yq eval \".\\\"iroh-node-v4-addr\\\" = \\\"$iroh_node_v4_addr\\\"\" -i $storage_cfg_path"
+        exec_on_host "$idx" "yq eval \".\\\"iroh-gateway-v4-addr\\\" = \\\"$iroh_gateway_v4_addr\\\"\" -i $storage_cfg_path"
+        exec_on_host "$idx" "yq eval \".\\\"run-mode\\\" = \\\"$run_mode\\\"\" -i $storage_cfg_path"
+        exec_on_host "$idx" "yq eval \".\\\"eth-rpc-url\\\" = \\\"http://127.0.0.1:$eth_api_port\\\"\" -i $storage_cfg_path"
+
+        local register_flag=""
+        if [ "$register_operator" = "true" ]; then
+            register_flag=" --register-operator"
+        fi
+
+        log_info "Starting storage services on $name..."
+        if exec_on_host "$idx" "nohup $ipc_binary storage run --config $storage_cfg_path$register_flag > $node_home/storage.log 2>&1 &"; then
+            log_success "Storage services started on $name"
+            started=$((started + 1))
+        else
+            log_error "Failed to start storage services on $name"
+        fi
+    done
+
+    if [ "$started" -eq 0 ]; then
+        return 1
+    fi
+    return 0
+}
+
+check_storage_status() {
+    local found=false
+    for idx in "${!VALIDATORS[@]}"; do
+        if ! storage_should_run_on_validator "$idx"; then
+            continue
+        fi
+        found=true
+        local name="${VALIDATORS[$idx]}"
+        if check_process_running "$idx" "ipc-cli storage run"; then
+            log_check "ok" "$name storage process running"
+        else
+            log_check "fail" "$name storage process not running"
+        fi
+    done
+
+    if [ "$found" = false ]; then
+        log_warn "No validators matched storage.run_on target"
+        return 1
+    fi
 }
 
 set_federated_power() {
@@ -275,6 +418,8 @@ deploy_subnet() {
     # Get configuration values
     local permission_mode=$(get_config_value "init.permission_mode")
     local supply_source=$(get_config_value "init.subnet_supply_source_kind")
+    local node_topdown_mode
+    node_topdown_mode=$(get_config_value_with_default "init.node_topdown_mode" "legacy")
     local min_validators=$(get_config_value "init.min_validators" 2>/dev/null)
     if [ -z "$min_validators" ] || [ "$min_validators" = "null" ]; then
         min_validators=$validator_count
@@ -296,6 +441,8 @@ deploy_subnet() {
     local subnet_init_config="/tmp/subnet-init-$$.yaml"
 
     cat > "$subnet_init_config" << EOF
+node-topdown-mode: $node_topdown_mode
+
 import-wallets:
   - wallet-type: evm
     private-key: $primary_private_key
@@ -418,12 +565,42 @@ EOF
         exit 1
     fi
 
-    # Extract subnet ID from config (use local path when deploy runs locally)
+    # Extract subnet ID from config (use local path when deploy runs locally).
+    # Pick the LAST matching child subnet block so repeated deployments don't reuse stale IDs.
     local ipc_config_dir
     ipc_config_dir=$(get_local_ipc_config_dir)
     local ipc_config_file="$ipc_config_dir/config.toml"
 
-    local subnet_id=$(grep '^id = ' "$ipc_config_file" | cut -d'"' -f2 | grep -E "^$parent_chain_id/t[a-z0-9]+" | head -1)
+    local subnet_id
+    subnet_id=$(awk -v parent="$parent_chain_id" '
+        BEGIN {
+            in_subnet = 0
+            current_id = ""
+            last_match = ""
+        }
+        /^\[\[subnets\]\]/ {
+            in_subnet = 1
+            current_id = ""
+            next
+        }
+        in_subnet && /^id = / {
+            current_id = $0
+            sub(/^id = "/, "", current_id)
+            sub(/"$/, "", current_id)
+            next
+        }
+        in_subnet && /^\[subnets\.config\]/ {
+            if (current_id ~ ("^" parent "/t[a-z0-9]+$")) {
+                last_match = current_id
+            }
+            in_subnet = 0
+            current_id = ""
+            next
+        }
+        END {
+            print last_match
+        }
+    ' "$ipc_config_file")
 
     if [ -z "$subnet_id" ]; then
         log_error "Could not extract subnet ID from IPC config at $ipc_config_file" >&2
@@ -1778,6 +1955,8 @@ show_voting_status() {
 update_validator_binaries() {
     local validator_idx="$1"
     local branch="$2"
+    local with_storage="${3:-false}"
+    local do_git_pull="${4:-false}"
 
     local name="${VALIDATORS[$validator_idx]}"
     local ip=$(get_config_value "validators[$validator_idx].ip")
@@ -1787,17 +1966,38 @@ update_validator_binaries() {
 
     log_info "[$name] Updating binaries from branch '$branch'..."
 
+    local vcs_cmd="git checkout $branch"
+    if [ "$do_git_pull" = "true" ]; then
+        vcs_cmd="git fetch origin && git checkout $branch && git pull origin $branch"
+    fi
+
     local update_cmd="cd $ipc_repo && \
         source ~/.cargo/env 2>/dev/null; \
         source ~/.bashrc 2>/dev/null; \
         export PATH=\"\$HOME/.cargo/bin:\$HOME/.foundry/bin:\$HOME/.npm-global/bin:\$PATH\" && \
-        git fetch origin && \
-        git checkout $branch && \
-        git pull origin $branch && \
+        $vcs_cmd && \
         cargo clean && \
         make"
 
-    log_info "[$name] Pulling latest changes and building... (this may take 10-15 min for full rebuild)"
+    if [ "$with_storage" = "true" ]; then
+        # Some branches do not expose ipc-storage on ipc-cli directly.
+        # Fall back to plain ipc-cli build when the feature is unavailable.
+        update_cmd="$update_cmd && \
+        if rg -q \"^[[:space:]]*ipc-storage[[:space:]]*=\" ipc/cli/Cargo.toml; then \
+            cargo build --release -p ipc-cli --features ipc-storage; \
+        else \
+            echo \"[warn] ipc-cli feature 'ipc-storage' not found; building ipc-cli without feature\"; \
+            cargo build --release -p ipc-cli; \
+        fi && \
+        cargo build --release -p fendermint_app --features ipc-storage && \
+        cargo build --release -p ipc-decentralized-storage --bin node --bin gateway"
+    fi
+
+    if [ "$do_git_pull" = "true" ]; then
+        log_info "[$name] Pulling latest changes and building... (this may take 10-15 min for full rebuild)"
+    else
+        log_info "[$name] Building current local checkout (no git pull)..."
+    fi
     if ! ssh_exec_long "$ip" "$ssh_user" "$ipc_user" "$update_cmd"; then
         log_error "[$name] Build failed"
         return 1
@@ -1823,13 +2023,20 @@ build_ipc_locally() {
     local branch="${1:-main}"
     local local_repo="$2"
     local result_file="$3"
+    local with_storage="${4:-false}"
+    local do_git_pull="${5:-false}"
 
     log_info "Building IPC locally (branch: $branch)..."
     log_info "Repository: $local_repo"
 
-    # Git fetch and checkout
-    if ! (cd "$local_repo" && git fetch origin && git checkout "$branch" && git pull origin "$branch"); then
-        log_error "Failed to update git repository"
+    # Git checkout (optional pull)
+    if [ "$do_git_pull" = "true" ]; then
+        if ! (cd "$local_repo" && git fetch origin && git checkout "$branch" && git pull origin "$branch"); then
+            log_error "Failed to update git repository"
+            return 1
+        fi
+    elif ! (cd "$local_repo" && git checkout "$branch"); then
+        log_error "Failed to checkout branch '$branch' in local repository"
         return 1
     fi
 
@@ -1842,6 +2049,7 @@ build_ipc_locally() {
 
     local target_triple=""
     local binary_dir=""
+    local cargo_build_cmd="cargo build --release"
     local os_name
     os_name=$(uname -s)
 
@@ -1849,6 +2057,7 @@ build_ipc_locally() {
         # Cross-compile for Linux (validators are typically x86_64 Linux)
         target_triple="x86_64-unknown-linux-gnu"
         binary_dir="$local_repo/target/$target_triple/release"
+        cargo_build_cmd="cargo zigbuild --release --target $target_triple"
 
         # Prefer cargo-zigbuild (no Docker needed); fall back to cross
         if command -v cargo-zigbuild &>/dev/null && command -v zig &>/dev/null; then
@@ -1861,7 +2070,12 @@ build_ipc_locally() {
         elif command -v cross &>/dev/null; then
             log_info "Cross-compiling for $target_triple using cross (macOS -> Linux)..."
             local cross_output
-            cross_output=$(cd "$local_repo" && cross build --release --target "$target_triple" 2>&1)
+            local cross_prefix=""
+            if [ "$(uname -m)" = "arm64" ]; then
+                # cross images are often amd64-only; force amd64 for both build and run on Apple Silicon.
+                cross_prefix="CROSS_BUILD_OPTS=--platform=linux/amd64 CROSS_CONTAINER_OPTS=--platform=linux/amd64 "
+            fi
+            cross_output=$(cd "$local_repo" && eval "${cross_prefix}cross build --release --target \"$target_triple\"" 2>&1)
             local cross_exit=$?
             if [ $cross_exit -ne 0 ]; then
                 echo "$cross_output" | tail -20
@@ -1889,8 +2103,65 @@ build_ipc_locally() {
         fi
     fi
 
+    if [ "$with_storage" = "true" ]; then
+        log_info "Building storage-enabled binaries locally..."
+        local storage_build_cmd="$cargo_build_cmd"
+
+        # On macOS cross-compiling to Linux, storage transitive deps can require
+        # pkg-config target setup for OpenSSL. Prefer `cross` for this package.
+        if [ "$os_name" = "Darwin" ] && [ -n "$target_triple" ]; then
+            if command -v cross &>/dev/null; then
+                local cross_prefix=""
+                if [ "$(uname -m)" = "arm64" ]; then
+                    # cross images are often amd64-only; force amd64 for both build and run on Apple Silicon.
+                    cross_prefix="CROSS_BUILD_OPTS=--platform=linux/amd64 CROSS_CONTAINER_OPTS=--platform=linux/amd64 "
+                fi
+                storage_build_cmd="${cross_prefix}cross build --release --target $target_triple"
+                log_info "Using cross for storage binaries to avoid OpenSSL cross-compile issues..."
+
+                # cross 0.2.5 can fail on Apple Silicon unless the non-host
+                # toolchain is pre-installed with --force-non-host.
+                local rust_channel
+                rust_channel=$(sed -n 's/^channel = "\(.*\)"/\1/p' "$local_repo/rust-toolchain.toml" | head -1)
+                if [ -n "$rust_channel" ]; then
+                    local cross_toolchain="${rust_channel}-${target_triple}"
+                    log_info "Ensuring non-host toolchain exists: $cross_toolchain"
+                    rustup toolchain install --force-non-host "$cross_toolchain" --profile minimal >/dev/null 2>&1 || true
+                fi
+            else
+                log_warn "cross not found; storage build may fail on OpenSSL cross-compilation"
+                log_warn "Install with: cargo install cross --git https://github.com/cross-rs/cross"
+            fi
+        fi
+
+        if rg -q "^[[:space:]]*ipc-storage[[:space:]]*=" "$local_repo/ipc/cli/Cargo.toml"; then
+            if ! (cd "$local_repo" && $cargo_build_cmd -p ipc-cli --features ipc-storage 2>&1); then
+                log_error "Failed to build ipc-cli with ipc-storage feature"
+                return 1
+            fi
+        else
+            log_warn "ipc-cli feature 'ipc-storage' not found on this branch; building ipc-cli without it"
+            if ! (cd "$local_repo" && $cargo_build_cmd -p ipc-cli 2>&1); then
+                log_error "Failed to build ipc-cli"
+                return 1
+            fi
+        fi
+        if ! (cd "$local_repo" && $cargo_build_cmd -p fendermint_app --features ipc-storage 2>&1); then
+            log_error "Failed to build fendermint_app with ipc-storage feature"
+            return 1
+        fi
+        if ! (cd "$local_repo" && eval "$storage_build_cmd -p ipc-decentralized-storage --bin node --bin gateway" 2>&1); then
+            log_error "Failed to build storage node/gateway binaries"
+            return 1
+        fi
+    fi
+
     if [ ! -f "$binary_dir/ipc-cli" ] || [ ! -f "$binary_dir/fendermint" ]; then
         log_error "Binaries not found in $binary_dir"
+        return 1
+    fi
+    if [ "$with_storage" = "true" ] && { [ ! -f "$binary_dir/node" ] || [ ! -f "$binary_dir/gateway" ]; }; then
+        log_error "Storage binaries not found in $binary_dir (need node and gateway)"
         return 1
     fi
 
@@ -1902,6 +2173,7 @@ build_ipc_locally() {
 deploy_binaries_to_validator() {
     local validator_idx="$1"
     local binary_dir="$2"
+    local with_storage="${3:-false}"
 
     local name="${VALIDATORS[$validator_idx]}"
     local ipc_repo=$(get_config_value "paths.ipc_repo")
@@ -1919,6 +2191,33 @@ deploy_binaries_to_validator() {
     if ! copy_to_host "$validator_idx" "$binary_dir/fendermint" "$remote_release/fendermint"; then
         log_error "[$name] Failed to copy fendermint"
         return 1
+    fi
+
+    local should_copy_storage=false
+    if [ "$with_storage" = "true" ] || [ -f "$binary_dir/node" ] || [ -f "$binary_dir/gateway" ]; then
+        should_copy_storage=true
+    fi
+
+    if [ "$should_copy_storage" = "true" ]; then
+        if [ -f "$binary_dir/node" ]; then
+            if ! copy_to_host "$validator_idx" "$binary_dir/node" "$remote_release/node"; then
+                log_error "[$name] Failed to copy storage node binary"
+                return 1
+            fi
+        elif [ "$with_storage" = "true" ]; then
+            log_error "[$name] Missing storage node binary: $binary_dir/node"
+            return 1
+        fi
+
+        if [ -f "$binary_dir/gateway" ]; then
+            if ! copy_to_host "$validator_idx" "$binary_dir/gateway" "$remote_release/gateway"; then
+                log_error "[$name] Failed to copy storage gateway binary"
+                return 1
+            fi
+        elif [ "$with_storage" = "true" ]; then
+            log_error "[$name] Missing storage gateway binary: $binary_dir/gateway"
+            return 1
+        fi
     fi
 
     log_success "[$name] Binaries deployed"
@@ -1980,10 +2279,20 @@ deploy_binaries_only() {
 update_all_binaries() {
     local branch="${1:-main}"
     local compile_mode="${2:-remote}"
+    local with_storage="${3:-false}"
+    local do_git_pull="${4:-false}"
 
     log_header "Updating IPC Binaries"
     log_info "Branch: $branch"
     log_info "Compile mode: $compile_mode"
+    if [ "$do_git_pull" = "true" ]; then
+        log_info "Git pull: enabled"
+    else
+        log_info "Git pull: disabled (build current checkout)"
+    fi
+    if [ "$with_storage" = "true" ]; then
+        log_info "Storage build: enabled (ipc-storage feature + storage binaries)"
+    fi
     log_info "Validators: ${#VALIDATORS[@]}"
     echo ""
 
@@ -2003,7 +2312,7 @@ update_all_binaries() {
 
         local result_file="/tmp/ipc-manager-build-result.$$"
         trap "rm -f $result_file" EXIT
-        if ! build_ipc_locally "$branch" "$local_repo" "$result_file"; then
+        if ! build_ipc_locally "$branch" "$local_repo" "$result_file" "$with_storage" "$do_git_pull"; then
             rm -f "$result_file"
             return 1
         fi
@@ -2016,7 +2325,7 @@ update_all_binaries() {
 
         local all_success=true
         for idx in "${!VALIDATORS[@]}"; do
-            if ! deploy_binaries_to_validator "$idx" "$binary_dir"; then
+            if ! deploy_binaries_to_validator "$idx" "$binary_dir" "$with_storage"; then
                 all_success=false
             fi
         done
@@ -2039,7 +2348,7 @@ update_all_binaries() {
     local results=()
 
     for idx in "${!VALIDATORS[@]}"; do
-        update_validator_binaries "$idx" "$branch"
+        update_validator_binaries "$idx" "$branch" "$with_storage" "$do_git_pull"
         results[$idx]=$?
         [ ${results[$idx]} -ne 0 ] && all_success=false
     done
