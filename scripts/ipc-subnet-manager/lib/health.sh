@@ -246,7 +246,7 @@ start_storage_services() {
 
         log_info "Preparing storage config on $name..."
         local init_cmd="$ipc_binary storage init --node-config $node_init_config"
-        if ! exec_on_host "$idx" "$init_cmd >/dev/null 2>&1"; then
+        if ! exec_on_host_simple "$idx" "$init_cmd >/dev/null 2>&1"; then
             log_error "Failed to generate storage config on $name"
             continue
         fi
@@ -276,13 +276,13 @@ start_storage_services() {
         local eth_api_port
         eth_api_port=$(get_validator_port "$idx" "eth_api" "$(get_config_value_with_default "network.eth_api_port" "8545")")
 
-        exec_on_host "$idx" "yq eval \".\\\"objects-listen-addr\\\" = \\\"$objects_listen_addr\\\"\" -i $storage_cfg_path"
-        exec_on_host "$idx" "yq eval \".\\\"node-rpc-bind-addr\\\" = \\\"$node_rpc_bind_addr\\\"\" -i $storage_cfg_path"
-        exec_on_host "$idx" "yq eval \".\\\"operator-rpc-url\\\" = \\\"$operator_rpc_url\\\"\" -i $storage_cfg_path"
-        exec_on_host "$idx" "yq eval \".\\\"iroh-node-v4-addr\\\" = \\\"$iroh_node_v4_addr\\\"\" -i $storage_cfg_path"
-        exec_on_host "$idx" "yq eval \".\\\"iroh-gateway-v4-addr\\\" = \\\"$iroh_gateway_v4_addr\\\"\" -i $storage_cfg_path"
-        exec_on_host "$idx" "yq eval \".\\\"run-mode\\\" = \\\"$run_mode\\\"\" -i $storage_cfg_path"
-        exec_on_host "$idx" "yq eval \".\\\"eth-rpc-url\\\" = \\\"http://127.0.0.1:$eth_api_port\\\"\" -i $storage_cfg_path"
+        exec_on_host_simple "$idx" "yq eval \".\\\"objects-listen-addr\\\" = \\\"$objects_listen_addr\\\"\" -i $storage_cfg_path"
+        exec_on_host_simple "$idx" "yq eval \".\\\"node-rpc-bind-addr\\\" = \\\"$node_rpc_bind_addr\\\"\" -i $storage_cfg_path"
+        exec_on_host_simple "$idx" "yq eval \".\\\"operator-rpc-url\\\" = \\\"$operator_rpc_url\\\"\" -i $storage_cfg_path"
+        exec_on_host_simple "$idx" "yq eval \".\\\"iroh-node-v4-addr\\\" = \\\"$iroh_node_v4_addr\\\"\" -i $storage_cfg_path"
+        exec_on_host_simple "$idx" "yq eval \".\\\"iroh-gateway-v4-addr\\\" = \\\"$iroh_gateway_v4_addr\\\"\" -i $storage_cfg_path"
+        exec_on_host_simple "$idx" "yq eval \".\\\"run-mode\\\" = \\\"$run_mode\\\"\" -i $storage_cfg_path"
+        exec_on_host_simple "$idx" "yq eval \".\\\"eth-rpc-url\\\" = \\\"http://127.0.0.1:$eth_api_port\\\"\" -i $storage_cfg_path"
 
         local register_flag=""
         if [ "$register_operator" = "true" ]; then
@@ -290,7 +290,7 @@ start_storage_services() {
         fi
 
         log_info "Starting storage services on $name..."
-        if exec_on_host "$idx" "nohup $ipc_binary storage run --config $storage_cfg_path$register_flag > $node_home/storage.log 2>&1 &"; then
+        if exec_on_host_simple "$idx" "nohup $ipc_binary storage run --config $storage_cfg_path$register_flag > $node_home/storage.log 2>&1 &"; then
             log_success "Storage services started on $name"
             started=$((started + 1))
         else
