@@ -275,6 +275,10 @@ start_storage_services() {
         run_mode=$(get_config_value_with_default "storage.run_mode" "both")
         local eth_api_port
         eth_api_port=$(get_validator_port "$idx" "eth_api" "$(get_config_value_with_default "network.eth_api_port" "8545")")
+        local ipc_repo
+        ipc_repo=$(get_config_value "paths.ipc_repo")
+        local storage_node_bin="$ipc_repo/target/release/node"
+        local storage_gateway_bin="$ipc_repo/target/release/gateway"
 
         exec_on_host_simple "$idx" "yq eval \".\\\"objects-listen-addr\\\" = \\\"$objects_listen_addr\\\"\" -i $storage_cfg_path"
         exec_on_host_simple "$idx" "yq eval \".\\\"node-rpc-bind-addr\\\" = \\\"$node_rpc_bind_addr\\\"\" -i $storage_cfg_path"
@@ -283,6 +287,8 @@ start_storage_services() {
         exec_on_host_simple "$idx" "yq eval \".\\\"iroh-gateway-v4-addr\\\" = \\\"$iroh_gateway_v4_addr\\\"\" -i $storage_cfg_path"
         exec_on_host_simple "$idx" "yq eval \".\\\"run-mode\\\" = \\\"$run_mode\\\"\" -i $storage_cfg_path"
         exec_on_host_simple "$idx" "yq eval \".\\\"eth-rpc-url\\\" = \\\"http://127.0.0.1:$eth_api_port\\\"\" -i $storage_cfg_path"
+        exec_on_host_simple "$idx" "yq eval \".\\\"storage-node-bin\\\" = \\\"$storage_node_bin\\\"\" -i $storage_cfg_path"
+        exec_on_host_simple "$idx" "yq eval \".\\\"storage-gateway-bin\\\" = \\\"$storage_gateway_bin\\\"\" -i $storage_cfg_path"
 
         local register_flag=""
         if [ "$register_operator" = "true" ]; then
@@ -2106,31 +2112,32 @@ build_ipc_locally() {
     if [ "$with_storage" = "true" ]; then
         log_info "Building storage-enabled binaries locally..."
         local storage_build_cmd="$cargo_build_cmd"
+        local build_storage_in_debian12=false
 
-        # On macOS cross-compiling to Linux, storage transitive deps can require
-        # pkg-config target setup for OpenSSL. Prefer `cross` for this package.
+        # On macOS cross-compiling to Linux, storage transitive deps can link to
+        # OpenSSL 1.1 when built with generic cross toolchains, which fails on
+        # Debian 12 validators (OpenSSL 3). Prefer building storage binaries in a
+        # Debian 12 container to guarantee runtime-compatible linkage.
         if [ "$os_name" = "Darwin" ] && [ -n "$target_triple" ]; then
-            if command -v cross &>/dev/null; then
-                local cross_prefix=""
-                if [ "$(uname -m)" = "arm64" ]; then
-                    # cross images are often amd64-only; force amd64 for both build and run on Apple Silicon.
-                    cross_prefix="CROSS_BUILD_OPTS=--platform=linux/amd64 CROSS_CONTAINER_OPTS=--platform=linux/amd64 "
-                fi
-                storage_build_cmd="${cross_prefix}cross build --release --target $target_triple"
-                log_info "Using cross for storage binaries to avoid OpenSSL cross-compile issues..."
-
-                # cross 0.2.5 can fail on Apple Silicon unless the non-host
-                # toolchain is pre-installed with --force-non-host.
-                local rust_channel
-                rust_channel=$(sed -n 's/^channel = "\(.*\)"/\1/p' "$local_repo/rust-toolchain.toml" | head -1)
-                if [ -n "$rust_channel" ]; then
-                    local cross_toolchain="${rust_channel}-${target_triple}"
-                    log_info "Ensuring non-host toolchain exists: $cross_toolchain"
-                    rustup toolchain install --force-non-host "$cross_toolchain" --profile minimal >/dev/null 2>&1 || true
-                fi
+            if command -v docker &>/dev/null && docker info >/dev/null 2>&1; then
+                build_storage_in_debian12=true
+                log_info "Building storage binaries in Debian 12 container for runtime compatibility..."
             else
-                log_warn "cross not found; storage build may fail on OpenSSL cross-compilation"
-                log_warn "Install with: cargo install cross --git https://github.com/cross-rs/cross"
+                if command -v docker &>/dev/null; then
+                    log_warn "Docker daemon not available; falling back to cross/cargo build for storage binaries"
+                    log_warn "Start Docker Desktop to enable Debian 12 container builds"
+                else
+                    log_warn "Docker not found; falling back to cross/cargo build for storage binaries"
+                fi
+                if command -v cross &>/dev/null; then
+                    local cross_prefix=""
+                    if [ "$(uname -m)" = "arm64" ]; then
+                        # cross images are often amd64-only; force amd64 for both build and run on Apple Silicon.
+                        cross_prefix="CROSS_BUILD_OPTS=--platform=linux/amd64 CROSS_CONTAINER_OPTS=--platform=linux/amd64 "
+                    fi
+                    storage_build_cmd="${cross_prefix}cross build --release --target $target_triple"
+                    log_info "Using cross for storage binaries (fallback mode)..."
+                fi
             fi
         fi
 
@@ -2146,13 +2153,39 @@ build_ipc_locally() {
                 return 1
             fi
         fi
-        if ! (cd "$local_repo" && $cargo_build_cmd -p fendermint_app --features ipc-storage 2>&1); then
-            log_error "Failed to build fendermint_app with ipc-storage feature"
-            return 1
+        # On macOS cross-builds this step can fail while building wasm actors
+        # (blst/clang wasm target). Keep existing fendermint binary from the base
+        # build and continue, since storage runtime needs ipc-cli + node/gateway.
+        if [ "$os_name" = "Darwin" ] && [ -n "$target_triple" ]; then
+            log_warn "Skipping fendermint_app --features ipc-storage on macOS cross-build (known wasm toolchain issue)"
+        else
+            if ! (cd "$local_repo" && $cargo_build_cmd -p fendermint_app --features ipc-storage 2>&1); then
+                log_error "Failed to build fendermint_app with ipc-storage feature"
+                return 1
+            fi
         fi
-        if ! (cd "$local_repo" && eval "$storage_build_cmd -p ipc-decentralized-storage --bin node --bin gateway" 2>&1); then
-            log_error "Failed to build storage node/gateway binaries"
-            return 1
+        if [ "$build_storage_in_debian12" = true ]; then
+            local docker_platform=""
+            if [ "$(uname -m)" = "arm64" ]; then
+                docker_platform="--platform linux/amd64"
+            fi
+            local docker_build_cmd="set -euo pipefail; \
+                export DEBIAN_FRONTEND=noninteractive; \
+                apt-get update -qq; \
+                apt-get install -y -qq build-essential clang cmake pkg-config libssl-dev protobuf-compiler git curl ca-certificates; \
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y -q; \
+                . \$HOME/.cargo/env; \
+                rustup target add $target_triple >/dev/null 2>&1 || true; \
+                cargo build --release --target $target_triple -p ipc-decentralized-storage --bin node --bin gateway"
+            if ! (cd "$local_repo" && docker run --rm $docker_platform -v "$local_repo":/workspace -w /workspace debian:12 bash -lc "$docker_build_cmd" 2>&1); then
+                log_error "Failed to build storage node/gateway binaries in Debian 12 container"
+                return 1
+            fi
+        else
+            if ! (cd "$local_repo" && eval "$storage_build_cmd -p ipc-decentralized-storage --bin node --bin gateway" 2>&1); then
+                log_error "Failed to build storage node/gateway binaries"
+                return 1
+            fi
         fi
     fi
 

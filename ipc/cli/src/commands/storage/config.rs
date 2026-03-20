@@ -59,6 +59,10 @@ pub struct StorageConfig {
     pub objects_listen_addr: String,
     pub iroh_gateway_path: PathBuf,
     pub iroh_gateway_v4_addr: Option<String>,
+
+    /// Gateway URL for storage CLI operations (optional)
+    /// If not set, CLI commands will check env var or prompt
+    pub gateway_url: Option<String>,
 }
 
 impl StorageConfig {
@@ -75,5 +79,70 @@ impl StorageConfig {
         let contents = serde_yaml::to_string(self)?;
         fs::write(path, contents)?;
         Ok(())
+    }
+
+    /// Get the gateway URL from various sources
+    ///
+    /// Priority order:
+    /// 1. Explicit gateway_url parameter (CLI flag)
+    /// 2. IPC_STORAGE_GATEWAY environment variable
+    /// 3. gateway_url field in config file
+    /// 4. Prompt user if interactive is true
+    ///
+    /// If a new URL is discovered via prompt, it will be saved to the config.
+    pub fn get_gateway_url<P: AsRef<Path>>(
+        &mut self,
+        explicit_url: Option<&str>,
+        config_path: Option<P>,
+        interactive: bool,
+    ) -> Result<String> {
+        // 1. Check explicit URL (CLI flag)
+        if let Some(url) = explicit_url {
+            return Ok(url.to_string());
+        }
+
+        // 2. Check environment variable
+        if let Ok(url) = std::env::var("IPC_STORAGE_GATEWAY") {
+            if !url.is_empty() {
+                return Ok(url);
+            }
+        }
+
+        // 3. Check config file
+        if let Some(url) = &self.gateway_url {
+            if !url.is_empty() {
+                return Ok(url.clone());
+            }
+        }
+
+        // 4. Prompt user if interactive
+        if interactive {
+            println!("Gateway URL not configured.");
+            println!("Please enter the storage gateway URL (e.g., http://localhost:8080):");
+
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            let url = input.trim().to_string();
+
+            if url.is_empty() {
+                anyhow::bail!("Gateway URL cannot be empty");
+            }
+
+            // Save to config if path provided
+            if let Some(path) = config_path {
+                self.gateway_url = Some(url.clone());
+                self.save(path)?;
+                println!("Gateway URL saved to config.");
+            }
+
+            return Ok(url);
+        }
+
+        anyhow::bail!(
+            "Gateway URL not configured. Set via:\n\
+            1. --gateway flag\n\
+            2. IPC_STORAGE_GATEWAY environment variable\n\
+            3. gateway_url in storage config file"
+        )
     }
 }

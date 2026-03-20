@@ -116,9 +116,16 @@ EOF
 # Acquire lock to prevent concurrent executions
 acquire_lock() {
     if [ -e "$LOCK_FILE" ]; then
-        log_error "Another instance is running. Lock file exists: $LOCK_FILE"
-        log_error "If you're sure no other instance is running, remove the lock file."
-        exit 1
+        local lock_pid
+        lock_pid=$(tr -d '[:space:]' < "$LOCK_FILE" 2>/dev/null || true)
+        if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+            log_error "Another instance is running (pid: $lock_pid). Lock file: $LOCK_FILE"
+            log_error "Wait for it to finish, or stop that process before retrying."
+            exit 1
+        fi
+
+        log_warn "Found stale lock file at $LOCK_FILE; removing it."
+        rm -f "$LOCK_FILE"
     fi
 
     echo $$ > "$LOCK_FILE"
