@@ -4,7 +4,7 @@
 # Subnet Configuration
 subnet:
   # Subnet ID - get this from your subnet creation
-  id: "/r314159/t410f2pjrl3woxjvyjm7nnk2tfv3dhyykexithlsyima"
+  id: "/r314159/t410fdg2vwrukcxeopg3sfslrmsf2fkxjyzfldcnf7kq"
   # Parent chain RPC endpoint
   parent_rpc: "https://api.calibration.node.glif.io/rpc/v1"
   #parent_rpc: "http://localhost:8555"
@@ -64,8 +64,8 @@ paths:
 # Initialization Settings
 init:
   # Deploy new subnet and gateway contracts (set true for fresh deployment)
-  deploy_subnet: true
-  activate_subnet: true
+  deploy_subnet: false
+  activate_subnet: false
   # node-topdown-mode passed to `ipc-cli subnet init` (legacy | f3 | auto)
   node_topdown_mode: "legacy"
   # Supply source (native or ERC20)
