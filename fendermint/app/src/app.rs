@@ -882,7 +882,7 @@ where
         let mut events = to_begin_block(begin_response.applied_cron_message).events;
 
         let mut tx_results = Vec::with_capacity(request.txs.len());
-        for tx in request.txs {
+        for (tx_idx, tx) in request.txs.into_iter().enumerate() {
             let msg = tx.to_vec();
             let result = self
                 .messages_interpreter
@@ -901,6 +901,17 @@ where
                 }
                 Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
             };
+
+            if deliver_tx.code != 0.into() {
+                tracing::warn!(
+                    height = block_height,
+                    tx_index = tx_idx,
+                    code = ?deliver_tx.code,
+                    info = %deliver_tx.info,
+                    log = %deliver_tx.log,
+                    "finalize_block tx failed"
+                );
+            }
 
             tx_results.push(tendermint::abci::types::ExecTxResult {
                 code: deliver_tx.code,
