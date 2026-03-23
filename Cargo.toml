@@ -183,7 +183,7 @@ paste = "1"
 pin-project = "1.1.2"
 prometheus = { version = "0.13", features = ["process"] }
 prometheus_exporter = "0.8"
-prost = { version = "0.11" }
+prost = { version = "0.13" }
 quickcheck = "1"
 quickcheck_async = "0.1"
 quickcheck_macros = "1"
@@ -294,17 +294,17 @@ netwatch = { path = "patches/netwatch" }
 
 frc42_dispatch = { path = "./ext/frc42_dispatch" }
 
-# Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
-tower-abci = { version = "0.7" }
+# Using the same tendermint-rs dependency as tower-abci.
+tower-abci = { version = "0.16" }
 tower = { version = "0.4" }
-tendermint = { version = "0.31", features = ["secp256k1"] }
-tendermint-config = "0.33.0"
-tendermint-rpc = { version = "0.31", features = [
+tendermint = { version = "0.38.1", features = ["secp256k1"] }
+tendermint-config = "0.38.1"
+tendermint-rpc = { version = "0.38.1", features = [
   "secp256k1",
   "http-client",
   "websocket-client",
 ] }
-tendermint-proto = { version = "0.31" }
+tendermint-proto = { version = "0.38.1" }
 
 rust-f3 = { git = "https://github.com/ChainSafe/rust-f3.git", branch = "main" }
 filecoin-proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs.git", branch = "main" }

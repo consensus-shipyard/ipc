@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 async-trait = { workspace = true }
+bytes = { workspace = true }
 futures = { workspace = true }
 tower = "0.4"
 tracing = { workspace = true }

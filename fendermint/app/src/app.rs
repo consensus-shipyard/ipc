@@ -856,9 +856,12 @@ where
         }
     }
 
-    /// Signals the beginning of a new block, prior to any `DeliverTx` calls.
-    async fn begin_block(&self, request: request::BeginBlock) -> AbciResult<response::BeginBlock> {
-        let block_height = request.header.height.into();
+    /// Execute and finalize an entire block (ABCI 2.0).
+    async fn finalize_block(
+        &self,
+        request: request::FinalizeBlock,
+    ) -> AbciResult<response::FinalizeBlock> {
+        let block_height = request.height.into();
         let block_hash = match request.hash {
             tendermint::Hash::Sha256(h) => h,
             tendermint::Hash::None => return Err(anyhow!("empty block hash").into()),
@@ -875,131 +878,106 @@ where
         let db = self.state_store_clone();
         let state = self.committed_state()?;
         let mut state_params = state.app_state.state_params.clone();
+        state_params.timestamp = to_timestamp(request.time);
 
-        tracing::debug!(
-            height = block_height,
-            timestamp = request.header.time.unix_timestamp(),
-            app_hash = request.header.app_hash.to_string(),
-            //app_state_hash = to_app_hash(&state_params).to_string(), // should be the same as `app_hash`
-            "begin block"
-        );
+        let validator = self.get_validator_from_cache(&request.proposer_address).await?;
 
-        state_params.timestamp = to_timestamp(request.header.time);
-
-        let validator = self
-            .get_validator_from_cache(&request.header.proposer_address)
-            .await?;
-
-        let mut state =
+        let mut exec_state =
             FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
                 .context("error creating new state")?
                 .with_block_hash(block_hash)
                 .with_block_producer(validator);
 
-        tracing::debug!("initialized new exec state");
-
-        let response = self
+        let begin_response = self
             .messages_interpreter
-            .begin_block(&mut state)
+            .begin_block(&mut exec_state)
             .await
             .context("failed to begin block")?;
+        let mut events = to_begin_block(begin_response.applied_cron_message).events;
 
-        self.put_exec_state(state).await;
+        let mut tx_results = Vec::with_capacity(request.txs.len());
+        for tx in request.txs {
+            let msg = tx.to_vec();
+            let result = self.messages_interpreter.apply_message(&mut exec_state, msg).await;
+            let deliver_tx = match result {
+                Ok(ApplyMessageResponse {
+                    applied_message,
+                    domain_hash,
+                }) => to_deliver_tx(applied_message, domain_hash, exec_state.block_hash()),
+                Err(ApplyMessageError::InvalidSignature(err)) => {
+                    invalid_deliver_tx(AppError::InvalidSignature, err.to_string())
+                }
+                Err(ApplyMessageError::InvalidMessage(s)) => {
+                    invalid_deliver_tx(AppError::InvalidEncoding, s)
+                }
+                Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
+            };
 
-        Ok(to_begin_block(response.applied_cron_message))
-    }
-
-    /// Apply a transaction to the application's state.
-    async fn deliver_tx(&self, request: request::DeliverTx) -> AbciResult<response::DeliverTx> {
-        let msg = request.tx.to_vec();
-
-        let (result, block_hash) = {
-            let mut guard = self.exec_state.lock().await;
-            let mut state = guard.take().expect("exec state empty");
-
-            let result = self
-                .messages_interpreter
-                .apply_message(&mut state, msg)
-                .await;
-            let block_hash = state.block_hash();
-
-            *guard = Some(state);
-            (result, block_hash)
-        };
-
-        let response = match result {
-            Ok(ApplyMessageResponse {
-                applied_message,
-                domain_hash,
-            }) => to_deliver_tx(applied_message, domain_hash, block_hash),
-            Err(ApplyMessageError::InvalidSignature(err)) => {
-                invalid_deliver_tx(AppError::InvalidSignature, err.to_string())
-            }
-            Err(ApplyMessageError::InvalidMessage(s)) => {
-                invalid_deliver_tx(AppError::InvalidEncoding, s)
-            }
-            Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
-        };
-
-        if response.code != 0.into() {
-            tracing::info!(
-                "deliver_tx failed: {:?} - {:?}",
-                response.code,
-                response.info
-            );
+            tx_results.push(tendermint::abci::types::ExecTxResult {
+                code: deliver_tx.code,
+                data: deliver_tx.data,
+                log: deliver_tx.log,
+                info: deliver_tx.info,
+                gas_wanted: deliver_tx.gas_wanted,
+                gas_used: deliver_tx.gas_used,
+                events: deliver_tx.events,
+                codespace: deliver_tx.codespace,
+            });
         }
-
-        Ok(response)
-    }
-
-    /// Signals the end of a block.
-    async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
-        tracing::debug!(height = request.height, "end block");
-
-        let response = {
-            let mut guard = self.exec_state.lock().await;
-            let mut state = guard.take().expect("exec state empty");
-
-            let result = self.messages_interpreter.end_block(&mut state).await;
-            *guard = Some(state);
-
-            result?
-        };
 
         let EndBlockResponse {
             power_updates,
             gas_market,
             light_client_commitments,
             end_block_events,
-        } = response;
+        } = self.messages_interpreter.end_block(&mut exec_state).await?;
 
         let mut c = self.light_client_commitments.lock().await;
-        *c = light_client_commitments;
+        *c = light_client_commitments.clone();
 
-        // Convert the incoming power updates to Tendermint validator updates.
         let validator_updates =
             to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
-
-        // Replace the validator cache if the validator set has changed.
         if !validator_updates.is_empty() {
             self.refresh_validators_cache().await?;
         }
 
-        // Maybe update the app state with the new block gas limit.
         let consensus_param_updates = self
             .maybe_update_app_state(&gas_market)
             .context("failed to update block gas limit")?;
 
-        let ret = response::EndBlock {
+        events.extend(
+            end_block_events
+                .into_iter()
+                .flat_map(|(stamped, emitters)| to_events("event", stamped, emitters)),
+        );
+
+        // In ABCI 2.0 the app hash is returned from FinalizeBlock, so compute the same
+        // post-state hash that commit() will persist.
+        let state_root = exec_state
+            .flush_state_root()
+            .context("failed to flush finalized state root")?;
+        let params = exec_state.updatable_params();
+
+        let mut projected_state = self.committed_state()?;
+        projected_state.app_state.block_height = exec_state.block_height().try_into()?;
+        projected_state.app_state.state_params.timestamp = exec_state.timestamp();
+        projected_state.app_state.state_params.state_root = state_root;
+        projected_state.app_state.state_params.app_version = params.app_version;
+        projected_state.app_state.state_params.base_fee = params.base_fee;
+        projected_state.app_state.state_params.circ_supply = params.circ_supply;
+        projected_state.app_state.state_params.power_scale = params.power_scale;
+        projected_state.state_commitments = light_client_commitments;
+        let app_hash = projected_state.app_hash();
+
+        self.put_exec_state(exec_state).await;
+
+        Ok(response::FinalizeBlock {
+            events,
+            tx_results,
             validator_updates,
             consensus_param_updates,
-            events: end_block_events
-                .into_iter()
-                .flat_map(|(stamped, emitters)| to_events("event", stamped, emitters))
-                .collect::<Vec<_>>(),
-        };
-
-        Ok(ret)
+            app_hash,
+        })
     }
 
     /// Commit the current state at the current height.

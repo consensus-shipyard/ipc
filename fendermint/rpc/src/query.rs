@@ -233,7 +233,7 @@ fn parse_deliver_tx(res: AbciQuery) -> anyhow::Result<DeliverTx> {
     let bz: Vec<u8> =
         fvm_ipld_encoding::from_slice(&res.value).context("failed to decode IPLD as bytes")?;
 
-    let deliver_tx = tendermint_proto::abci::ResponseDeliverTx::decode(bz.as_ref())
+    let deliver_tx = tendermint_proto::v0_37::abci::ResponseDeliverTx::decode(bz.as_ref())
         .context("failed to deserialize ResponseDeliverTx from proto bytes")?;
 
     let mut deliver_tx = tendermint::abci::response::DeliverTx::try_from(deliver_tx)

@@ -15,7 +15,7 @@ use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, num::NonZeroU32};
-use tendermint::abci::{response, Code, Event, EventAttribute};
+use tendermint::abci::{response, Code, Event, EventAttributeIndexExt};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct SnapshotMetadata {
@@ -87,11 +87,7 @@ pub fn to_deliver_tx(
     if let Some(h) = block_hash {
         events.push(Event::new(
             "block",
-            vec![EventAttribute {
-                key: "hash".to_string(),
-                value: hex::encode(h),
-                index: true,
-            }],
+            vec![("hash".to_string(), hex::encode(h)).index()],
         ));
     }
 
@@ -178,27 +174,19 @@ pub fn to_events(
         .map(|se| {
             let mut attrs = Vec::new();
 
-            attrs.push(EventAttribute {
-                key: "emitter.id".to_string(),
-                value: se.emitter.to_string(),
-                index: true,
-            });
+            attrs.push(("emitter.id".to_string(), se.emitter.to_string()).index());
 
             // This is emitted because some clients might want to subscribe to events
             // based on the deterministic Ethereum address even before a contract is created.
             if let Some(deleg_addr) = emitters.get(&se.emitter) {
-                attrs.push(EventAttribute {
-                    key: "emitter.deleg".to_string(),
-                    value: deleg_addr.to_string(),
-                    index: true,
-                });
+                attrs.push(("emitter.deleg".to_string(), deleg_addr.to_string()).index());
             }
 
             for e in se.event.entries {
-                attrs.push(EventAttribute {
-                    key: e.key,
-                    value: hex::encode(e.value),
-                    index: !e.flags.is_empty(),
+                attrs.push(if !e.flags.is_empty() {
+                    (e.key, hex::encode(e.value)).index()
+                } else {
+                    (e.key, hex::encode(e.value)).no_index()
                 });
             }
 
@@ -214,21 +202,13 @@ pub fn to_domain_hash_event(domain_hash: &DomainHash) -> Event {
     };
     Event::new(
         k,
-        vec![EventAttribute {
-            key: "hash".to_string(),
-            value: v,
-            index: true,
-        }],
+        vec![("hash".to_string(), v).index()],
     )
 }
 
 /// Event about the message itself.
 pub fn to_message_event(from: Address, to: Address) -> Event {
-    let attr = |k: &str, v: Address| EventAttribute {
-        key: k.to_string(),
-        value: v.to_string(),
-        index: true,
-    };
+    let attr = |k: &str, v: Address| (k.to_string(), v.to_string()).index();
     Event::new(
         "message".to_string(),
         vec![attr("from", from), attr("to", to)],
@@ -265,7 +245,7 @@ pub fn to_query(ret: QueryResponse, block_height: BlockHeight) -> anyhow::Result
             // This is so there is a single representation of a call result, instead
             // of a normal delivery being one way and a query exposing `ApplyResponse`.
             let dtx = to_deliver_tx(*ret, None, None);
-            let dtx = tendermint_proto::abci::ResponseDeliverTx::from(dtx);
+            let dtx = tendermint_proto::v0_37::abci::ResponseDeliverTx::from(dtx);
             let mut buf = bytes::BytesMut::new();
             dtx.encode(&mut buf)?;
             let bz = buf.to_vec();
