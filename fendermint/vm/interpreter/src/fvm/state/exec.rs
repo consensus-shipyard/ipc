@@ -109,8 +109,7 @@ impl fmt::Debug for FvmStateParams {
 /// This is just a technical thing to help us not forget about saving something.
 ///
 /// TODO: `base_fee` should surely be here.
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FvmUpdatableParams {
     /// The application protocol version, which changes during upgrades.
     pub app_version: u64,

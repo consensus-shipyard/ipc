@@ -188,7 +188,9 @@ where
                 Request::ProcessProposal(r) => {
                     Response::ProcessProposal(log_error(app.process_proposal(r).await)?)
                 }
-                Request::ExtendVote(r) => Response::ExtendVote(log_error(app.extend_vote(r).await)?),
+                Request::ExtendVote(r) => {
+                    Response::ExtendVote(log_error(app.extend_vote(r).await)?)
+                }
                 Request::VerifyVoteExtension(r) => {
                     Response::VerifyVoteExtension(log_error(app.verify_vote_extension(r).await)?)
                 }

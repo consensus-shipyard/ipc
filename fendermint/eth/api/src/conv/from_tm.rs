@@ -284,7 +284,8 @@ pub async fn to_eth_receipt(
     let contract_address = if result.tx_result.code.is_err() {
         None
     } else {
-        maybe_contract_address_from_exec_tx_result(&result.tx_result).map(|ca| et::H160::from_slice(&ca.0))
+        maybe_contract_address_from_exec_tx_result(&result.tx_result)
+            .map(|ca| et::H160::from_slice(&ca.0))
     };
 
     let receipt = et::TransactionReceipt {

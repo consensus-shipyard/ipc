@@ -407,6 +407,29 @@ where
         Ok(Some(updated))
     }
 
+    /// Build the post-execution state that both `finalize_block` and `commit` rely on.
+    ///
+    /// Keeping this in one place avoids app-hash drift between ABCI phases.
+    fn project_post_exec_state(
+        &self,
+        block_height: ChainEpoch,
+        timestamp: Timestamp,
+        state_root: Cid,
+        params: FvmUpdatableParams,
+        state_commitments: Option<LightClientCommitments>,
+    ) -> Result<SubnetAppState> {
+        let mut state = self.committed_state()?;
+        state.app_state.block_height = block_height.try_into()?;
+        state.app_state.state_params.timestamp = timestamp;
+        state.app_state.state_params.state_root = state_root;
+        state.app_state.state_params.app_version = params.app_version;
+        state.app_state.state_params.base_fee = params.base_fee;
+        state.app_state.state_params.circ_supply = params.circ_supply;
+        state.app_state.state_params.power_scale = params.power_scale;
+        state.state_commitments = state_commitments;
+        Ok(state)
+    }
+
     /// Put the execution state during block execution. Has to be empty.
     async fn put_exec_state(&self, state: FvmExecState<BS>) {
         let mut guard = self.exec_state.lock().await;
@@ -880,7 +903,9 @@ where
         let mut state_params = state.app_state.state_params.clone();
         state_params.timestamp = to_timestamp(request.time);
 
-        let validator = self.get_validator_from_cache(&request.proposer_address).await?;
+        let validator = self
+            .get_validator_from_cache(&request.proposer_address)
+            .await?;
 
         let mut exec_state =
             FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
@@ -896,9 +921,12 @@ where
         let mut events = to_begin_block(begin_response.applied_cron_message).events;
 
         let mut tx_results = Vec::with_capacity(request.txs.len());
-        for tx in request.txs {
+        for (tx_idx, tx) in request.txs.into_iter().enumerate() {
             let msg = tx.to_vec();
-            let result = self.messages_interpreter.apply_message(&mut exec_state, msg).await;
+            let result = self
+                .messages_interpreter
+                .apply_message(&mut exec_state, msg)
+                .await;
             let deliver_tx = match result {
                 Ok(ApplyMessageResponse {
                     applied_message,
@@ -912,6 +940,17 @@ where
                 }
                 Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
             };
+
+            if deliver_tx.code != 0.into() {
+                tracing::warn!(
+                    height = block_height,
+                    tx_index = tx_idx,
+                    code = ?deliver_tx.code,
+                    info = %deliver_tx.info,
+                    log = %deliver_tx.log,
+                    "finalize_block tx failed"
+                );
+            }
 
             tx_results.push(tendermint::abci::types::ExecTxResult {
                 code: deliver_tx.code,
@@ -956,17 +995,13 @@ where
         let state_root = exec_state
             .flush_state_root()
             .context("failed to flush finalized state root")?;
-        let params = exec_state.updatable_params();
-
-        let mut projected_state = self.committed_state()?;
-        projected_state.app_state.block_height = exec_state.block_height().try_into()?;
-        projected_state.app_state.state_params.timestamp = exec_state.timestamp();
-        projected_state.app_state.state_params.state_root = state_root;
-        projected_state.app_state.state_params.app_version = params.app_version;
-        projected_state.app_state.state_params.base_fee = params.base_fee;
-        projected_state.app_state.state_params.circ_supply = params.circ_supply;
-        projected_state.app_state.state_params.power_scale = params.power_scale;
-        projected_state.state_commitments = light_client_commitments;
+        let projected_state = self.project_post_exec_state(
+            exec_state.block_height(),
+            exec_state.timestamp(),
+            state_root,
+            exec_state.updatable_params(),
+            light_client_commitments,
+        )?;
         let app_hash = projected_state.app_hash();
 
         self.put_exec_state(exec_state).await;
@@ -983,32 +1018,16 @@ where
     /// Commit the current state at the current height.
     async fn commit(&self) -> AbciResult<response::Commit> {
         let exec_state = self.take_exec_state().await;
+        let block_height = exec_state.block_height();
+        let timestamp = exec_state.timestamp();
 
         // Commit the execution state to the datastore.
-        let mut state = self.committed_state()?;
-        state.app_state.block_height = exec_state.block_height().try_into()?;
-        state.app_state.state_params.timestamp = exec_state.timestamp();
-
-        let (
-            state_root,
-            FvmUpdatableParams {
-                app_version,
-                base_fee,
-                circ_supply,
-                power_scale,
-            },
-            _,
-        ) = exec_state.commit().context("failed to commit FVM")?;
-
-        state.app_state.state_params.state_root = state_root;
-        state.app_state.state_params.app_version = app_version;
-        state.app_state.state_params.base_fee = base_fee;
-        state.app_state.state_params.circ_supply = circ_supply;
-        state.app_state.state_params.power_scale = power_scale;
+        let (state_root, params, _) = exec_state.commit().context("failed to commit FVM")?;
 
         let mut c = self.light_client_commitments.lock().await;
         // because of the take, no need to *c = None
-        state.state_commitments = c.take();
+        let state =
+            self.project_post_exec_state(block_height, timestamp, state_root, params, c.take())?;
 
         let app_hash = state.app_hash();
         let block_height = state.app_state.block_height;

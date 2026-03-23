@@ -200,10 +200,7 @@ pub fn to_domain_hash_event(domain_hash: &DomainHash) -> Event {
     let (k, v) = match domain_hash {
         DomainHash::Eth(h) => ("eth", hex::encode(h)),
     };
-    Event::new(
-        k,
-        vec![("hash".to_string(), v).index()],
-    )
+    Event::new(k, vec![("hash".to_string(), v).index()])
 }
 
 /// Event about the message itself.
