@@ -313,7 +313,7 @@ where
 
     /// Flush and return the current state root without consuming the execution state.
     pub fn flush_state_root(&mut self) -> anyhow::Result<Cid> {
-        self.executor.flush().map_err(Into::into)
+        self.executor.flush()
     }
 
     /// Return a copy of currently tracked mutable parameters.
