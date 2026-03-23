@@ -92,6 +92,11 @@ pub struct AppState {
     state_params: FvmStateParams,
 }
 
+struct FinalizedBlockState {
+    state: SubnetAppState,
+    app_hash: tendermint::hash::AppHash,
+}
+
 impl SubnetAppState {
     pub fn app_hash(&self) -> tendermint::hash::AppHash {
         derive_subnet_app_hash(self)
@@ -165,6 +170,8 @@ where
     messages_interpreter: Arc<MI>,
 
     light_client_commitments: Arc<tokio::sync::Mutex<Option<LightClientCommitments>>>,
+    /// Post-state computed in `finalize_block`, consumed by `commit`.
+    finalized_block_state: Arc<tokio::sync::Mutex<Option<FinalizedBlockState>>>,
 
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
@@ -208,6 +215,7 @@ where
             state_hist_size: config.state_hist_size,
             messages_interpreter: Arc::new(interpreter),
             light_client_commitments: Arc::new(tokio::sync::Mutex::new(None)),
+            finalized_block_state: Arc::new(tokio::sync::Mutex::new(None)),
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
@@ -418,6 +426,19 @@ where
     async fn take_exec_state(&self) -> FvmExecState<BS> {
         let mut guard = self.exec_state.lock().await;
         guard.take().expect("exec state empty")
+    }
+
+    /// Put the post-state produced during finalization. Has to be empty.
+    async fn put_finalized_block_state(&self, state: FinalizedBlockState) {
+        let mut guard = self.finalized_block_state.lock().await;
+        assert!(guard.is_none(), "finalized block state not empty");
+        *guard = Some(state);
+    }
+
+    /// Take the post-state produced during finalization. Has to be non-empty.
+    async fn take_finalized_block_state(&self) -> FinalizedBlockState {
+        let mut guard = self.finalized_block_state.lock().await;
+        guard.take().expect("finalized block state empty")
     }
 
     /// Update the execution state using the provided closure.
@@ -880,7 +901,9 @@ where
         let mut state_params = state.app_state.state_params.clone();
         state_params.timestamp = to_timestamp(request.time);
 
-        let validator = self.get_validator_from_cache(&request.proposer_address).await?;
+        let validator = self
+            .get_validator_from_cache(&request.proposer_address)
+            .await?;
 
         let mut exec_state =
             FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
@@ -898,7 +921,10 @@ where
         let mut tx_results = Vec::with_capacity(request.txs.len());
         for tx in request.txs {
             let msg = tx.to_vec();
-            let result = self.messages_interpreter.apply_message(&mut exec_state, msg).await;
+            let result = self
+                .messages_interpreter
+                .apply_message(&mut exec_state, msg)
+                .await;
             let deliver_tx = match result {
                 Ok(ApplyMessageResponse {
                     applied_message,
@@ -912,6 +938,15 @@ where
                 }
                 Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
             };
+
+            if deliver_tx.code != 0.into() {
+                tracing::info!(
+                    code = ?deliver_tx.code,
+                    log = %deliver_tx.log,
+                    info = %deliver_tx.info,
+                    "deliver_tx failed"
+                );
+            }
 
             tx_results.push(tendermint::abci::types::ExecTxResult {
                 code: deliver_tx.code,
@@ -969,6 +1004,11 @@ where
         projected_state.state_commitments = light_client_commitments;
         let app_hash = projected_state.app_hash();
 
+        self.put_finalized_block_state(FinalizedBlockState {
+            state: projected_state,
+            app_hash: app_hash.clone(),
+        })
+        .await;
         self.put_exec_state(exec_state).await;
 
         Ok(response::FinalizeBlock {
@@ -983,11 +1023,12 @@ where
     /// Commit the current state at the current height.
     async fn commit(&self) -> AbciResult<response::Commit> {
         let exec_state = self.take_exec_state().await;
+        let finalized = self.take_finalized_block_state().await;
+        let exec_block_height: BlockHeight = exec_state.block_height().try_into()?;
+        let exec_timestamp = exec_state.timestamp();
 
         // Commit the execution state to the datastore.
-        let mut state = self.committed_state()?;
-        state.app_state.block_height = exec_state.block_height().try_into()?;
-        state.app_state.state_params.timestamp = exec_state.timestamp();
+        let state = finalized.state;
 
         let (
             state_root,
@@ -1000,17 +1041,21 @@ where
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
 
-        state.app_state.state_params.state_root = state_root;
-        state.app_state.state_params.app_version = app_version;
-        state.app_state.state_params.base_fee = base_fee;
-        state.app_state.state_params.circ_supply = circ_supply;
-        state.app_state.state_params.power_scale = power_scale;
+        if state.app_state.block_height != exec_block_height
+            || state.app_state.state_params.timestamp != exec_timestamp
+            || state.app_state.state_params.state_root != state_root
+            || state.app_state.state_params.app_version != app_version
+            || state.app_state.state_params.base_fee != base_fee
+            || state.app_state.state_params.circ_supply != circ_supply
+            || state.app_state.state_params.power_scale != power_scale
+        {
+            return Err(anyhow!("finalized state does not match committed execution state").into());
+        }
 
         let mut c = self.light_client_commitments.lock().await;
-        // because of the take, no need to *c = None
-        state.state_commitments = c.take();
+        let _ = c.take();
 
-        let app_hash = state.app_hash();
+        let app_hash = finalized.app_hash;
         let block_height = state.app_state.block_height;
 
         // Tell CometBFT how much of the block history it can forget.
