@@ -23,6 +23,8 @@ use fendermint_app::cmd::key::{convert_key_to_cometbft, store_key};
 use fendermint_crypto::SecretKey;
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::IpcProvider;
+use ipc_wallet::EvmKeyStore;
+use rand::thread_rng;
 use std::path::Path;
 
 use crate::commands::subnet::create_genesis::{create_genesis, CreatedGenesis};
@@ -70,6 +72,7 @@ impl CommandLineHandler for InitNode {
             .context("failed to parse Fendermint configuration overrides")?;
 
         let home_paths = ensure_directories(&config.home).await?;
+        let validator_key_kind = wallet_type_to_account_kind(&config.key.wallet_type)?;
 
         let provider = get_ipc_provider(global).context("failed to initialize IPC provider")?;
 
@@ -86,7 +89,14 @@ impl CommandLineHandler for InitNode {
 
         init_cometbft(&home_paths.comet_bft, &secret_key, &cometbft_overrides).await?;
 
-        init_fendermint(&home_paths.fendermint, &secret_key, &fendermint_overrides).await?;
+        init_fendermint(
+            &home_paths.fendermint,
+            &secret_key,
+            validator_key_kind,
+            &fendermint_overrides,
+        )
+        .await?;
+        ensure_resolver_network_key(&home_paths.fendermint).await?;
 
         convert_genesis_to_tendermint(&genesis, &home_paths.comet_bft).await?;
 
@@ -233,6 +243,17 @@ async fn import_and_store_key(
 ) -> Result<SecretKey> {
     log::info!("Importing validator key");
 
+    if key_config.private_key.is_none() && key_config.path.is_none() {
+        if key_config.wallet_type.eq_ignore_ascii_case("evm") {
+            log::info!(
+                "No validator key provided in node config; falling back to default EVM wallet key"
+            );
+            return load_default_evm_validator_key(provider);
+        }
+
+        bail!("validator key source missing; set key.private-key or key.path in node config");
+    }
+
     let imported_wallet = import_wallet(provider, key_config)
         .context("failed to import wallet - check key format and permissions")?;
 
@@ -242,6 +263,32 @@ async fn import_and_store_key(
     )?;
 
     log::info!("Validator key imported successfully");
+    Ok(secret_key)
+}
+
+fn load_default_evm_validator_key(provider: &IpcProvider) -> Result<SecretKey> {
+    let keystore = provider
+        .evm_wallet()
+        .context("failed to access EVM keystore for default validator key fallback")?;
+    let mut keystore = keystore.write().unwrap();
+
+    let default_addr = keystore
+        .get_default()
+        .context("failed to read default EVM key from keystore")?
+        .context("no default EVM key configured in IPC wallet")?;
+
+    let key_info = keystore
+        .get(&default_addr)
+        .context("failed to load default EVM key info from keystore")?
+        .context("default EVM key was not found in keystore")?;
+
+    let secret_key = SecretKey::try_from(key_info.private_key().to_vec())
+        .context("default EVM key is not a valid secp256k1 validator key")?;
+
+    log::info!(
+        "Using default EVM key {} as validator key",
+        default_addr.to_string()
+    );
     Ok(secret_key)
 }
 
@@ -358,6 +405,7 @@ async fn init_cometbft(
 async fn init_fendermint(
     home: &Path,
     secret_key: &SecretKey,
+    validator_key_kind: &'static str,
     overrides: &Option<FendermintOverrides>,
 ) -> Result<()> {
     log::info!("Initializing Fendermint");
@@ -416,7 +464,94 @@ async fn init_fendermint(
         )
     })?;
 
+    ensure_validator_signing_config(home, validator_key_kind, overrides)?;
+
     log::info!("Fendermint initialized successfully");
+    Ok(())
+}
+
+/// Ensure validator key config exists so legacy topdown vote publishing runs in validator mode.
+fn ensure_validator_signing_config(
+    home: &Path,
+    validator_key_kind: &'static str,
+    overrides: &Option<FendermintOverrides>,
+) -> Result<()> {
+    if overrides
+        .as_ref()
+        .and_then(|o| o.extra.get("validator_key"))
+        .is_some()
+    {
+        log::debug!("Skipping validator_key config write because override already sets it");
+        return Ok(());
+    }
+
+    let config_path = home.join("config/default.toml");
+    let validator_key_config = toml::from_str::<toml::Value>(&format!(
+        r#"[validator_key]
+path = "validator.sk"
+kind = "{validator_key_kind}"
+"#
+    ))
+    .context("failed to build validator_key override configuration")?;
+
+    merge_toml_config(&config_path, &validator_key_config).with_context(|| {
+        format!(
+            "failed to write validator_key config to {}",
+            config_path.display()
+        )
+    })?;
+
+    Ok(())
+}
+
+fn wallet_type_to_account_kind(wallet_type: &str) -> Result<&'static str> {
+    if wallet_type.eq_ignore_ascii_case("evm") {
+        Ok("ethereum")
+    } else if wallet_type.eq_ignore_ascii_case("fvm") {
+        Ok("regular")
+    } else {
+        bail!(
+            "unsupported wallet type '{}' for validator key kind mapping",
+            wallet_type
+        );
+    }
+}
+
+/// Ensure resolver identity key exists for IPLD resolver service.
+///
+/// Legacy topdown mode requires a libp2p key at `fendermint/keys/network.sk`.
+/// If it's missing, node start fails even when node init succeeds.
+async fn ensure_resolver_network_key(fendermint_home: &Path) -> Result<()> {
+    let keys_dir = fendermint_home.join("keys");
+    let network_sk = keys_dir.join("network.sk");
+
+    if tokio::fs::try_exists(&network_sk).await? {
+        log::debug!(
+            "Resolver network key already exists at {}",
+            network_sk.display()
+        );
+        return Ok(());
+    }
+
+    tokio::fs::create_dir_all(&keys_dir)
+        .await
+        .with_context(|| {
+            format!(
+                "failed to create Fendermint resolver keys directory at {}",
+                keys_dir.display()
+            )
+        })?;
+
+    let mut rng = thread_rng();
+    let network_key = SecretKey::random(&mut rng);
+    store_key(&network_key, "network", &keys_dir).with_context(|| {
+        format!(
+            "failed to generate resolver network key files in {}",
+            keys_dir.display()
+        )
+    })?;
+
+    log::info!("Generated resolver network key at {}", network_sk.display());
     Ok(())
 }
 

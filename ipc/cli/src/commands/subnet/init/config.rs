@@ -99,6 +99,19 @@ pub enum ActivateConfig {
     },
 }
 
+/// Preset for generating topdown configuration in node config templates.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum NodeTopdownMode {
+    /// Auto-detect from subnet-create settings. If `parent-filecoin-rpc` is set, use F3.
+    #[default]
+    Auto,
+    /// Generate legacy vote-based topdown configuration.
+    Legacy,
+    /// Generate F3 proof-based topdown configuration.
+    F3,
+}
+
 /// Top-level YAML schema for `subnet init`
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -120,6 +133,10 @@ pub struct SubnetInitConfig {
     /// Configuration for subnet genesis
     #[serde(default)]
     pub genesis: Option<GenesisConfig>,
+
+    /// Preset for auto-generated node topdown config (auto|legacy|f3).
+    #[serde(default)]
+    pub node_topdown_mode: NodeTopdownMode,
 }
 
 impl SubnetInitConfig {

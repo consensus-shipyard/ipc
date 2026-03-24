@@ -48,6 +48,7 @@ Commands:
     init --resume     Continue init from where it left off (after deploy failure)
     update-config     Update existing node configs without wiping data
     update-binaries   Pull latest code, build, and install binaries on all validators
+    deploy-binaries   Copy existing binaries to validators (no build)
     check             Comprehensive health check on all nodes
     diagnose [name]   Detailed diagnostics for troubleshooting (all or one validator)
     restart           Graceful restart of all nodes
@@ -60,6 +61,9 @@ Commands:
     watch-blocks      Monitor block production in real-time
     logs [validator]  Tail logs from specific validator
     install-systemd   Install systemd services on all validators
+    start-storage     Start storage node/gateway services
+    stop-storage      Stop storage node/gateway services
+    storage-status    Check storage service status
     start-relayer     Start checkpoint relayer on primary validator
     stop-relayer      Stop checkpoint relayer
     relayer-status    Check relayer status and view logs
@@ -71,6 +75,9 @@ Options:
     --yes                Skip confirmation prompts
     --debug              Show verbose debug output
     --branch NAME        For bootstrap/update-binaries: git branch to pull from (default: main)
+    --compile MODE       For update-binaries: 'local' or 'remote' (default: remote)
+    --git-pull           For update-binaries: fetch/pull latest changes before build (default: off)
+    --with-storage       For bootstrap/update-binaries: build ipc-storage feature and storage binaries
     --duration SECONDS   For block-time: sample duration (default: 10)
     --help               Show this help message
 
@@ -87,12 +94,15 @@ Examples:
     $0 restart --mode local --yes              # Restart local subnet
 
     # Remote mode (multiple machines via SSH)
-    $0 bootstrap --branch main                 # First: bootstrap fresh hosts
+    $0 bootstrap --branch main --with-storage  # First: bootstrap fresh hosts (with storage binaries)
     $0 init                                    # Then: initialize subnet from scratch
     $0 init --resume                           # Resume after deploy (skip wipe/deploy)
     $0 init --debug                            # Initialize with verbose debug output
     $0 check                                   # Run health checks
     $0 update-binaries --branch main           # Update binaries from main branch
+    $0 update-binaries -C local --branch main  # Build locally, deploy to validators
+    $0 update-binaries --branch main --with-storage  # Update binaries with storage support
+    $0 deploy-binaries --path ./target/release # Copy binaries to all validators
     $0 watch-finality                          # Monitor parent finality progress
     $0 watch-blocks                            # Monitor block production
     $0 logs validator-1                        # View logs from validator-1
@@ -106,9 +116,16 @@ EOF
 # Acquire lock to prevent concurrent executions
 acquire_lock() {
     if [ -e "$LOCK_FILE" ]; then
-        log_error "Another instance is running. Lock file exists: $LOCK_FILE"
-        log_error "If you're sure no other instance is running, remove the lock file."
-        exit 1
+        local lock_pid
+        lock_pid=$(tr -d '[:space:]' < "$LOCK_FILE" 2>/dev/null || true)
+        if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+            log_error "Another instance is running (pid: $lock_pid). Lock file: $LOCK_FILE"
+            log_error "Wait for it to finish, or stop that process before retrying."
+            exit 1
+        fi
+
+        log_warn "Found stale lock file at $LOCK_FILE; removing it."
+        rm -f "$LOCK_FILE"
     fi
 
     echo $$ > "$LOCK_FILE"
@@ -138,6 +155,7 @@ confirm() {
 # Bootstrap validator hosts - install deps and build IPC
 cmd_bootstrap() {
     local branch="main"
+    local with_storage=false
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -153,6 +171,10 @@ cmd_bootstrap() {
                 DRY_RUN=true
                 shift
                 ;;
+            --with-storage)
+                with_storage=true
+                shift
+                ;;
             --help|-h)
                 cat << EOF
 Bootstrap validator hosts with IPC and dependencies
@@ -161,6 +183,7 @@ Usage: $0 bootstrap [options]
 
 Options:
     --branch NAME    Git branch to clone (default: main)
+    --with-storage   Build ipc-storage feature and storage binaries
     --config FILE    Path to config file
     --dry-run        Preview without executing
 
@@ -197,7 +220,7 @@ EOF
     check_ssh_connectivity
     check_config_validity
 
-    bootstrap_all_hosts "$branch"
+    bootstrap_all_hosts "$branch" "$with_storage"
 }
 
 # Initialize subnet (nuclear option)
@@ -270,28 +293,13 @@ cmd_init() {
         log_section "Wiping Node Data"
         wipe_all_nodes
 
-        # Clean IPC CLI config directory to avoid corrupted files
-        # Preserve the EVM keystore which contains validator keys
-        log_info "Cleaning IPC CLI config directory (preserving keystore)..."
-        if is_local_mode; then
-            # Preserve keystore, only remove config.toml
-            rm -f ~/.ipc/config.toml
-        else
-            for idx in "${!VALIDATORS[@]}"; do
-                local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-                ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
-                # Preserve keystore, only remove config.toml
-                exec_on_host "$idx" "rm -f $ipc_config_dir/config.toml"
-            done
-        fi
-
         # Ensure EVM keystore exists with validator keys
         log_section "Preparing EVM Keystore"
         ensure_evm_keystore
 
-        # Update IPC CLI configs (must be done BEFORE subnet deployment)
-        log_section "Deploying IPC CLI Configuration"
-        log_info "Creating ~/.ipc/config.toml with parent subnet configuration..."
+        # Sync existing IPC CLI config (generated by subnet init) before node init.
+        log_section "Syncing IPC CLI Configuration"
+        log_info "Copying local IPC config store to validators..."
         update_ipc_cli_configs
     fi
 
@@ -327,6 +335,16 @@ cmd_init() {
     fi
 
     if [ -n "$subnet_id" ]; then
+        # Force regeneration of node-init configuration from manager YAML.
+        # ipc-cli subnet init can leave behind generated node_<subnet>.yaml templates
+        # that may contain stale topdown/resolver settings from earlier runs.
+        local generated_node_config
+        generated_node_config=$(get_generated_node_config_path "$subnet_id")
+        if [ -f "$generated_node_config" ]; then
+            log_info "Removing cached generated node config: $generated_node_config"
+            rm -f "$generated_node_config"
+        fi
+
         # Update child subnet provider_http to use correct port (8546 instead of default 8545)
         # ipc-cli subnet init writes provider_http with default port, but we need the configured port
         log_section "Updating IPC CLI Configuration"
@@ -426,12 +444,23 @@ cmd_init() {
 # Update binaries on all validators
 cmd_update_binaries() {
     local branch="main"
+    local compile_mode="remote"
+    local with_storage=false
+    local git_pull=false
 
     # Parse options
     while [[ $# -gt 0 ]]; do
         case $1 in
             --branch)
                 branch="$2"
+                shift 2
+                ;;
+            --compile|-C)
+                compile_mode="$2"
+                if [[ "$compile_mode" != "local" && "$compile_mode" != "remote" ]]; then
+                    log_error "Invalid --compile value: $compile_mode (use 'local' or 'remote')"
+                    exit 1
+                fi
                 shift 2
                 ;;
             --help|-h)
@@ -441,25 +470,40 @@ Update IPC binaries on all validators
 Usage: $0 update-binaries [options]
 
 Options:
-    --branch NAME    Git branch to pull from (default: main)
-    --help           Show this help message
+    --branch NAME       Git branch to build from (default: main)
+    --compile MODE      Where to build: 'local' or 'remote' (default: remote)
+    -C MODE             Short for --compile
+    --git-pull          Fetch/pull latest changes before build (default: off)
+    --with-storage      Build ipc-storage feature and storage binaries
+    --help              Show this help message
 
-This command will:
-  1. SSH to each validator (in parallel)
-  2. Pull latest changes from the specified branch
-  3. Build binaries using 'make' in the repo root
-  4. Copy ipc-cli and fendermint binaries to /usr/local/bin
+Compile modes:
+  remote  Build on each validator via SSH (current behavior). Requires pnpm,
+          Rust, Foundry on each host.
+  local   Build on this machine and SCP binaries to validators. If you're on
+          macOS and validators are Linux, cross-compiles to x86_64-unknown-linux-gnu.
+          Requires: cargo-zigbuild + zig (recommended) or cross (needs Docker).
 
 Examples:
     $0 update-binaries --branch main
-    $0 update-binaries --branch dev
-    $0 update-binaries --branch feature-xyz
+    $0 update-binaries --branch main --compile local
+    $0 update-binaries -C local --branch main
+    $0 update-binaries --branch main --git-pull
+    $0 update-binaries --branch main --with-storage
 EOF
                 exit 0
                 ;;
+            --git-pull)
+                git_pull=true
+                shift
+                ;;
+            --with-storage)
+                with_storage=true
+                shift
+                ;;
             *)
                 log_error "Unknown option: $1"
-                echo "Usage: $0 update-binaries --branch <branch-name>"
+                echo "Usage: $0 update-binaries [options] (use --help for details)"
                 exit 1
                 ;;
         esac
@@ -469,7 +513,82 @@ EOF
     load_config
 
     # Update binaries
-    update_all_binaries "$branch"
+    update_all_binaries "$branch" "$compile_mode" "$with_storage" "$git_pull"
+}
+
+# Deploy binaries to validators (copy only, no build)
+cmd_deploy_binaries() {
+    local binary_path=""
+    local target_validator=""
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --path)
+                binary_path="$2"
+                shift 2
+                ;;
+            --help|-h)
+                cat << EOF
+Copy ipc-cli and fendermint binaries to validators (no build)
+
+Usage: $0 deploy-binaries [options] [validator-name]
+
+Options:
+    --path DIR    Path to directory containing ipc-cli and fendermint
+    --help        Show this help message
+
+If --path is omitted, auto-detects from local IPC repo:
+  - target/release/ (native build)
+  - target/x86_64-unknown-linux-gnu/release/ (cross-compiled)
+
+Examples:
+    $0 deploy-binaries --path ./target/release
+    $0 deploy-binaries --path ./target/x86_64-unknown-linux-gnu/release
+    $0 deploy-binaries validator-2   # Deploy to single validator (uses auto-detect path)
+EOF
+                exit 0
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                target_validator="$1"
+                shift
+                ;;
+        esac
+    done
+
+    load_config
+
+    # Auto-detect path if not specified
+    if [ -z "$binary_path" ]; then
+        local local_repo
+        local_repo=$(get_config_value "paths.local_ipc_repo" 2>/dev/null || true)
+        if [ -z "$local_repo" ] || [ "$local_repo" = "null" ]; then
+            local_repo=$(cd "${SCRIPT_DIR}/../.." && pwd)
+        fi
+        if [ -f "$local_repo/target/release/ipc-cli" ]; then
+            binary_path="$local_repo/target/release"
+        elif [ -f "$local_repo/target/x86_64-unknown-linux-gnu/release/ipc-cli" ]; then
+            binary_path="$local_repo/target/x86_64-unknown-linux-gnu/release"
+        else
+            log_error "Binaries not found. Specify --path or run from IPC repo with built binaries."
+            log_info "Expected: target/release/ or target/x86_64-unknown-linux-gnu/release/"
+            exit 1
+        fi
+        log_info "Using binaries from: $binary_path"
+    fi
+
+    binary_path=$(cd "$binary_path" 2>/dev/null && pwd)
+    if [ -z "$binary_path" ]; then
+        log_error "Invalid path"
+        exit 1
+    fi
+
+    log_header "Deploying Binaries"
+    deploy_binaries_only "$binary_path" "$target_validator"
 }
 
 # Update existing node configs
@@ -488,7 +607,7 @@ cmd_update_config() {
     log_info "Updating node configurations..."
     update_all_configs
 
-    log_info "Updating IPC CLI configurations..."
+    log_info "Syncing IPC CLI configurations..."
     update_ipc_cli_configs
 
     log_info "Restarting nodes..."
@@ -810,6 +929,51 @@ cmd_install_systemd() {
         fi
 }
 
+cmd_start_storage() {
+    local skip_confirm=false
+    local register_operator=false
+
+    for arg in "$@"; do
+        case $arg in
+            --yes) skip_confirm=true ;;
+            --register-operator) register_operator=true ;;
+        esac
+    done
+
+    log_header "Starting Storage Services"
+    confirm "This will start storage services on configured validator(s)" "$skip_confirm"
+
+    load_config
+    if start_storage_services "$register_operator"; then
+        log_success "✓ Storage services started"
+    else
+        log_error "✗ Failed to start storage services"
+        return 1
+    fi
+}
+
+cmd_stop_storage() {
+    local skip_confirm=false
+    for arg in "$@"; do
+        case $arg in
+            --yes) skip_confirm=true ;;
+        esac
+    done
+
+    log_header "Stopping Storage Services"
+    confirm "This will stop storage services on all validators" "$skip_confirm"
+
+    load_config
+    stop_all_storage_nodes
+    log_success "✓ Storage services stopped"
+}
+
+cmd_storage_status() {
+    log_header "Storage Service Status"
+    load_config
+    check_storage_status
+}
+
 # Main execution
 main() {
     if [ $# -eq 0 ]; then
@@ -854,7 +1018,7 @@ main() {
 
     # Acquire lock for destructive operations
     case $command in
-        init|restart|update-binaries)
+        init|restart|update-binaries|deploy-binaries|start-storage|stop-storage)
             acquire_lock
             ;;
     esac
@@ -872,6 +1036,9 @@ main() {
             ;;
         update-binaries)
             cmd_update_binaries "$@"
+            ;;
+        deploy-binaries)
+            cmd_deploy_binaries "$@"
             ;;
         check)
             cmd_check "$@"
@@ -909,6 +1076,15 @@ main() {
         install-systemd)
             load_config
             cmd_install_systemd "$@"
+            ;;
+        start-storage)
+            cmd_start_storage "$@"
+            ;;
+        stop-storage)
+            cmd_stop_storage "$@"
+            ;;
+        storage-status)
+            cmd_storage_status "$@"
             ;;
         start-relayer)
             load_config

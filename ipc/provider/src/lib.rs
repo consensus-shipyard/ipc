@@ -649,6 +649,21 @@ impl IpcProvider {
         conn.manager().get_validator_changeset(subnet, epoch).await
     }
 
+    /// Get the changes in subnet validators in an inclusive range. This is fetched from parent.
+    pub async fn get_validator_changeset_range(
+        &self,
+        subnet: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> anyhow::Result<Vec<PowerChangeRequest>> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = self.get_connection(&parent)?;
+
+        conn.manager()
+            .get_validator_changeset_range(subnet, from, to)
+            .await
+    }
+
     /// Get genesis info for a child subnet. This can be used to deterministically
     /// generate the genesis of the subnet
     pub async fn get_genesis_info(&self, subnet: &SubnetID) -> anyhow::Result<SubnetGenesisInfo> {
@@ -666,6 +681,19 @@ impl IpcProvider {
         let conn = self.get_connection(&parent)?;
 
         conn.manager().get_top_down_msgs(subnet, epoch).await
+    }
+
+    /// Get the top down messages in an inclusive range.
+    pub async fn get_top_down_msgs_range(
+        &self,
+        subnet: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> anyhow::Result<Vec<IpcEnvelope>> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = self.get_connection(&parent)?;
+
+        conn.manager().get_top_down_msgs_range(subnet, from, to).await
     }
 
     pub async fn get_block_hash(

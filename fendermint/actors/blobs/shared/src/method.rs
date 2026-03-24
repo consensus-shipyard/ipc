@@ -46,4 +46,12 @@ pub enum Method {
     RegisterNodeOperator = frc42_dispatch::method_hash!("RegisterNodeOperator"),
     GetOperatorInfo = frc42_dispatch::method_hash!("GetOperatorInfo"),
     GetActiveOperators = frc42_dispatch::method_hash!("GetActiveOperators"),
+
+    // Execution methods (MVP in blobs actor)
+    CreateJob = frc42_dispatch::method_hash!("CreateJob"),
+    ClaimJob = frc42_dispatch::method_hash!("ClaimJob"),
+    CompleteJob = frc42_dispatch::method_hash!("CompleteJob"),
+    FailJob = frc42_dispatch::method_hash!("FailJob"),
+    GetJob = frc42_dispatch::method_hash!("GetJob"),
+    ListJobs = frc42_dispatch::method_hash!("ListJobs"),
 }

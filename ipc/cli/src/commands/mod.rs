@@ -5,9 +5,12 @@
 mod checkpoint;
 mod config;
 mod crossmsg;
+#[cfg(feature = "ipc-storage")]
+mod exec;
 // mod daemon;
 mod deploy;
 mod node;
+mod storage;
 mod subnet;
 mod ui;
 mod util;
@@ -38,7 +41,10 @@ use std::str::FromStr;
 
 use crate::commands::config::ConfigCommandsArgs;
 use crate::commands::deploy::{DeployCommand, DeployCommandArgs};
+#[cfg(feature = "ipc-storage")]
+use crate::commands::exec::ExecCommandsArgs;
 use crate::commands::node::NodeCommandsArgs;
+use crate::commands::storage::StorageCommandsArgs;
 use crate::commands::validator::ValidatorCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
 use crate::CommandLineHandler;
@@ -62,6 +68,9 @@ enum Commands {
     Deploy(DeployCommandArgs),
     Ui(UICommandArgs),
     Node(NodeCommandsArgs),
+    Storage(StorageCommandsArgs),
+    #[cfg(feature = "ipc-storage")]
+    Exec(ExecCommandsArgs),
 }
 
 #[derive(Debug, Parser)]
@@ -157,6 +166,9 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Deploy(args) => DeployCommand::handle(global, args).await,
                 Commands::Ui(args) => run_ui_command(global.clone(), args.clone()).await,
                 Commands::Node(args) => args.handle(global).await,
+                Commands::Storage(args) => args.handle(global).await,
+                #[cfg(feature = "ipc-storage")]
+                Commands::Exec(args) => args.handle(global).await,
             };
 
             r.with_context(|| format!("error processing command {:?}", args.command))

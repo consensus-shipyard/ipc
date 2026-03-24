@@ -6,6 +6,7 @@
 bootstrap_validator_host() {
     local validator_idx="$1"
     local branch="${2:-main}"
+    local with_storage="${3:-false}"
 
     local name="${VALIDATORS[$validator_idx]}"
     local ip=$(get_config_value "validators[$validator_idx].ip")
@@ -149,6 +150,20 @@ bootstrap_validator_host() {
         export PATH=\"\$HOME/.cargo/bin:\$HOME/.foundry/bin:\$HOME/.npm-global/bin:\$PATH\"; \
         make 2>&1"
 
+    if [ "$with_storage" = "true" ]; then
+        # Some branches do not expose ipc-storage on ipc-cli directly.
+        # Fall back to plain ipc-cli build when the feature is unavailable.
+        build_cmd="$build_cmd && \
+        if rg -q \"^[[:space:]]*ipc-storage[[:space:]]*=\" ipc/cli/Cargo.toml; then \
+            cargo build --release -p ipc-cli --features ipc-storage; \
+        else \
+            echo \"[warn] ipc-cli feature 'ipc-storage' not found; building ipc-cli without feature\"; \
+            cargo build --release -p ipc-cli; \
+        fi && \
+        cargo build --release -p fendermint_app --features ipc-storage && \
+        cargo build --release -p ipc-decentralized-storage --bin node --bin gateway 2>&1"
+    fi
+
     local build_output
     build_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" "$build_cmd")
 
@@ -180,10 +195,14 @@ bootstrap_validator_host() {
 # Usage: bootstrap_all_hosts [branch]
 bootstrap_all_hosts() {
     local branch="${1:-main}"
+    local with_storage="${2:-false}"
 
     log_header "Bootstrap Validator Hosts"
     log_info "This will install Rust, Foundry, Node.js, and build IPC on each host."
     log_info "Branch: $branch"
+    if [ "$with_storage" = "true" ]; then
+        log_info "Storage build: enabled (ipc-storage feature + storage binaries)"
+    fi
     log_info "Validators: ${#VALIDATORS[@]}"
     echo ""
 
@@ -194,7 +213,7 @@ bootstrap_all_hosts() {
         local name="${VALIDATORS[$idx]}"
         log_subsection "$name"
 
-        if bootstrap_validator_host "$idx" "$branch"; then
+        if bootstrap_validator_host "$idx" "$branch" "$with_storage"; then
             results[$idx]=0
         else
             results[$idx]=1

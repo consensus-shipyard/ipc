@@ -3,12 +3,13 @@
 
 //! CLI for running the blob gateway with objects API
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
 use clap::Parser;
 use fendermint_rpc::message::SignedMessageFactory;
 use fendermint_rpc::FendermintClient;
 use fendermint_rpc::QueryClient;
+use fendermint_vm_actor_interface::eam::EthAddress as FvmEthAddress;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::address::{set_current_network, Address, Network};
 use fvm_shared::chainid::ChainID;
@@ -79,16 +80,16 @@ struct Args {
     iroh_v6_addr: Option<SocketAddrV6>,
 }
 
-/// Get the next sequence number (nonce) of an account.
-async fn get_sequence(client: &impl QueryClient, addr: &Address) -> Result<u64> {
+/// Get the next sequence number (nonce) of an account if it exists.
+async fn get_sequence_opt(client: &impl QueryClient, addr: &Address) -> Result<Option<u64>> {
     let state = client
         .actor_state(addr, FvmQueryHeight::default())
         .await
         .context("failed to get actor state")?;
 
     match state.value {
-        Some((_id, state)) => Ok(state.sequence),
-        None => Err(anyhow!("cannot find actor {addr}")),
+        Some((_id, state)) => Ok(Some(state.sequence)),
+        None => Ok(None),
     }
 }
 
@@ -125,10 +126,13 @@ async fn main() -> Result<()> {
         .context("failed to read secret key")?;
 
     let pk = sk.public_key();
-    // Use f1 address (secp256k1) for signing native FVM actor transactions
-    let from_addr =
-        Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
-    tracing::info!("Gateway sender address: {}", from_addr);
+    let from_f1 = Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
+    let from_eth = FvmEthAddress::new_secp256k1(&pk.serialize())
+        .context("failed to derive delegated address from secret key")?;
+    let from_f410 =
+        Address::new_delegated(10, &from_eth.0).context("failed to create f410 address")?;
+    tracing::info!("Gateway sender f1 address: {}", from_f1);
+    tracing::info!("Gateway sender f410 address: {}", from_f410);
 
     // Parse or generate BLS private key if provided
     let _bls_private_key = if let Some(key_file) = &args.bls_key_file {
@@ -214,11 +218,6 @@ async fn main() -> Result<()> {
     let client = FendermintClient::new_http(args.rpc_url, None)
         .context("failed to create Fendermint client")?;
 
-    // Query the account nonce from the state
-    let sequence = get_sequence(&client, &from_addr)
-        .await
-        .context("failed to get account sequence")?;
-
     // Query the chain ID
     let chain_id = client
         .state_params(FvmQueryHeight::default())
@@ -228,6 +227,20 @@ async fn main() -> Result<()> {
         .chain_id;
 
     tracing::info!("Chain ID: {}", chain_id);
+
+    let (from_addr, sequence) = if let Some(sequence) = get_sequence_opt(&client, &from_f410)
+        .await
+        .context("failed to get delegated account sequence")?
+    {
+        tracing::info!("Using delegated sender (f410) for gateway transactions");
+        (from_f410, sequence)
+    } else {
+        anyhow::bail!(
+            "delegated sender {} not found on-chain; cross-fund this delegated address and retry (native f1 {} is intentionally not used)",
+            from_f410, from_f1
+        );
+    };
+    tracing::info!("Gateway sender address: {}", from_addr);
     tracing::info!("Account sequence: {}", sequence);
 
     // Create signed message factory

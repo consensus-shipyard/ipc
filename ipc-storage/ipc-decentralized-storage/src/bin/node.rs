@@ -3,10 +3,16 @@
 
 //! Binary for running a decentralized storage node
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
+use bytes::Bytes;
 use clap::{Parser, Subcommand};
-use ethers::types::Address as EthAddress;
+use ethers::abi::{encode as abi_encode, Token as AbiToken};
+use ethers::types::{Address as EthAddress, U256 as EthU256};
+use fendermint_actor_blobs_shared::execution::{
+    ExecutionJob, GetJobParams, JobStatus, ListJobsParams, ListJobsReturn, CLAIM_JOB_SELECTOR,
+    COMPLETE_JOB_SELECTOR, FAIL_JOB_SELECTOR,
+};
 use fendermint_actor_blobs_shared::method::Method;
 use fendermint_actor_blobs_shared::operators::RegisterNodeOperatorParams;
 use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
@@ -14,18 +20,25 @@ use fendermint_rpc::message::{GasParams, SignedMessageFactory};
 use fendermint_rpc::tx::{TxClient, TxCommit};
 use fendermint_rpc::FendermintClient;
 use fendermint_rpc::QueryClient;
+use fendermint_vm_actor_interface::eam::EthAddress as FvmEthAddress;
+use fendermint_vm_actor_interface::system;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::{set_current_network, Address, Network};
+use fvm_shared::bigint::Zero;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::message::Message;
 use ipc_decentralized_storage::node::{launch, NodeConfig};
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 use tendermint_rpc::Url;
+use tokio::process::Command as TokioCommand;
 use tracing::info;
+
+const REGISTER_NODE_OPERATOR_SELECTOR: [u8; 4] = [0x71, 0x3b, 0x10, 0xcf];
 
 #[derive(Parser, Debug)]
 #[command(name = "ipc-storage-node")]
@@ -51,6 +64,8 @@ enum Commands {
     QueryBlob(QueryBlobArgs),
     /// Query an object from a bucket by key
     QueryObject(QueryObjectArgs),
+    /// Run execution worker loop over blobs actor jobs
+    RunExecutor(RunExecutorArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -165,6 +180,21 @@ struct QueryObjectArgs {
     height: Option<u64>,
 }
 
+#[derive(Parser, Debug)]
+struct RunExecutorArgs {
+    /// Path to file containing the secp256k1 secret key in Base64 format
+    #[arg(long, env = "SECRET_KEY_FILE", required = true)]
+    secret_key_file: PathBuf,
+
+    /// Tendermint RPC URL for the chain
+    #[arg(long, default_value = "http://localhost:26657")]
+    rpc_url: String,
+
+    /// Polling interval in seconds
+    #[arg(long, default_value = "5")]
+    poll_interval_secs: u64,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
@@ -197,6 +227,7 @@ async fn main() -> Result<()> {
         Commands::GenerateBlsKey(args) => generate_bls_key(args),
         Commands::QueryBlob(args) => query_blob(args).await,
         Commands::QueryObject(args) => query_object(args).await,
+        Commands::RunExecutor(args) => run_executor(args).await,
     }
 }
 
@@ -307,11 +338,13 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         .context("failed to read secret key")?;
 
     let pk = sk.public_key();
-    // Use f1 address (secp256k1) instead of f410 (delegated/ethereum) because we're calling
-    // a native FVM actor with CBOR params, not an EVM contract with calldata
-    let from_addr =
-        Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
-    info!("Sender address: {}", from_addr);
+    let from_f1 = Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
+    let from_eth = FvmEthAddress::new_secp256k1(&pk.serialize())
+        .context("failed to derive delegated address from secret key")?;
+    let from_f410 =
+        Address::new_delegated(10, &from_eth.0).context("failed to create f410 address")?;
+    info!("Sender f1 address: {}", from_f1);
+    info!("Sender f410 address: {}", from_f410);
 
     // Parse chain RPC URL
     let chain_rpc_url =
@@ -321,10 +354,17 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
     let client = FendermintClient::new_http(chain_rpc_url, None)
         .context("failed to create Fendermint client")?;
 
-    // Query the account nonce from the state
-    let sequence = get_sequence(&client, &from_addr)
+    // Ensure blobs actor exists on this subnet.
+    let blobs_actor_state = client
+        .actor_state(&BLOBS_ACTOR_ADDR, FvmQueryHeight::default())
         .await
-        .context("failed to get account sequence")?;
+        .context("failed to query blobs actor state")?;
+    if blobs_actor_state.value.is_none() {
+        anyhow::bail!(
+            "blobs actor {} is not deployed on this subnet. Recreate/start the subnet with ipc-storage enabled (fendermint_app built with --features ipc-storage), then retry register-operator.",
+            BLOBS_ACTOR_ADDR
+        );
+    }
 
     // Query the chain ID
     let chain_id = client
@@ -335,22 +375,12 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         .chain_id;
 
     info!("Chain ID: {}", chain_id);
-    info!("Account sequence: {}", sequence);
-
-    // Create signed message factory
-    let mf = SignedMessageFactory::new(sk, from_addr, sequence, ChainID::from(chain_id));
-
-    // Bind the client with the message factory
-    let mut client = client.bind(mf);
 
     // Prepare registration parameters
     let params = RegisterNodeOperatorParams {
         bls_pubkey: bls_pubkey.clone(),
         rpc_url: args.operator_rpc_url.clone(),
     };
-
-    let params_bytes =
-        RawBytes::serialize(params).context("failed to serialize RegisterNodeOperatorParams")?;
 
     // Gas params
     let gas_params = GasParams {
@@ -359,36 +389,47 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         gas_premium: TokenAmount::from_atto(100),
     };
 
-    info!("Sending RegisterNodeOperator transaction...");
-
-    // Send the transaction
-    let res = TxClient::<TxCommit>::transaction(
-        &mut client,
-        BLOBS_ACTOR_ADDR,
-        Method::RegisterNodeOperator as u64,
-        params_bytes,
-        TokenAmount::from_atto(0),
-        gas_params,
-    )
-    .await
-    .context("failed to send RegisterNodeOperator transaction")?;
-
-    if res.response.check_tx.code.is_err() {
+    let tx_hash = if let Some(sequence) = get_sequence_opt(&client, &from_f410)
+        .await
+        .context("failed to get delegated account sequence")?
+    {
+        info!("Using delegated sender (f410) via InvokeContract facade");
+        info!("Account sequence: {}", sequence);
+        let mf = SignedMessageFactory::new(sk, from_f410, sequence, ChainID::from(chain_id));
+        let mut client = client.bind(mf);
+        let calldata = encode_register_node_operator_calldata(&params);
+        let res = TxClient::<TxCommit>::fevm_invoke(
+            &mut client,
+            BLOBS_ACTOR_ADDR,
+            calldata,
+            TokenAmount::from_atto(0),
+            gas_params,
+        )
+        .await
+        .context("failed to send delegated RegisterNodeOperator transaction")?;
+        if res.response.check_tx.code.is_err() {
+            anyhow::bail!(
+                "RegisterNodeOperator check_tx failed: {}",
+                res.response.check_tx.log
+            );
+        }
+        if res.response.deliver_tx.code.is_err() {
+            anyhow::bail!(
+                "RegisterNodeOperator deliver_tx failed: code={:?}, log={}, info={}, gas_used={}",
+                res.response.deliver_tx.code,
+                res.response.deliver_tx.log,
+                res.response.deliver_tx.info,
+                res.response.deliver_tx.gas_used
+            );
+        }
+        info!("Sent RegisterNodeOperator transaction with delegated path");
+        res.response.hash.to_string()
+    } else {
         anyhow::bail!(
-            "RegisterNodeOperator check_tx failed: {}",
-            res.response.check_tx.log
+            "delegated sender {} not found on-chain; cross-fund this delegated address and retry (native f1 {} is intentionally not used)",
+            from_f410, from_f1
         );
-    }
-
-    if res.response.deliver_tx.code.is_err() {
-        anyhow::bail!(
-            "RegisterNodeOperator deliver_tx failed: code={:?}, log={}, info={}, gas_used={}",
-            res.response.deliver_tx.code,
-            res.response.deliver_tx.log,
-            res.response.deliver_tx.info,
-            res.response.deliver_tx.gas_used
-        );
-    }
+    };
 
     info!("✓ Successfully registered as node operator!");
     info!(
@@ -396,21 +437,78 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         hex::encode(bls_private_key.public_key().as_bytes())
     );
     info!("  RPC URL: {}", args.operator_rpc_url);
-    info!("  Tx hash: {}", res.response.hash);
+    info!("  Tx hash: {}", tx_hash);
 
     Ok(())
 }
 
-/// Get the next sequence number (nonce) of an account.
-async fn get_sequence(client: &impl QueryClient, addr: &Address) -> Result<u64> {
+/// Get the next sequence number (nonce) of an account if it exists.
+async fn get_sequence_opt(client: &impl QueryClient, addr: &Address) -> Result<Option<u64>> {
     let state = client
         .actor_state(addr, FvmQueryHeight::default())
         .await
         .context("failed to get actor state")?;
 
     match state.value {
-        Some((_id, state)) => Ok(state.sequence),
-        None => Err(anyhow!("cannot find actor {addr}")),
+        Some((_id, state)) => Ok(Some(state.sequence)),
+        None => Ok(None),
+    }
+}
+
+fn encode_register_node_operator_calldata(params: &RegisterNodeOperatorParams) -> Bytes {
+    let args = abi_encode(&[
+        AbiToken::Bytes(params.bls_pubkey.clone()),
+        AbiToken::String(params.rpc_url.clone()),
+    ]);
+    let mut calldata = Vec::with_capacity(4 + args.len());
+    calldata.extend_from_slice(&REGISTER_NODE_OPERATOR_SELECTOR);
+    calldata.extend_from_slice(&args);
+    Bytes::from(calldata)
+}
+
+fn encode_claim_job_calldata(id: u64) -> Bytes {
+    let args = abi_encode(&[AbiToken::Uint(EthU256::from(id))]);
+    let mut calldata = Vec::with_capacity(4 + args.len());
+    calldata.extend_from_slice(&CLAIM_JOB_SELECTOR);
+    calldata.extend_from_slice(&args);
+    Bytes::from(calldata)
+}
+
+fn encode_complete_job_calldata(
+    id: u64,
+    output_refs: Vec<String>,
+    output_commitment: [u8; 32],
+    exit_code: i32,
+) -> Bytes {
+    let args = abi_encode(&[
+        AbiToken::Uint(EthU256::from(id)),
+        AbiToken::Array(output_refs.into_iter().map(AbiToken::String).collect()),
+        AbiToken::FixedBytes(output_commitment.to_vec()),
+        AbiToken::Int(abi_int256_from_i32(exit_code)),
+    ]);
+    let mut calldata = Vec::with_capacity(4 + args.len());
+    calldata.extend_from_slice(&COMPLETE_JOB_SELECTOR);
+    calldata.extend_from_slice(&args);
+    Bytes::from(calldata)
+}
+
+fn encode_fail_job_calldata(id: u64, reason: String, exit_code: i32) -> Bytes {
+    let args = abi_encode(&[
+        AbiToken::Uint(EthU256::from(id)),
+        AbiToken::String(reason),
+        AbiToken::Int(abi_int256_from_i32(exit_code)),
+    ]);
+    let mut calldata = Vec::with_capacity(4 + args.len());
+    calldata.extend_from_slice(&FAIL_JOB_SELECTOR);
+    calldata.extend_from_slice(&args);
+    Bytes::from(calldata)
+}
+
+fn abi_int256_from_i32(value: i32) -> EthU256 {
+    if value >= 0 {
+        EthU256::from(value as u32)
+    } else {
+        EthU256::MAX - EthU256::from((-value) as u32) + EthU256::from(1u8)
     }
 }
 
@@ -598,4 +696,276 @@ async fn query_object(args: QueryObjectArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn run_executor(args: RunExecutorArgs) -> Result<()> {
+    info!("Starting execution worker loop");
+
+    let rpc_url = Url::from_str(&args.rpc_url).context("failed to parse RPC URL")?;
+    let client = FendermintClient::new_http(rpc_url, None).context("failed to create client")?;
+
+    let sk = SignedMessageFactory::read_secret_key(&args.secret_key_file)
+        .context("failed to read secret key")?;
+    let pk = sk.public_key();
+    let from_eth = FvmEthAddress::new_secp256k1(&pk.serialize())
+        .context("failed to derive delegated address from secret key")?;
+    let from_f410 =
+        Address::new_delegated(10, &from_eth.0).context("failed to create f410 address")?;
+
+    let chain_id = client
+        .state_params(FvmQueryHeight::default())
+        .await
+        .context("failed to get state params")?
+        .value
+        .chain_id;
+
+    let sequence = get_sequence_opt(&client, &from_f410)
+        .await
+        .context("failed to get delegated account sequence")?
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "delegated sender {} not found on-chain; cross-fund this delegated address and retry",
+                from_f410
+            )
+        })?;
+
+    info!("Executor sender address: {}", from_f410);
+    info!("Executor chain ID: {}", chain_id);
+    info!("Executor account sequence: {}", sequence);
+
+    let mf = SignedMessageFactory::new(sk, from_f410, sequence, ChainID::from(chain_id));
+    let mut tx_client = client.bind(mf);
+
+    let poll_interval = Duration::from_secs(args.poll_interval_secs);
+    loop {
+        let pending_jobs = list_pending_jobs(&tx_client).await?;
+        if pending_jobs.is_empty() {
+            tokio::time::sleep(poll_interval).await;
+            continue;
+        }
+
+        let job = pending_jobs[0].clone();
+        info!("Found candidate job {} with binary_ref={}", job.id, job.binary_ref);
+
+        let latest = get_job(&tx_client, job.id).await?;
+        let Some(latest) = latest else {
+            info!("Skipping job {}: no longer exists", job.id);
+            tokio::time::sleep(poll_interval).await;
+            continue;
+        };
+        if latest.status != JobStatus::Pending {
+            info!(
+                "Skipping job {}: latest status is {:?}, not Pending",
+                latest.id, latest.status
+            );
+            tokio::time::sleep(poll_interval).await;
+            continue;
+        }
+
+        let gas_params = GasParams {
+            gas_limit: 10_000_000,
+            gas_fee_cap: TokenAmount::from_atto(100),
+            gas_premium: TokenAmount::from_atto(100),
+        };
+        let claim_res = TxClient::<TxCommit>::fevm_invoke(
+            &mut tx_client,
+            BLOBS_ACTOR_ADDR,
+            encode_claim_job_calldata(job.id),
+            TokenAmount::zero(),
+            gas_params.clone(),
+        )
+        .await
+        .context("failed to send ClaimJob transaction via InvokeContract facade")?;
+        if claim_res.response.check_tx.code.is_err() || claim_res.response.deliver_tx.code.is_err() {
+            info!(
+                "ClaimJob rejected for {}: check={:?} deliver={:?} log={} info={}",
+                job.id,
+                claim_res.response.check_tx.code,
+                claim_res.response.deliver_tx.code,
+                claim_res.response.deliver_tx.log,
+                claim_res.response.deliver_tx.info
+            );
+            tokio::time::sleep(poll_interval).await;
+            continue;
+        }
+        info!("ClaimJob accepted for {}", job.id);
+
+        let run_result = run_job_binary(&job.binary_ref, &job.args).await;
+        match run_result {
+            Ok((exit_code, stdout, stderr)) if exit_code == 0 => {
+                let output_commitment = fendermint_actor_blobs_shared::bytes::B256(
+                    *blake3::hash([stdout.as_bytes(), stderr.as_bytes()].concat().as_slice())
+                        .as_bytes(),
+                );
+                let output_refs = vec![format!("inline://stdout/{}", hex::encode(output_commitment.0))];
+                let complete_res = TxClient::<TxCommit>::fevm_invoke(
+                    &mut tx_client,
+                    BLOBS_ACTOR_ADDR,
+                    encode_complete_job_calldata(job.id, output_refs, output_commitment.0, exit_code),
+                    TokenAmount::zero(),
+                    gas_params.clone(),
+                )
+                .await
+                .context("failed to send CompleteJob transaction via InvokeContract facade")?;
+                if complete_res.response.check_tx.code.is_err()
+                    || complete_res.response.deliver_tx.code.is_err()
+                {
+                    info!(
+                        "CompleteJob rejected for {}: check={:?} deliver={:?} log={} info={}",
+                        job.id,
+                        complete_res.response.check_tx.code,
+                        complete_res.response.deliver_tx.code,
+                        complete_res.response.deliver_tx.log,
+                        complete_res.response.deliver_tx.info
+                    );
+                } else {
+                    info!("Job {} completed successfully", job.id);
+                }
+            }
+            Ok((exit_code, _stdout, stderr)) => {
+                let fail_res = TxClient::<TxCommit>::fevm_invoke(
+                    &mut tx_client,
+                    BLOBS_ACTOR_ADDR,
+                    encode_fail_job_calldata(
+                        job.id,
+                        format!("process exited with code {}: {}", exit_code, stderr),
+                        exit_code,
+                    ),
+                    TokenAmount::zero(),
+                    gas_params.clone(),
+                )
+                .await
+                .context("failed to send FailJob transaction via InvokeContract facade")?;
+                if fail_res.response.check_tx.code.is_err()
+                    || fail_res.response.deliver_tx.code.is_err()
+                {
+                    info!(
+                        "FailJob rejected for {}: check={:?} deliver={:?} log={} info={}",
+                        job.id,
+                        fail_res.response.check_tx.code,
+                        fail_res.response.deliver_tx.code,
+                        fail_res.response.deliver_tx.log,
+                        fail_res.response.deliver_tx.info
+                    );
+                } else {
+                    info!("Job {} failed with non-zero exit", job.id);
+                }
+            }
+            Err(e) => {
+                let fail_res = TxClient::<TxCommit>::fevm_invoke(
+                    &mut tx_client,
+                    BLOBS_ACTOR_ADDR,
+                    encode_fail_job_calldata(job.id, format!("execution error: {}", e), -1),
+                    TokenAmount::zero(),
+                    gas_params.clone(),
+                )
+                .await
+                .context("failed to send FailJob transaction via InvokeContract facade")?;
+                if fail_res.response.check_tx.code.is_err()
+                    || fail_res.response.deliver_tx.code.is_err()
+                {
+                    info!(
+                        "FailJob rejected for {}: check={:?} deliver={:?} log={} info={}",
+                        job.id,
+                        fail_res.response.check_tx.code,
+                        fail_res.response.deliver_tx.code,
+                        fail_res.response.deliver_tx.log,
+                        fail_res.response.deliver_tx.info
+                    );
+                } else {
+                    info!("Job {} failed due to execution error", job.id);
+                }
+            }
+        }
+
+        tokio::time::sleep(poll_interval).await;
+    }
+}
+
+async fn list_pending_jobs(client: &impl QueryClient) -> Result<Vec<ExecutionJob>> {
+    // Query all and apply local filtering to avoid relying on possibly stale enum-filter behavior.
+    let params = ListJobsParams {
+        status: None,
+        limit: 10,
+    };
+    let params = RawBytes::serialize(params).context("failed to serialize ListJobs params")?;
+
+    let msg = Message {
+        version: Default::default(),
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: BLOBS_ACTOR_ADDR,
+        sequence: 0,
+        value: TokenAmount::zero(),
+        method_num: Method::ListJobs as u64,
+        params,
+        gas_limit: 10_000_000_000,
+        gas_fee_cap: TokenAmount::zero(),
+        gas_premium: TokenAmount::zero(),
+    };
+
+    let response = client
+        .call(msg, FvmQueryHeight::default())
+        .await
+        .context("failed to execute ListJobs query")?;
+    if response.value.code.is_err() {
+        anyhow::bail!("ListJobs query failed: {}", response.value.info);
+    }
+    let return_data = fendermint_rpc::response::decode_data(&response.value.data)
+        .context("failed to decode ListJobs response data")?;
+    let jobs = fvm_ipld_encoding::from_slice::<ListJobsReturn>(&return_data)
+        .context("failed to decode ListJobs return type")?;
+    Ok(jobs
+        .jobs
+        .into_iter()
+        .filter(|j| j.status == JobStatus::Pending)
+        .collect())
+}
+
+async fn get_job(client: &impl QueryClient, id: u64) -> Result<Option<ExecutionJob>> {
+    let params = RawBytes::serialize(GetJobParams { id }).context("failed to serialize GetJob params")?;
+
+    let msg = Message {
+        version: Default::default(),
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: BLOBS_ACTOR_ADDR,
+        sequence: 0,
+        value: TokenAmount::zero(),
+        method_num: Method::GetJob as u64,
+        params,
+        gas_limit: 10_000_000_000,
+        gas_fee_cap: TokenAmount::zero(),
+        gas_premium: TokenAmount::zero(),
+    };
+
+    let response = client
+        .call(msg, FvmQueryHeight::default())
+        .await
+        .context("failed to execute GetJob query")?;
+    if response.value.code.is_err() {
+        anyhow::bail!("GetJob query failed: {}", response.value.info);
+    }
+    let return_data = fendermint_rpc::response::decode_data(&response.value.data)
+        .context("failed to decode GetJob response data")?;
+    let job = fvm_ipld_encoding::from_slice::<Option<ExecutionJob>>(&return_data)
+        .context("failed to decode GetJob return type")?;
+    Ok(job)
+}
+
+async fn run_job_binary(binary_ref: &str, args: &[String]) -> Result<(i32, String, String)> {
+    // MVP runner supports local paths directly or `local://` URIs.
+    let binary = binary_ref
+        .strip_prefix("local://")
+        .unwrap_or(binary_ref)
+        .to_string();
+
+    let output = TokioCommand::new(binary)
+        .args(args)
+        .output()
+        .await
+        .context("failed to spawn process")?;
+
+    let code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    Ok((code, stdout, stderr))
 }

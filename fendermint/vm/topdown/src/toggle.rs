@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::finality::ParentViewPayload;
+use crate::proxy::ParentQueryProxy;
 use crate::{
     BlockHash, BlockHeight, CachedFinalityProvider, Error, IPCParentFinality,
     ParentFinalityProvider, ParentViewProvider,
@@ -88,6 +89,16 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
 }
 
 impl<P> Toggle<CachedFinalityProvider<P>> {
+    pub async fn latest_finalized_parent_view(&self) -> anyhow::Result<Option<IPCParentFinality>>
+    where
+        P: ParentQueryProxy + Send + Sync + 'static,
+    {
+        match self.inner.as_ref() {
+            Some(p) => p.latest_finalized_parent_view().await,
+            None => Ok(None),
+        }
+    }
+
     pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
         self.perform_or_else(|p| p.block_hash(height), None)
     }

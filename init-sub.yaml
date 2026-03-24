@@ -7,6 +7,8 @@
 #   from: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 #   chain-id: 314159
 
+node-topdown-mode: legacy
+
 create:
   parent: /r314159
   chain-id: 314159

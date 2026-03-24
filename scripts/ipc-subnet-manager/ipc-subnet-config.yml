@@ -4,7 +4,7 @@
 # Subnet Configuration
 subnet:
   # Subnet ID - get this from your subnet creation
-  id: "/r314159/t410fjzsmxroshdmvdq5bg4zwqxx5lznwxaga4h7zgqa"
+  id: "/r314159/t410fko243732vbebcpg32q6lbcnhmmqlkfyvu36ibdi"
   # Parent chain RPC endpoint
   parent_rpc: "https://api.calibration.node.glif.io/rpc/v1"
   #parent_rpc: "http://localhost:8555"
@@ -12,9 +12,9 @@ subnet:
   # Parent chain ID
   parent_chain_id: "/r314159"
   # Parent registry contract address
-  parent_registry: "0x2ec77af2b8bb08106c0d70bcfd1436547cb06ce3"
+  parent_registry: "0x618dc98241aa36710d83de2927eeb50ccd1c853d"
   # Parent gateway contract address
-  parent_gateway: "0xd020c71b245fae12bff70efc4bb173b72174a6da"
+  parent_gateway: "0x9e78a3c81023b8f4edb16f2975893c76b3265a82"
 # Validator Nodes (GCP hosts: ipc-chain-test-1, ipc-chain-test-2, ipc-chain-test-3)
 # ip: external IP (for SSH, RPC). internal_ip: for CometBFT/libp2p peer connections (same VPC)
 validators:
@@ -25,20 +25,20 @@ validators:
     ipc_user: "ipc"
     role: "primary" # First node initialized
     private_key: "0x867c766fa9ea9fab8929a6ec6a4fe32ccf33969035d3d7f2262f6eb8021b56d8"
-  - name: "validator-2"
-    ip: "136.115.12.207"
-    internal_ip: "10.128.0.3"
-    ssh_user: "philip"
-    ipc_user: "ipc"
-    role: "secondary"
-    private_key: "0x40aa709b5d6765411f2afbdb0b4ae00e45a06425b37a386334c80482b203d04d"
-  - name: "validator-3"
-    ip: "35.202.56.101"
-    internal_ip: "10.128.0.4"
-    ssh_user: "philip"
-    ipc_user: "ipc"
-    role: "secondary"
-    private_key: "0xc1099a062e296366a2ac3b26ac80a409833e6a74edbf677a0bd14580d2c68ea2"
+    # - name: "validator-2"
+    #   ip: "136.115.12.207"
+    #   internal_ip: "10.128.0.3"
+    #   ssh_user: "philip"
+    #   ipc_user: "ipc"
+    #   role: "secondary"
+    #   private_key: "0x40aa709b5d6765411f2afbdb0b4ae00e45a06425b37a386334c80482b203d04d"
+    # - name: "validator-3"
+    #   ip: "35.202.56.101"
+    #   internal_ip: "10.128.0.4"
+    #   ssh_user: "philip"
+    #   ipc_user: "ipc"
+    #   role: "secondary"
+    #   private_key: "0xc1099a062e296366a2ac3b26ac80a409833e6a74edbf677a0bd14580d2c68ea2"
 # Network Configuration
 network:
   cometbft_p2p_port: 26656
@@ -50,6 +50,9 @@ paths:
   ipc_repo: "/home/ipc/ipc"
   # Path to ipc-cli binary on remote hosts
   ipc_binary: "/home/ipc/ipc/target/release/ipc-cli"
+  # Path to IPC repo for local builds (update-binaries --compile local)
+  # Default: auto-detect from script location (parent of scripts/ipc-subnet-manager)
+  # local_ipc_repo: "/path/to/ipc"
   # Node home directory (will be created)
   node_home: "/home/ipc/.ipc-node"
   # Node init config path
@@ -63,6 +66,8 @@ init:
   # Deploy new subnet and gateway contracts (set true for fresh deployment)
   deploy_subnet: true
   activate_subnet: true
+  # node-topdown-mode passed to `ipc-cli subnet init` (legacy | f3 | auto)
+  node_topdown_mode: "legacy"
   # Supply source (native or ERC20)
   subnet_supply_source_kind: "native"
   # Permission mode (collateral or federated)
@@ -86,7 +91,7 @@ init:
   # - Topdown queries parent for genesis epoch; fails if subnet doesn't exist on-chain
   # - Re-enable after subnet is activated on the parent
   topdown:
-    enabled: false # Required for bootstrap: subnet not activated on parent yet
+    enabled: true # Required for bootstrap: subnet not activated on parent yet
     chain_head_delay: 5 # Reduced from 10 for faster parent block processing
     proposal_delay: 5 # Reduced from 10 for faster proposals
     max_proposal_range: 50 # Reduced from 100 for smaller batches
@@ -124,8 +129,8 @@ ipc_cli:
     network_type: "fevm"
     provider_http: "https://api.calibration.node.glif.io/rpc/v1"
     #provider_http: "http://localhost:8555"
-    registry_addr: "0x2ec77af2b8bb08106c0d70bcfd1436547cb06ce3"
-    gateway_addr: "0xd020c71b245fae12bff70efc4bb173b72174a6da"
+    registry_addr: "0x618dc98241aa36710d83de2927eeb50ccd1c853d"
+    gateway_addr: "0x9e78a3c81023b8f4edb16f2975893c76b3265a82"
   # Child subnet configuration (this subnet)
   child:
     # Uses subnet.id from above
@@ -143,6 +148,19 @@ relayer:
   checkpoint_interval: 10
   # Maximum parallel checkpoint submissions
   max_parallelism: 1
+# Storage service configuration (ipc-cli storage init/run)
+storage:
+  # Where to run storage services: primary | all | <validator-name>
+  run_on: "primary"
+  # Run mode for ipc-cli storage run: both | node | gateway
+  run_mode: "both"
+  # Storage service listen addresses
+  objects_listen_addr: "0.0.0.0:8080"
+  node_rpc_bind_addr: "0.0.0.0:8081"
+  operator_rpc_url: "http://127.0.0.1:8081"
+  # Iroh listen addresses
+  iroh_node_v4_addr: "0.0.0.0:11204"
+  iroh_gateway_v4_addr: "0.0.0.0:11205"
 # Environment Variable Overrides:
 # - IPC_SUBNET_ID
 # - IPC_SUBNET_PARENT_RPC

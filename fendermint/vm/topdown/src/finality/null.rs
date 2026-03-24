@@ -1,9 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::finality::{
-    ensure_sequential, topdown_cross_msgs, validator_changes, ParentViewPayload,
-};
+use crate::finality::{ensure_sequential, ParentViewPayload};
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
 use ipc_api::cross::IpcEnvelope;
@@ -41,22 +39,6 @@ impl FinalityWithNull {
 
     pub fn genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
         Ok(self.genesis_epoch)
-    }
-
-    pub async fn validator_changes(
-        &self,
-        height: BlockHeight,
-    ) -> anyhow::Result<Option<Vec<PowerChangeRequest>>> {
-        let r = atomically(|| self.handle_null_block(height, validator_changes, Vec::new)).await;
-        Ok(r)
-    }
-
-    pub async fn top_down_msgs(
-        &self,
-        height: BlockHeight,
-    ) -> anyhow::Result<Option<Vec<IpcEnvelope>>> {
-        let r = atomically(|| self.handle_null_block(height, topdown_cross_msgs, Vec::new)).await;
-        Ok(r)
     }
 
     pub fn last_committed_finality(&self) -> Stm<Option<IPCParentFinality>> {
@@ -228,23 +210,6 @@ impl FinalityWithNull {
 
         tracing::debug!(last_committed_height, "no non-null block after delay");
         Ok(None)
-    }
-
-    fn handle_null_block<T, F: Fn(&ParentViewPayload) -> T, D: Fn() -> T>(
-        &self,
-        height: BlockHeight,
-        f: F,
-        d: D,
-    ) -> Stm<Option<T>> {
-        let cache = self.cached_data.read()?;
-        Ok(cache.get_value(height).map(|v| {
-            if let Some(i) = v.as_ref() {
-                f(i)
-            } else {
-                tracing::debug!(height, "a null round detected, return default");
-                d()
-            }
-        }))
     }
 
     fn get_at_height<T, F: Fn(&ParentViewPayload) -> T>(
