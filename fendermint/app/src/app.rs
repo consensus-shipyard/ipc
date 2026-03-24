@@ -1,6 +1,5 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use std::future::Future;
 use std::sync::Arc;
 
 use crate::observe::{
@@ -423,23 +422,6 @@ where
         guard.take().ok_or_else(|| anyhow!("exec state empty"))
     }
 
-    /// Update the execution state using the provided closure.
-    ///
-    /// Note: Deals with panics in the user provided closure as well.
-    async fn modify_exec_state<T, G, F>(&self, generator: G) -> Result<T>
-    where
-        G: for<'s> FnOnce(&'s mut FvmExecState<BS>) -> F,
-        F: Future<Output = Result<T>>,
-        T: 'static,
-    {
-        let mut guard = self.exec_state.lock().await;
-        let maybe_state = guard.as_mut();
-        let state = maybe_state.ok_or_else(|| anyhow!("exec state empty"))?;
-        let ret = generator(state).await?;
-
-        Ok(ret)
-    }
-
     /// Get a read-only view from the current FVM execution state, optionally passing a new BlockContext.
     /// This is useful to perform query commands targeting the latest state. Mutations from transactions
     /// will not be persisted.
@@ -512,28 +494,6 @@ where
             serde_json::Value::String(s) => Ok(GenesisAppState::decode_and_decompress(&s)?),
             _ => Err(anyhow!("invalid app state json")),
         }
-    }
-
-    /// Replaces the current validators cache with a new one.
-    async fn refresh_validators_cache(&self) -> Result<()> {
-        // TODO: This should be read only state, but we can't use the read-only view here
-        // because it hasn't been committed to state store yet.
-        let mut cache = self.validators_cache.lock().await;
-        self.modify_exec_state(|s| {
-            // we need to leave this outside the closure
-            // otherwise `s`' lifetime would be captured by the
-            // closure causing unresolvable liftetime conflicts
-            // this is fine since we execute the future directly
-            // after calling the generator closure.
-            let x = ValidatorCache::new_from_state(s);
-            async {
-                *cache = Some(x?);
-                Ok(())
-            }
-        })
-        .await?;
-
-        Ok(())
     }
 
     /// Retrieves a validator from the cache, initializing it if necessary.
