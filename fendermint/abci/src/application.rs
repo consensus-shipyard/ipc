@@ -210,7 +210,8 @@ where
                 Request::ApplySnapshotChunk(r) => {
                     Response::ApplySnapshotChunk(log_error(app.apply_snapshot_chunk(r).await)?)
                 }
-                Request::Flush => panic!("Flush should be handled by the Server!"),
+                // Some clients still send explicit Flush requests; never panic on protocol input.
+                Request::Flush => Response::Flush,
             };
             Ok(res)
         };
