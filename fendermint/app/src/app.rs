@@ -882,7 +882,7 @@ where
         let mut events = to_begin_block(begin_response.applied_cron_message).events;
 
         let mut tx_results = Vec::with_capacity(request.txs.len());
-        for (tx_idx, tx) in request.txs.into_iter().enumerate() {
+        for tx in request.txs {
             let msg = tx.to_vec();
             let result = self
                 .messages_interpreter
@@ -901,17 +901,6 @@ where
                 }
                 Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
             };
-
-            if deliver_tx.code != 0.into() {
-                tracing::warn!(
-                    height = block_height,
-                    tx_index = tx_idx,
-                    code = ?deliver_tx.code,
-                    info = %deliver_tx.info,
-                    log = %deliver_tx.log,
-                    "finalize_block tx failed"
-                );
-            }
 
             tx_results.push(tendermint::abci::types::ExecTxResult {
                 code: deliver_tx.code,
@@ -962,13 +951,17 @@ where
         let state_root = exec_state
             .flush_state_root()
             .context("failed to flush finalized state root")?;
-        let projected_state = self.project_post_exec_state(
-            exec_state.block_height(),
-            exec_state.timestamp(),
-            state_root,
-            exec_state.updatable_params(),
-            light_client_commitments,
-        )?;
+        let params = exec_state.updatable_params();
+
+        let mut projected_state = self.committed_state()?;
+        projected_state.app_state.block_height = exec_state.block_height().try_into()?;
+        projected_state.app_state.state_params.timestamp = exec_state.timestamp();
+        projected_state.app_state.state_params.state_root = state_root;
+        projected_state.app_state.state_params.app_version = params.app_version;
+        projected_state.app_state.state_params.base_fee = params.base_fee;
+        projected_state.app_state.state_params.circ_supply = params.circ_supply;
+        projected_state.app_state.state_params.power_scale = params.power_scale;
+        projected_state.state_commitments = light_client_commitments;
         let app_hash = projected_state.app_hash();
 
         self.put_exec_state(exec_state)
@@ -997,8 +990,7 @@ where
 
         let mut c = self.light_client_commitments.lock().await;
         // because of the take, no need to *c = None
-        let state =
-            self.project_post_exec_state(block_height, timestamp, state_root, params, c.take())?;
+        state.state_commitments = c.take();
 
         let app_hash = state.app_hash();
         let block_height = state.app_state.block_height;
