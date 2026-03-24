@@ -315,8 +315,6 @@ fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "mas
 # Fix netwatch socket2 0.5 compatibility (macOS BSD sockets)
 # Patched version with socket2 0.5+ API fixes
 netwatch = { path = "patches/netwatch" }
-# Patch tower-abci v0.16 to avoid panicking on empty ABCI request frames.
-tower-abci = { path = "patches/tower-abci" }
 
 fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
 fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
