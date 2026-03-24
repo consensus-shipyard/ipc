@@ -34,10 +34,17 @@ stop_all_nodes() {
         log_info "Stopping $name..."
         kill_process "$idx" "ipc-cli node start"
         # Also stop child processes that can keep RocksDB LOCK files open.
+        kill_process "$idx" "fendermint"
         kill_process "$idx" "/target/release/fendermint"
         kill_process "$idx" "fendermint/app/src/service/node.rs"
         kill_process "$idx" "cometbft start"
+        kill_process "$idx" "cometbft"
         kill_process "$idx" "/cometbft"
+
+        # Fallback non-sudo process kill when sudo -n is unavailable.
+        exec_on_host_simple "$idx" "pkill -f \"ipc-cli node start\" >/dev/null 2>&1 || true" || true
+        exec_on_host_simple "$idx" "pkill -f \"fendermint\" >/dev/null 2>&1 || true" || true
+        exec_on_host_simple "$idx" "pkill -f \"cometbft\" >/dev/null 2>&1 || true" || true
 
         # Best-effort systemd stop (some hosts run ipc-node service directly).
         if ! is_local_mode; then
@@ -51,7 +58,28 @@ stop_all_nodes() {
 
         # Wait a moment for graceful shutdown
         sleep 2
+
+        # Stale LOCK can remain when prior process exits uncleanly.
+        cleanup_stale_rocksdb_lock "$idx"
     done
+}
+
+cleanup_stale_rocksdb_lock() {
+    local validator_idx="$1"
+    local name="${VALIDATORS[$validator_idx]}"
+    local node_home
+    node_home=$(get_node_home "$validator_idx")
+    local lock_path="$node_home/fendermint/data/rocksdb/LOCK"
+
+    if exec_on_host_simple "$validator_idx" "pgrep -f \"fendermint|cometbft|ipc-cli node start\" >/dev/null 2>&1"; then
+        return 0
+    fi
+
+    if exec_on_host_simple "$validator_idx" "[ -f $lock_path ]"; then
+        if exec_on_host_simple "$validator_idx" "rm -f $lock_path"; then
+            log_warn "Removed stale RocksDB lock on $name: $lock_path"
+        fi
+    fi
 }
 
 stop_all_storage_nodes() {
@@ -90,6 +118,7 @@ start_validator_node() {
     local subnet_id=$(get_config_value "subnet.id")
 
     log_info "Starting $name..."
+    cleanup_stale_rocksdb_lock "$validator_idx"
 
     # Use wrapper script to set env vars reliably (avoids SSH quoting issues with sudo su -c '...').
     # resolver_enabled() requires: !listen_addr.is_empty() && subnet_id != UNDEF
@@ -665,6 +694,23 @@ EOF
             print last_match
         }
     ' "$ipc_config_file")
+
+    # Validate extracted subnet ID against on-chain subnet list.
+    # If TOML extraction picked a stale local entry, prefer the latest on-chain child subnet.
+    local onchain_subnets
+    onchain_subnets=$($ipc_binary_expanded subnet list --parent "$parent_chain_id" 2>/dev/null | awk -v parent="$parent_chain_id" '
+        $1 ~ ("^" parent "/t[a-z0-9]+$") { print $1 }
+    ')
+    if [ -n "$onchain_subnets" ]; then
+        if [ -z "$subnet_id" ] || ! echo "$onchain_subnets" | grep -Fxq "$subnet_id"; then
+            local onchain_latest
+            onchain_latest=$(echo "$onchain_subnets" | tail -1)
+            if [ -n "$onchain_latest" ]; then
+                log_warn "Extracted subnet ID was not on-chain; using latest on-chain subnet: $onchain_latest" >&2
+                subnet_id="$onchain_latest"
+            fi
+        fi
+    fi
 
     if [ -z "$subnet_id" ]; then
         log_error "Could not extract subnet ID from IPC config at $ipc_config_file" >&2

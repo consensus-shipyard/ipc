@@ -4,7 +4,7 @@
 # Subnet Configuration
 subnet:
   # Subnet ID - get this from your subnet creation
-  id: "/r314159/t410fdg2vwrukcxeopg3sfslrmsf2fkxjyzfldcnf7kq"
+  id: "/r314159/t410fko243732vbebcpg32q6lbcnhmmqlkfyvu36ibdi"
   # Parent chain RPC endpoint
   parent_rpc: "https://api.calibration.node.glif.io/rpc/v1"
   #parent_rpc: "http://localhost:8555"
@@ -12,9 +12,9 @@ subnet:
   # Parent chain ID
   parent_chain_id: "/r314159"
   # Parent registry contract address
-  parent_registry: "0x3527b860bfe033601b5cfda1dbaaaeb0e81033be"
+  parent_registry: "0x618dc98241aa36710d83de2927eeb50ccd1c853d"
   # Parent gateway contract address
-  parent_gateway: "0x46eb516b535b990825a3171a28548af072975296"
+  parent_gateway: "0x9e78a3c81023b8f4edb16f2975893c76b3265a82"
 # Validator Nodes (GCP hosts: ipc-chain-test-1, ipc-chain-test-2, ipc-chain-test-3)
 # ip: external IP (for SSH, RPC). internal_ip: for CometBFT/libp2p peer connections (same VPC)
 validators:
@@ -129,8 +129,8 @@ ipc_cli:
     network_type: "fevm"
     provider_http: "https://api.calibration.node.glif.io/rpc/v1"
     #provider_http: "http://localhost:8555"
-    registry_addr: "0x3527b860bfe033601b5cfda1dbaaaeb0e81033be"
-    gateway_addr: "0x46eb516b535b990825a3171a28548af072975296"
+    registry_addr: "0x618dc98241aa36710d83de2927eeb50ccd1c853d"
+    gateway_addr: "0x9e78a3c81023b8f4edb16f2975893c76b3265a82"
   # Child subnet configuration (this subnet)
   child:
     # Uses subnet.id from above

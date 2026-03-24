@@ -155,7 +155,9 @@ check_process_running() {
         local ip=$(get_config_value "validators[$validator_idx].ip")
         local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
         local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-        ssh_check_process "$ip" "$ssh_user" "$ipc_user" "$process_pattern"
+        local status
+        status=$(ssh_check_process "$ip" "$ssh_user" "$ipc_user" "$process_pattern" 2>/dev/null | tr -d '\r\n ')
+        [ "$status" = "running" ]
     fi
 }
 
