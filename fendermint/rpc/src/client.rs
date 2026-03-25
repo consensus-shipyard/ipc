@@ -245,12 +245,22 @@ where
             .broadcast_tx_commit(data)
             .await
             .context("broadcast_tx_commit failed")?;
+        let deliver_tx = tendermint::abci::response::DeliverTx {
+            code: response.tx_result.code,
+            data: response.tx_result.data.clone(),
+            log: response.tx_result.log.clone(),
+            info: response.tx_result.info.clone(),
+            gas_wanted: response.tx_result.gas_wanted,
+            gas_used: response.tx_result.gas_used,
+            events: response.tx_result.events.clone(),
+            codespace: response.tx_result.codespace.clone(),
+        };
         // We have a fully `DeliverTx` with default fields even if `CheckTx` indicates failure.
-        let return_data = if response.check_tx.code.is_err() || response.deliver_tx.code.is_err() {
+        let return_data = if response.check_tx.code.is_err() || deliver_tx.code.is_err() {
             None
         } else {
             let return_data =
-                f(&response.deliver_tx).context("error decoding data from deliver_tx in commit")?;
+                f(&deliver_tx).context("error decoding data from tx_result in commit")?;
             Some(return_data)
         };
         let response = CommitResponse {

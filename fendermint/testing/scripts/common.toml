@@ -61,6 +61,9 @@ clear = true
 dependencies = []
 
 [tasks.teardown]
+# Cleanup should be best-effort; CI failures should reflect test/setup failures,
+# not post-failure cleanup noise.
+ignore_errors = true
 # `dependencies` doesn't seem to work with `cleanup_task`.
 run_task = { name = [
   "cometbft-destroy",

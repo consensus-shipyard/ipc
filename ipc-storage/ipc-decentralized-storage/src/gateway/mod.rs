@@ -802,10 +802,10 @@ where
             );
         }
 
-        if res.response.deliver_tx.code.is_err() {
+        if res.response.tx_result.code.is_err() {
             anyhow::bail!(
                 "FinalizeBlob deliver_tx failed: {}",
-                res.response.deliver_tx.log
+                res.response.tx_result.log
             );
         }
 

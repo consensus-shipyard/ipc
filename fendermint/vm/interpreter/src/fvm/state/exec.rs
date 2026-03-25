@@ -109,7 +109,7 @@ impl fmt::Debug for FvmStateParams {
 /// This is just a technical thing to help us not forget about saving something.
 ///
 /// TODO: `base_fee` should surely be here.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FvmUpdatableParams {
     /// The application protocol version, which changes during upgrades.
     pub app_version: u64,
@@ -309,6 +309,16 @@ where
     pub fn commit(mut self) -> anyhow::Result<(Cid, FvmUpdatableParams, bool)> {
         let cid = self.executor.flush()?;
         Ok((cid, self.params, self.params_dirty))
+    }
+
+    /// Flush and return the current state root without consuming the execution state.
+    pub fn flush_state_root(&mut self) -> anyhow::Result<Cid> {
+        self.executor.flush()
+    }
+
+    /// Return a copy of currently tracked mutable parameters.
+    pub fn updatable_params(&self) -> FvmUpdatableParams {
+        self.params.clone()
     }
 
     /// The height of the currently executing block.

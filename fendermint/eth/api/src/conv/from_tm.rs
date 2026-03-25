@@ -86,10 +86,9 @@ fn block_zero() -> tendermint::Block {
     tendermint::Block::new(
         header,
         Vec::new(),
-        tendermint::evidence::Data::default(),
+        tendermint::evidence::List::default(),
         Some(commit),
     )
-    .unwrap()
 }
 
 pub fn is_block_zero(block: &tendermint::Block) -> bool {
@@ -285,7 +284,8 @@ pub async fn to_eth_receipt(
     let contract_address = if result.tx_result.code.is_err() {
         None
     } else {
-        maybe_contract_address(&result.tx_result).map(|ca| et::H160::from_slice(&ca.0))
+        maybe_contract_address_from_exec_tx_result(&result.tx_result)
+            .map(|ca| et::H160::from_slice(&ca.0))
     };
 
     let receipt = et::TransactionReceipt {
@@ -413,8 +413,10 @@ pub fn to_eth_block_zero(block: tendermint::Block) -> anyhow::Result<et::Block<s
         txs_results: None,
         begin_block_events: None,
         end_block_events: None,
+        finalize_block_events: Vec::new(),
         validator_updates: Vec::new(),
         consensus_param_updates: None,
+        app_hash: tendermint::AppHash::default(),
     };
     let block = to_eth_block(&block, block_results, TokenAmount::zero(), ChainID::from(0))
         .context("failed to map block zero to eth")?;
@@ -442,14 +444,16 @@ pub fn to_logs(
         let addr = event
             .attributes
             .iter()
-            .find(|a| a.key == "emitter.deleg")
-            .and_then(|a| a.value.parse::<Address>().ok());
+            .find(|a| attr_key(a) == Some("emitter.deleg"))
+            .and_then(|a| attr_value(a))
+            .and_then(|v| v.parse::<Address>().ok());
 
         let actor_id = event
             .attributes
             .iter()
-            .find(|a| a.key == "emitter.id")
-            .and_then(|a| a.value.parse::<u64>().ok())
+            .find(|a| attr_key(a) == Some("emitter.id"))
+            .and_then(|a| attr_value(a))
+            .and_then(|v| v.parse::<u64>().ok())
             .ok_or_else(|| anyhow!("cannot find the 'emitter.id' key"))?;
 
         let address = addr
@@ -489,19 +493,21 @@ fn to_topics_and_data(attrs: &Vec<EventAttribute>) -> anyhow::Result<(Vec<et::H2
     let mut topics = Vec::new();
     let mut data = None;
     for attr in attrs {
+        let key = attr_key(attr).unwrap_or_default();
+        let value = attr_value(attr).unwrap_or_default();
         let decode_value = || {
-            hex::decode(&attr.value)
-                .with_context(|| format!("failed to decode attr value as hex: {}", &attr.value))
+            hex::decode(value)
+                .with_context(|| format!("failed to decode attr value as hex: {}", value))
         };
 
-        match attr.key.as_str() {
+        match key {
             "t1" | "t2" | "t3" | "t4" => {
                 let bz = decode_value()?;
                 if bz.len() != 32 {
                     return Err(anyhow!("unexpected topic value: {attr:?}"));
                 }
                 let h = et::H256::from_slice(&bz);
-                let i = attr.key[1..].parse::<usize>().unwrap().saturating_sub(1);
+                let i = key[1..].parse::<usize>().unwrap().saturating_sub(1);
                 while topics.len() <= i {
                     topics.push(et::H256::default())
                 }
@@ -535,8 +541,9 @@ pub fn find_hash_event(kind: &str, events: &[abci::Event]) -> Option<et::H256> {
     events
         .iter()
         .find(|e| e.kind == kind)
-        .and_then(|e| e.attributes.iter().find(|a| a.key == "hash"))
-        .and_then(|a| hex::decode(&a.value).ok())
+        .and_then(|e| e.attributes.iter().find(|a| attr_key(a) == Some("hash")))
+        .and_then(|a| attr_value(a))
+        .and_then(|v| hex::decode(v).ok())
         .filter(|bz| bz.len() == 32)
         .map(|bz| et::H256::from_slice(&bz))
 }
@@ -559,13 +566,15 @@ pub fn collect_emitters(events: &[abci::Event]) -> HashSet<Address> {
             event
                 .attributes
                 .iter()
-                .find(|a| a.key == "emitter.deleg")
-                .and_then(|a| a.value.parse::<Address>().ok()),
+                .find(|a| attr_key(a) == Some("emitter.deleg"))
+                .and_then(|a| attr_value(a))
+                .and_then(|v| v.parse::<Address>().ok()),
             event
                 .attributes
                 .iter()
-                .find(|a| a.key == "emitter.id")
-                .and_then(|a| a.value.parse::<u64>().ok())
+                .find(|a| attr_key(a) == Some("emitter.id"))
+                .and_then(|a| attr_value(a))
+                .and_then(|v| v.parse::<u64>().ok())
                 .map(Address::new_id),
         ]
         .into_iter()
@@ -575,6 +584,30 @@ pub fn collect_emitters(events: &[abci::Event]) -> HashSet<Address> {
         }
     }
     emitters
+}
+
+fn attr_key(attr: &EventAttribute) -> Option<&str> {
+    attr.key_str().ok()
+}
+
+fn attr_value(attr: &EventAttribute) -> Option<&str> {
+    attr.value_str().ok()
+}
+
+fn maybe_contract_address_from_exec_tx_result(
+    tx_result: &tendermint::abci::types::ExecTxResult,
+) -> Option<EthAddress> {
+    let deliver_tx = DeliverTx {
+        code: tx_result.code,
+        data: tx_result.data.clone(),
+        log: tx_result.log.clone(),
+        info: tx_result.info.clone(),
+        gas_wanted: tx_result.gas_wanted,
+        gas_used: tx_result.gas_used,
+        events: tx_result.events.clone(),
+        codespace: tx_result.codespace.clone(),
+    };
+    maybe_contract_address(&deliver_tx)
 }
 
 #[cfg(test)]

@@ -1,6 +1,5 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use std::future::Future;
 use std::sync::Arc;
 
 use crate::observe::{
@@ -407,34 +406,41 @@ where
         Ok(Some(updated))
     }
 
+    /// Build the post-execution state projection used by both `FinalizeBlock` and `Commit`.
+    fn project_post_exec_state(
+        &self,
+        block_height: ChainEpoch,
+        timestamp: Timestamp,
+        state_root: Cid,
+        params: FvmUpdatableParams,
+        state_commitments: Option<LightClientCommitments>,
+    ) -> Result<SubnetAppState> {
+        let mut state = self.committed_state()?;
+        state.app_state.block_height = block_height.try_into()?;
+        state.app_state.state_params.timestamp = timestamp;
+        state.app_state.state_params.state_root = state_root;
+        state.app_state.state_params.app_version = params.app_version;
+        state.app_state.state_params.base_fee = params.base_fee;
+        state.app_state.state_params.circ_supply = params.circ_supply;
+        state.app_state.state_params.power_scale = params.power_scale;
+        state.state_commitments = state_commitments;
+        Ok(state)
+    }
+
     /// Put the execution state during block execution. Has to be empty.
-    async fn put_exec_state(&self, state: FvmExecState<BS>) {
+    async fn put_exec_state(&self, state: FvmExecState<BS>) -> Result<()> {
         let mut guard = self.exec_state.lock().await;
-        assert!(guard.is_none(), "exec state not empty");
+        if guard.is_some() {
+            return Err(anyhow!("exec state not empty"));
+        }
         *guard = Some(state);
+        Ok(())
     }
 
     /// Take the execution state during block execution. Has to be non-empty.
-    async fn take_exec_state(&self) -> FvmExecState<BS> {
+    async fn take_exec_state(&self) -> Result<FvmExecState<BS>> {
         let mut guard = self.exec_state.lock().await;
-        guard.take().expect("exec state empty")
-    }
-
-    /// Update the execution state using the provided closure.
-    ///
-    /// Note: Deals with panics in the user provided closure as well.
-    async fn modify_exec_state<T, G, F>(&self, generator: G) -> Result<T>
-    where
-        G: for<'s> FnOnce(&'s mut FvmExecState<BS>) -> F,
-        F: Future<Output = Result<T>>,
-        T: 'static,
-    {
-        let mut guard = self.exec_state.lock().await;
-        let maybe_state = guard.as_mut();
-        let state = maybe_state.expect("exec state empty");
-        let ret = generator(state).await?;
-
-        Ok(ret)
+        guard.take().ok_or_else(|| anyhow!("exec state empty"))
     }
 
     /// Get a read-only view from the current FVM execution state, optionally passing a new BlockContext.
@@ -509,28 +515,6 @@ where
             serde_json::Value::String(s) => Ok(GenesisAppState::decode_and_decompress(&s)?),
             _ => Err(anyhow!("invalid app state json")),
         }
-    }
-
-    /// Replaces the current validators cache with a new one.
-    async fn refresh_validators_cache(&self) -> Result<()> {
-        // TODO: This should be read only state, but we can't use the read-only view here
-        // because it hasn't been committed to state store yet.
-        let mut cache = self.validators_cache.lock().await;
-        self.modify_exec_state(|s| {
-            // we need to leave this outside the closure
-            // otherwise `s`' lifetime would be captured by the
-            // closure causing unresolvable liftetime conflicts
-            // this is fine since we execute the future directly
-            // after calling the generator closure.
-            let x = ValidatorCache::new_from_state(s);
-            async {
-                *cache = Some(x?);
-                Ok(())
-            }
-        })
-        .await?;
-
-        Ok(())
     }
 
     /// Retrieves a validator from the cache, initializing it if necessary.
@@ -856,9 +840,12 @@ where
         }
     }
 
-    /// Signals the beginning of a new block, prior to any `DeliverTx` calls.
-    async fn begin_block(&self, request: request::BeginBlock) -> AbciResult<response::BeginBlock> {
-        let block_height = request.header.height.into();
+    /// Execute and finalize an entire block (ABCI 2.0).
+    async fn finalize_block(
+        &self,
+        request: request::FinalizeBlock,
+    ) -> AbciResult<response::FinalizeBlock> {
+        let block_height = request.height.into();
         let block_hash = match request.hash {
             tendermint::Hash::Sha256(h) => h,
             tendermint::Hash::None => return Err(anyhow!("empty block hash").into()),
@@ -875,162 +862,132 @@ where
         let db = self.state_store_clone();
         let state = self.committed_state()?;
         let mut state_params = state.app_state.state_params.clone();
-
-        tracing::debug!(
-            height = block_height,
-            timestamp = request.header.time.unix_timestamp(),
-            app_hash = request.header.app_hash.to_string(),
-            //app_state_hash = to_app_hash(&state_params).to_string(), // should be the same as `app_hash`
-            "begin block"
-        );
-
-        state_params.timestamp = to_timestamp(request.header.time);
+        state_params.timestamp = to_timestamp(request.time);
 
         let validator = self
-            .get_validator_from_cache(&request.header.proposer_address)
+            .get_validator_from_cache(&request.proposer_address)
             .await?;
 
-        let mut state =
+        let mut exec_state =
             FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
                 .context("error creating new state")?
                 .with_block_hash(block_hash)
                 .with_block_producer(validator);
 
-        tracing::debug!("initialized new exec state");
-
-        let response = self
+        let begin_response = self
             .messages_interpreter
-            .begin_block(&mut state)
+            .begin_block(&mut exec_state)
             .await
             .context("failed to begin block")?;
+        let mut events = to_begin_block(begin_response.applied_cron_message).events;
 
-        self.put_exec_state(state).await;
-
-        Ok(to_begin_block(response.applied_cron_message))
-    }
-
-    /// Apply a transaction to the application's state.
-    async fn deliver_tx(&self, request: request::DeliverTx) -> AbciResult<response::DeliverTx> {
-        let msg = request.tx.to_vec();
-
-        let (result, block_hash) = {
-            let mut guard = self.exec_state.lock().await;
-            let mut state = guard.take().expect("exec state empty");
-
+        let mut tx_results = Vec::with_capacity(request.txs.len());
+        for tx in request.txs {
+            let msg = tx.to_vec();
             let result = self
                 .messages_interpreter
-                .apply_message(&mut state, msg)
+                .apply_message(&mut exec_state, msg)
                 .await;
-            let block_hash = state.block_hash();
+            let deliver_tx = match result {
+                Ok(ApplyMessageResponse {
+                    applied_message,
+                    domain_hash,
+                }) => to_deliver_tx(applied_message, domain_hash, exec_state.block_hash()),
+                Err(ApplyMessageError::InvalidSignature(err)) => {
+                    invalid_deliver_tx(AppError::InvalidSignature, err.to_string())
+                }
+                Err(ApplyMessageError::InvalidMessage(s)) => {
+                    invalid_deliver_tx(AppError::InvalidEncoding, s)
+                }
+                Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
+            };
 
-            *guard = Some(state);
-            (result, block_hash)
-        };
-
-        let response = match result {
-            Ok(ApplyMessageResponse {
-                applied_message,
-                domain_hash,
-            }) => to_deliver_tx(applied_message, domain_hash, block_hash),
-            Err(ApplyMessageError::InvalidSignature(err)) => {
-                invalid_deliver_tx(AppError::InvalidSignature, err.to_string())
-            }
-            Err(ApplyMessageError::InvalidMessage(s)) => {
-                invalid_deliver_tx(AppError::InvalidEncoding, s)
-            }
-            Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
-        };
-
-        if response.code != 0.into() {
-            tracing::info!(
-                "deliver_tx failed: {:?} - {:?}",
-                response.code,
-                response.info
-            );
+            tx_results.push(tendermint::abci::types::ExecTxResult {
+                code: deliver_tx.code,
+                data: deliver_tx.data,
+                log: deliver_tx.log,
+                info: deliver_tx.info,
+                gas_wanted: deliver_tx.gas_wanted,
+                gas_used: deliver_tx.gas_used,
+                events: deliver_tx.events,
+                codespace: deliver_tx.codespace,
+            });
         }
-
-        Ok(response)
-    }
-
-    /// Signals the end of a block.
-    async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
-        tracing::debug!(height = request.height, "end block");
-
-        let response = {
-            let mut guard = self.exec_state.lock().await;
-            let mut state = guard.take().expect("exec state empty");
-
-            let result = self.messages_interpreter.end_block(&mut state).await;
-            *guard = Some(state);
-
-            result?
-        };
 
         let EndBlockResponse {
             power_updates,
             gas_market,
             light_client_commitments,
             end_block_events,
-        } = response;
+        } = self.messages_interpreter.end_block(&mut exec_state).await?;
 
         let mut c = self.light_client_commitments.lock().await;
-        *c = light_client_commitments;
+        *c = light_client_commitments.clone();
 
-        // Convert the incoming power updates to Tendermint validator updates.
         let validator_updates =
             to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
-
-        // Replace the validator cache if the validator set has changed.
         if !validator_updates.is_empty() {
-            self.refresh_validators_cache().await?;
+            // Refresh the cache from the in-flight execution state, which isn't
+            // stored in `self.exec_state` until FinalizeBlock completes.
+            let mut cache = self.validators_cache.lock().await;
+            *cache = Some(
+                ValidatorCache::new_from_state(&mut exec_state)
+                    .context("failed to refresh validator cache")?,
+            );
         }
 
-        // Maybe update the app state with the new block gas limit.
         let consensus_param_updates = self
             .maybe_update_app_state(&gas_market)
             .context("failed to update block gas limit")?;
 
-        let ret = response::EndBlock {
+        events.extend(
+            end_block_events
+                .into_iter()
+                .flat_map(|(stamped, emitters)| to_events("event", stamped, emitters)),
+        );
+
+        // In ABCI 2.0 the app hash is returned from FinalizeBlock, so compute the same
+        // post-state hash that commit() will persist.
+        let state_root = exec_state
+            .flush_state_root()
+            .context("failed to flush finalized state root")?;
+        let projected_state = self.project_post_exec_state(
+            exec_state.block_height(),
+            exec_state.timestamp(),
+            state_root,
+            exec_state.updatable_params(),
+            light_client_commitments,
+        )?;
+        let app_hash = projected_state.app_hash();
+
+        self.put_exec_state(exec_state)
+            .await
+            .context("failed to store execution state")?;
+
+        Ok(response::FinalizeBlock {
+            events,
+            tx_results,
             validator_updates,
             consensus_param_updates,
-            events: end_block_events
-                .into_iter()
-                .flat_map(|(stamped, emitters)| to_events("event", stamped, emitters))
-                .collect::<Vec<_>>(),
-        };
-
-        Ok(ret)
+            app_hash,
+        })
     }
 
     /// Commit the current state at the current height.
     async fn commit(&self) -> AbciResult<response::Commit> {
-        let exec_state = self.take_exec_state().await;
+        let exec_state = self
+            .take_exec_state()
+            .await
+            .context("failed to load execution state")?;
 
-        // Commit the execution state to the datastore.
-        let mut state = self.committed_state()?;
-        state.app_state.block_height = exec_state.block_height().try_into()?;
-        state.app_state.state_params.timestamp = exec_state.timestamp();
-
-        let (
-            state_root,
-            FvmUpdatableParams {
-                app_version,
-                base_fee,
-                circ_supply,
-                power_scale,
-            },
-            _,
-        ) = exec_state.commit().context("failed to commit FVM")?;
-
-        state.app_state.state_params.state_root = state_root;
-        state.app_state.state_params.app_version = app_version;
-        state.app_state.state_params.base_fee = base_fee;
-        state.app_state.state_params.circ_supply = circ_supply;
-        state.app_state.state_params.power_scale = power_scale;
+        let block_height = exec_state.block_height();
+        let timestamp = exec_state.timestamp();
+        let (state_root, params, _) = exec_state.commit().context("failed to commit FVM")?;
 
         let mut c = self.light_client_commitments.lock().await;
         // because of the take, no need to *c = None
-        state.state_commitments = c.take();
+        let state =
+            self.project_post_exec_state(block_height, timestamp, state_root, params, c.take())?;
 
         let app_hash = state.app_hash();
         let block_height = state.app_state.block_height;
@@ -1044,7 +1001,7 @@ where
 
         tracing::debug!(
             block_height,
-            state_root = state_root.to_string(),
+            state_root = state.app_state.state_params.state_root.to_string(),
             app_hash = app_hash.to_string(),
             timestamp = state.app_state.state_params.timestamp.0,
             "commit state"

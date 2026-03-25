@@ -380,13 +380,13 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         );
     }
 
-    if res.response.deliver_tx.code.is_err() {
+    if res.response.tx_result.code.is_err() {
         anyhow::bail!(
             "RegisterNodeOperator deliver_tx failed: code={:?}, log={}, info={}, gas_used={}",
-            res.response.deliver_tx.code,
-            res.response.deliver_tx.log,
-            res.response.deliver_tx.info,
-            res.response.deliver_tx.gas_used
+            res.response.tx_result.code,
+            res.response.tx_result.log,
+            res.response.tx_result.info,
+            res.response.tx_result.gas_used
         );
     }
 

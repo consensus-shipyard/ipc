@@ -152,9 +152,10 @@ fn create_metadata_command(path: impl Into<PathBuf>) -> MetadataCommand {
     metadata_command
 }
 
-/// Find the `Cargo.lock` relative to the `OUT_DIR` environment variable.
+/// Find the `Cargo.lock` by walking parent directories from known anchors.
 ///
-/// If the `Cargo.lock` cannot be found, we emit a warning and return `None`.
+/// We first try `OUT_DIR`, then fall back to `CARGO_MANIFEST_DIR`.
+/// The fallback is needed when `CARGO_TARGET_DIR` points outside the workspace.
 fn find_cargo_lock(out_dir: &Path) -> Option<PathBuf> {
     fn find_impl(mut path: PathBuf) -> Option<PathBuf> {
         loop {
@@ -170,6 +171,12 @@ fn find_cargo_lock(out_dir: &Path) -> Option<PathBuf> {
 
     if let Some(path) = find_impl(out_dir.to_path_buf()) {
         return Some(path);
+    }
+
+    if let Some(manifest_dir) = std::env::var_os("CARGO_MANIFEST_DIR") {
+        if let Some(path) = find_impl(PathBuf::from(manifest_dir)) {
+            return Some(path);
+        }
     }
 
     None
