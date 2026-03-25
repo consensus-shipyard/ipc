@@ -145,30 +145,4 @@ mod tests {
         .unwrap();
     }
 
-    #[tokio::test]
-    async fn test_check_proposal_works() {
-        let provider = new_provider();
-
-        atomically_or_err(|| {
-            let target_block = 100;
-
-            // inject data
-            provider.new_parent_view(target_block, Some((vec![1u8; 32], vec![], vec![])))?;
-            provider.set_new_finality(IPCParentFinality {
-                height: target_block - 1,
-                block_hash: vec![1u8; 32],
-            })?;
-
-            let finality = IPCParentFinality {
-                height: target_block,
-                block_hash: vec![1u8; 32],
-            };
-
-            assert!(provider.check_proposal(&finality).is_ok());
-
-            Ok(())
-        })
-        .await
-        .unwrap();
-    }
 }

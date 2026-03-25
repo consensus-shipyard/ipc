@@ -39,6 +39,7 @@ use fendermint_vm_interpreter::fvm::end_block_hook::LightClientCommitments;
 use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
+use fendermint_vm_topdown::IPCParentFinality;
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::clock::ChainEpoch;
@@ -48,6 +49,7 @@ use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
+use tendermint::abci::types::ExtendedCommitInfo;
 use tendermint::abci::{request, response};
 use tendermint::consensus::params::Params as TendermintConsensusParams;
 use tracing::instrument;
@@ -537,6 +539,67 @@ where
             .get_validator(id)
     }
 
+    fn hash_to_bytes(hash: tendermint::Hash) -> Result<Vec<u8>> {
+        match hash {
+            tendermint::Hash::Sha256(h) => Ok(h.to_vec()),
+            tendermint::Hash::None => Err(anyhow!("empty block hash")),
+        }
+    }
+
+    fn quorum_parent_finality_from_extended_commit(
+        &self,
+        local_last_commit: Option<&ExtendedCommitInfo>,
+    ) -> Option<Option<IPCParentFinality>> {
+        let local_last_commit = local_last_commit?;
+
+        let mut total_power: u128 = 0;
+        let mut votes_by_candidate: std::collections::BTreeMap<(u64, Vec<u8>), u128> =
+            std::collections::BTreeMap::new();
+
+        for vote in &local_last_commit.votes {
+            let power = u128::from(vote.validator.power.value());
+            total_power = total_power.saturating_add(power);
+
+            if !vote.sig_info.is_signed() || vote.vote_extension.is_empty() {
+                continue;
+            }
+
+            let Ok(finality) =
+                fvm_ipld_encoding::from_slice::<IPCParentFinality>(vote.vote_extension.as_ref())
+            else {
+                continue;
+            };
+
+            let key = (finality.height, finality.block_hash);
+            votes_by_candidate
+                .entry(key)
+                .and_modify(|w| *w = w.saturating_add(power))
+                .or_insert(power);
+        }
+
+        let threshold = total_power.saturating_mul(2) / 3 + 1;
+        let mut best: Option<((u64, Vec<u8>), u128)> = None;
+
+        for (candidate, weight) in votes_by_candidate {
+            if weight < threshold {
+                continue;
+            }
+            match &best {
+                None => best = Some((candidate, weight)),
+                Some((best_candidate, best_weight)) => {
+                    // Prefer higher voting power; break ties by canonical candidate ordering.
+                    if weight > *best_weight
+                        || (weight == *best_weight && candidate < *best_candidate)
+                    {
+                        best = Some((candidate, weight));
+                    }
+                }
+            }
+        }
+
+        Some(best.map(|((height, block_hash), _)| IPCParentFinality { height, block_hash }))
+    }
+
     /// Get access to the messages interpreter
     /// Used to access the TopDownManager for updating the proof cache
     pub fn interpreter(&self) -> &Arc<MI> {
@@ -767,7 +830,14 @@ where
 
         let response = self
             .messages_interpreter
-            .prepare_messages_for_block(state, txs, request.max_tx_bytes.try_into().unwrap())
+            .prepare_messages_for_block(
+                state,
+                txs,
+                request.max_tx_bytes.try_into().unwrap(),
+                self.quorum_parent_finality_from_extended_commit(
+                    request.local_last_commit.as_ref(),
+                ),
+            )
             .await
             .context("failed to prepare proposal")?;
         tracing::info!(height, "PrepareProposal message preparation finished");
@@ -815,17 +885,20 @@ where
 
         let accept = process_decision == AttestMessagesResponse::Accept;
 
+        let proposal_height = request.height.value();
+        let proposal_hash = Self::hash_to_bytes(request.hash)?;
+
         emit(BlockProposalReceived {
-            height: request.height.value(),
-            hash: HexEncodableBlockHash(request.hash.into()),
+            height: proposal_height,
+            hash: HexEncodableBlockHash(proposal_hash.clone()),
             size: size_txs,
             tx_count: num_txs,
             validator: &request.proposer_address,
         });
 
         emit(BlockProposalEvaluated {
-            height: request.height.value(),
-            hash: HexEncodableBlockHash(request.hash.into()),
+            height: proposal_height,
+            hash: HexEncodableBlockHash(proposal_hash),
             size: size_txs,
             tx_count: num_txs,
             validator: &request.proposer_address,
@@ -837,6 +910,55 @@ where
             Ok(response::ProcessProposal::Accept)
         } else {
             Ok(response::ProcessProposal::Reject)
+        }
+    }
+
+    async fn extend_vote(&self, request: request::ExtendVote) -> AbciResult<response::ExtendVote> {
+        let vote_extension = match self
+            .messages_interpreter
+            .parent_vote_extension_candidate()
+            .await
+        {
+            Some(parent_finality) => {
+                bytes::Bytes::from(fvm_ipld_encoding::to_vec(&parent_finality)?)
+            }
+            None => bytes::Bytes::new(),
+        };
+
+        Ok(response::ExtendVote { vote_extension })
+    }
+
+    async fn verify_vote_extension(
+        &self,
+        request: request::VerifyVoteExtension,
+    ) -> AbciResult<response::VerifyVoteExtension> {
+        match self
+            .messages_interpreter
+            .parent_vote_extension_candidate()
+            .await
+        {
+            None => Ok(if request.vote_extension.is_empty() {
+                response::VerifyVoteExtension::Accept
+            } else {
+                response::VerifyVoteExtension::Reject
+            }),
+            Some(expected) => {
+                if request.vote_extension.is_empty() {
+                    return Ok(response::VerifyVoteExtension::Reject);
+                }
+
+                let parsed: IPCParentFinality =
+                    match fvm_ipld_encoding::from_slice(request.vote_extension.as_ref()) {
+                        Ok(v) => v,
+                        Err(_) => return Ok(response::VerifyVoteExtension::Reject),
+                    };
+
+                if parsed == expected {
+                    Ok(response::VerifyVoteExtension::Accept)
+                } else {
+                    Ok(response::VerifyVoteExtension::Reject)
+                }
+            }
         }
     }
 

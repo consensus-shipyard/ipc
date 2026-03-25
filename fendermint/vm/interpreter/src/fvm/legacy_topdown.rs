@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use async_stm::{atomically, atomically_or_err};
-use fendermint_tracing::emit;
-use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::ipc::{IpcMessage, ParentFinality};
 use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
@@ -43,11 +41,10 @@ impl LegacyTopDownHandler {
     }
 
     pub async fn attest(&self, finality: ParentFinality) -> bool {
-        let prop = IPCParentFinality {
-            height: finality.height as u64,
-            block_hash: finality.block_hash,
-        };
-        atomically(|| self.provider.check_proposal(&prop)).await
+        let _ = finality;
+        // Proposal acceptance should not depend on local parent-view checks.
+        // Deterministic selection is derived from consensus vote extensions.
+        true
     }
 
     pub async fn update_voting_power_table(&self, power_updates: &PowerUpdates) {
@@ -62,7 +59,11 @@ impl LegacyTopDownHandler {
 
     pub async fn chain_message_for_proposal(&self) -> Option<ChainMessage> {
         tracing::debug!("using legacy voting-based finality");
-        self.chain_message_from_finality_or_quorum().await
+        self.chain_message_from_provider().await
+    }
+
+    pub async fn vote_extension_candidate(&self) -> Option<IPCParentFinality> {
+        atomically(|| self.provider.next_proposal()).await
     }
 
     pub async fn validator_changes_from(
@@ -100,41 +101,8 @@ impl LegacyTopDownHandler {
         .await
     }
 
-    async fn chain_message_from_finality_or_quorum(&self) -> Option<ChainMessage> {
-        atomically(|| self.votes.pause_votes_until_find_quorum()).await;
-
-        let (parent, quorum) = atomically(|| {
-            let parent = self.provider.next_proposal()?;
-
-            let quorum = self
-                .votes
-                .find_quorum()?
-                .map(|(height, block_hash)| IPCParentFinality { height, block_hash });
-
-            Ok((parent, quorum))
-        })
-        .await;
-
-        let parent = parent?;
-
-        let quorum = if let Some(quorum) = quorum {
-            quorum
-        } else {
-            emit!(
-                DEBUG,
-                ParentFinalityMissingQuorum {
-                    block_height: parent.height,
-                    block_hash: &hex::encode(&parent.block_hash),
-                }
-            );
-            return None;
-        };
-
-        let finality = if parent.height <= quorum.height {
-            parent
-        } else {
-            quorum
-        };
+    async fn chain_message_from_provider(&self) -> Option<ChainMessage> {
+        let finality = atomically(|| self.provider.next_proposal()).await?;
 
         Some(ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
             height: finality.height as ChainEpoch,

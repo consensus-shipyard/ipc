@@ -15,6 +15,7 @@ use crate::fvm::state::{FvmExecState, FvmQueryState};
 use crate::fvm::store::ReadOnlyBlockstore;
 use crate::types::*;
 use async_trait::async_trait;
+use fendermint_vm_topdown::IPCParentFinality;
 use std::sync::Arc;
 
 use fvm_ipld_blockstore::Blockstore;
@@ -36,6 +37,7 @@ where
         state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
+        topdown_override: Option<Option<IPCParentFinality>>,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError>;
 
     async fn attest_block_messages(
@@ -43,6 +45,9 @@ where
         state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
     ) -> Result<AttestMessagesResponse, AttestMessagesError>;
+
+    /// Return the local, deterministic vote-extension candidate for parent finality, if any.
+    async fn parent_vote_extension_candidate(&self) -> Option<IPCParentFinality>;
 
     async fn begin_block(
         &self,

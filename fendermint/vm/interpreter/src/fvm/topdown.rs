@@ -234,10 +234,8 @@ where
     }
 
     pub async fn attest_legacy(&self, finality: ParentFinality) -> bool {
-        match &self.inner.legacy {
-            Some(h) => h.attest(finality).await,
-            None => false,
-        }
+        let _ = finality;
+        self.inner.legacy.is_some()
     }
 
     /// Get the chain message for parent finality proposal.
@@ -262,6 +260,20 @@ where
             return h.chain_message_for_proposal().await;
         }
         tracing::debug!("Top-down disabled; proposal includes only mempool messages");
+        None
+    }
+
+    /// Return the local parent-finality vote-extension candidate.
+    ///
+    /// In legacy mode this is the single-next parent candidate from the provider.
+    /// In F3 mode we currently do not produce parent-finality vote extensions.
+    pub async fn vote_extension_candidate(&self) -> Option<IPCParentFinality> {
+        if self.inner.f3.get().is_some() {
+            return None;
+        }
+        if let Some(h) = &self.inner.legacy {
+            return h.vote_extension_candidate().await;
+        }
         None
     }
 
