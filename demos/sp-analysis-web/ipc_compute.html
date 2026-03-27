@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>IPC Compute</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; font-family: 'DM Sans', system-ui, sans-serif; }
+  body { background: #070810; color: #dde3f0; }
+  @keyframes fadeUp   { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes fadeIn   { from{opacity:0} to{opacity:1} }
+  @keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @keyframes spin     { to{transform:rotate(360deg)} }
+  @keyframes slideIn  { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+  @keyframes ticker   { 0%{opacity:1} 50%{opacity:0.4} 100%{opacity:1} }
+  .fa { animation: fadeUp 0.25s ease both; }
+  .fi { animation: fadeIn 0.2s ease both; }
+  .si { animation: slideIn 0.25s ease both; }
+  input, textarea, select { font-family: inherit; background: transparent; border: none; outline: none; color: inherit; }
+  input[type=range] { cursor: pointer; accent-color: #00c9a7; }
+  textarea { resize: vertical; }
+  button { font-family: inherit; cursor: pointer; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1c2138; border-radius: 2px; }
+  ::selection { background: rgba(0,201,167,0.25); }
+  select option { background: #0d0f1a; color: #dde3f0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const C = {
+  bg:"#070810", surf:"#0d0f1a", surf2:"#111421", surf3:"#161b2e",
+  bdr:"#1c2138", bdrHi:"#2a3258",
+  teal:"#00c9a7", tealDim:"rgba(0,201,167,0.08)", tealBdr:"rgba(0,201,167,0.22)", tealGlow:"rgba(0,201,167,0.14)",
+  amber:"#f5a623", amberDim:"rgba(245,166,35,0.08)", amberBdr:"rgba(245,166,35,0.22)", amberGlow:"rgba(245,166,35,0.10)",
+  violet:"#9b8cf8", violetDim:"rgba(155,140,248,0.08)", violetBdr:"rgba(155,140,248,0.22)",
+  red:"#e05252", redDim:"rgba(224,82,82,0.08)", redBdr:"rgba(224,82,82,0.22)",
+  txt:"#dde3f0", txt2:"#6b7a99", txt3:"#323c58",
+  mono:'"DM Mono","Fira Code",monospace',
+  display:'"Syne",sans-serif',
+  sans:'"DM Sans",system-ui,sans-serif',
+};
+
+const MODELS = [
+  { id:"meta-llama/Llama-3.1-8B-Instruct", label:"Llama 3.1 8B Instruct", ppt:0.0002 },
+  { id:"mistralai/Mistral-7B-Instruct",    label:"Mistral 7B Instruct",    ppt:0.00015 },
+  { id:"microsoft/Phi-3-mini-4k",          label:"Phi-3 Mini 4k",          ppt:0.00010 },
+];
+
+const DEFAULT_PROMPT = `You are a data analyst. Your goal is to identify the most reliable Filecoin Storage Providers — those with a strong track record of consistent uptime, sector maintenance, and deal fulfilment.
+
+Save your final report to report.md containing:
+- Brief methodology note (which APIs, which signals, how scored)
+- Ranked table of top 15 most reliable SPs
+- 2–3 paragraph summary of what distinguishes the top performers`;
+
+const CHAIN_ID = 314159;
+const MOCK_BALANCE = 2.40;
+
+// ── WALLET MODE ──────────────────────────────────────────────────────────
+// Set to false to use a mock wallet (no MetaMask required) — good for demos.
+// Set to true to require real MetaMask connection + EIP-712 signing.
+const USE_REAL_WALLET = false;
+const MOCK_ADDRESS = "0xd8e29f1c3a5b7e4c2a1b9f3d7e5c8a2b4f6d9e1c";
+// ────────────────────────────────────────────────────────────────────────
+
+const REPORT_TABLE = [
+  { rank:1,  id:"f0116628",  score:106.99, uptime:96.2, deals:106,  power:"6.69 PiB" },
+  { rank:2,  id:"f0149768",  score:105.92, uptime:95.8, deals:83,   power:"2.00 PiB" },
+  { rank:3,  id:"f01393827", score:104.93, uptime:100,  deals:7,    power:"0.98 PiB" },
+  { rank:4,  id:"f0134991",  score:104.55, uptime:89.2, deals:47,   power:"6.63 PiB" },
+  { rank:5,  id:"f03339",    score:103.57, uptime:89.6, deals:941,  power:"1.08 PiB" },
+  { rank:6,  id:"f065103",   score:103.50, uptime:88.8, deals:86,   power:"2.16 PiB" },
+  { rank:7,  id:"f0230200",  score:103.46, uptime:92.3, deals:39,   power:"0.72 PiB" },
+  { rank:8,  id:"f01690643", score:103.03, uptime:100,  deals:675,  power:"0.34 PiB" },
+  { rank:9,  id:"f01694564", score:102.92, uptime:100,  deals:212,  power:"0.31 PiB" },
+  { rank:10, id:"f044160",   score:102.84, uptime:93.8, deals:1268, power:"0.34 PiB" },
+  { rank:11, id:"f01690774", score:102.82, uptime:100,  deals:706,  power:"0.27 PiB" },
+  { rank:12, id:"f018501",   score:102.80, uptime:94.9, deals:461,  power:"0.19 PiB" },
+  { rank:13, id:"f01652952", score:102.70, uptime:100,  deals:757,  power:"0.23 PiB" },
+  { rank:14, id:"f01690781", score:102.69, uptime:100,  deals:953,  power:"0.23 PiB" },
+  { rank:15, id:"f0121768",  score:102.66, uptime:90.4, deals:14,   power:"5.05 PiB" },
+];
+
+const MOCK_JOBS_INIT = [
+  { id:"job_8f2a1c", prompt:DEFAULT_PROMPT, model:"meta-llama/Llama-3.1-8B-Instruct", maxTokens:2048, temperature:0.3, status:"completed", submittedAt:Date.now()-1000*60*47, completedAt:Date.now()-1000*60*46, worker:"val-2.ipc-fil.io", txHash:"0x4a3f8b2e1c9d7e5f3a2b1c8d4e9f7a3b", resultTxHash:"0x9c1b7d3a4e8f2c5b1a9d7e3f8b4a2c6d", cid:"bafybeig7xq2m...r4p9wk", block:412847, tokensUsed:1842, cost:0.368, hasReport:true, sig:"0x7f3c8a...d4a21d" },
+  { id:"job_3d9e7f", prompt:"Summarise Filecoin network storage statistics for Q1 2026. Include total network capacity, active deals, average deal duration, and top storage regions.", model:"mistralai/Mistral-7B-Instruct", maxTokens:1024, temperature:0.5, status:"completed", submittedAt:Date.now()-1000*60*60*3, completedAt:Date.now()-1000*60*60*3+14000, worker:"val-1.ipc-fil.io", txHash:"0x2e8c4a1b9f7d3e5c2a8b4f9d7e1c3a5b", resultTxHash:"0x5b1a9c7e3f2d8b4a1e9f7c3b5d2a8e4c", cid:"bafybeid9m3kx7p...w2n5vq", block:411203, tokensUsed:891, cost:0.134, hasReport:false, sig:"0x3a1b...e82c" },
+  { id:"job_1a4b8c", prompt:"Analyse the top 10 Filecoin miners by sector count and compute a reliability composite score based on WindowPoSt success rate.", model:"meta-llama/Llama-3.1-8B-Instruct", maxTokens:4096, temperature:0.2, status:"failed", submittedAt:Date.now()-1000*60*60*8, worker:"val-3.ipc-fil.io", txHash:"0x7f3c8a2e4b1d9f5c7a3b2e8d4c1f9a5b", resultTxHash:null, cid:null, block:408991, tokensUsed:0, cost:0, error:"Container timeout after 300s", hasReport:false, sig:"0x9d2e...f14b" },
+];
+
+function timeAgo(ts) {
+  if (!ts) return "—";
+  const m = Math.floor((Date.now()-ts)/60000);
+  const h = Math.floor(m/60);
+  if (m<1) return "just now";
+  if (m<60) return m+"m ago";
+  if (h<24) return h+"h ago";
+  return Math.floor(h/24)+"d ago";
+}
+function trunc(s, n=6) { if(!s)return"—"; return s.length>n*2+3?s.slice(0,n)+"..."+s.slice(-n):s; }
+function jobId() { return "job_"+Math.random().toString(36).slice(2,8); }
+function mockTx() { return "0x"+Array.from({length:32},()=>Math.floor(Math.random()*16).toString(16)).join(""); }
+function estimateCost(tokens, modelId) {
+  const m = MODELS.find(x=>x.id===modelId)||MODELS[0];
+  return (tokens*m.ppt).toFixed(3);
+}
+
+/* ── SHARED ───────────────────────── */
+function Badge({ children, color=C.teal, style={} }) {
+  return <span style={{ fontFamily:C.mono, fontSize:10, padding:"2px 7px", borderRadius:4, border:`1px solid ${color}40`, background:`${color}12`, color, letterSpacing:"0.03em", ...style }}>{children}</span>;
+}
+
+function Btn({ children, onClick, disabled, variant="default", size="md", style={} }) {
+  const [h,setH]=useState(false);
+  const col = variant==="primary"?C.teal:variant==="amber"?C.amber:variant==="danger"?C.red:C.teal;
+  const sz = size==="sm"?{fontSize:11,padding:"5px 11px"}:size==="lg"?{fontSize:13,padding:"10px 22px"}:{fontSize:12,padding:"7px 15px"};
+  return (
+    <button onClick={onClick} disabled={disabled}
+      onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+      style={{ fontFamily:C.sans, borderRadius:8, border:`1px solid ${col}44`, background:disabled?"transparent":h?`${col}18`:"transparent", color:disabled?C.txt3:col, cursor:disabled?"not-allowed":"pointer", transition:"all 0.15s", ...sz, ...style }}>
+      {children}
+    </button>
+  );
+}
+
+function Spinner({ size=14, color=C.teal }) {
+  return <div style={{ width:size, height:size, borderRadius:"50%", border:`1.5px solid ${color}30`, borderTop:`1.5px solid ${color}`, animation:"spin 0.7s linear infinite", flexShrink:0, display:"inline-block" }}/>;
+}
+
+function StatusChip({ status }) {
+  const map = { queued:{label:"queued",color:C.txt2}, picked_up:{label:"picked up",color:C.amber}, running:{label:"running",color:C.amber}, completed:{label:"completed",color:C.teal}, failed:{label:"failed",color:C.red} };
+  const {label,color} = map[status]||map.queued;
+  const pulsing = status==="picked_up"||status==="running";
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+      <div style={{ width:6,height:6,borderRadius:"50%",background:color,flexShrink:0,animation:pulsing?"pulse 1s ease-in-out infinite":"none" }}/>
+      <span style={{ fontFamily:C.mono,fontSize:10,color,letterSpacing:"0.03em" }}>{label}</span>
+    </div>
+  );
+}
+
+function Field({ label, children, style={} }) {
+  return (
+    <div style={style}>
+      <div style={{ fontSize:10,fontFamily:C.mono,color:C.txt3,letterSpacing:"0.06em",marginBottom:6 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function CopyRow({ label, value }) {
+  const [copied,setCopied]=useState(false);
+  function copy(){ try{navigator.clipboard.writeText(value);}catch(e){} setCopied(true); setTimeout(()=>setCopied(false),1500); }
+  return (
+    <div style={{ padding:"11px 14px", background:C.surf, border:`1px solid ${C.bdr}`, borderRadius:10 }}>
+      <div style={{ fontSize:9.5,fontFamily:C.mono,color:C.txt3,letterSpacing:"0.06em",marginBottom:4 }}>{label}</div>
+      <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+        <span style={{ fontFamily:C.mono,fontSize:11,color:C.txt2,flex:1,wordBreak:"break-all",lineHeight:1.5 }}>{value||"—"}</span>
+        {value&&<button onClick={copy} style={{ fontFamily:C.mono,fontSize:9,color:copied?C.teal:C.txt3,background:"transparent",border:"none",cursor:"pointer",flexShrink:0 }}>{copied?"copied!":"copy"}</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ── WALLET ───────────────────────── */
+function useWallet() {
+  const [state,setState]=useState({ connected:false,address:null,balance:MOCK_BALANCE,provider:null,signer:null,connecting:false,error:null });
+
+  // ── MOCK connect ──────────────────
+  async function connectMock() {
+    setState(s=>({...s,connecting:true,error:null}));
+    await new Promise(r=>setTimeout(r,700)); // feel like a real handshake
+    setState({ connected:true,address:MOCK_ADDRESS,balance:MOCK_BALANCE,provider:null,signer:"mock",connecting:false,error:null });
+  }
+
+  // ── REAL connect (MetaMask) ───────
+  async function connectReal() {
+    setState(s=>({...s,connecting:true,error:null}));
+    try {
+      const eth = await new Promise(resolve=>{
+        if (window.ethereum) return resolve(window.ethereum);
+        const t = setTimeout(()=>resolve(null),3000);
+        window.addEventListener("ethereum#initialized",()=>{clearTimeout(t);resolve(window.ethereum);},{once:true});
+      });
+      if (!eth) {
+        setState(s=>({...s,connecting:false,error:"MetaMask not detected. Serve via localhost: npx serve . then open http://localhost:3000"}));
+        return;
+      }
+      const provider = new ethers.providers.Web3Provider(eth);
+      await provider.send("eth_requestAccounts",[]);
+      const signer = provider.getSigner();
+      const address = await signer.getAddress();
+      setState({ connected:true,address,balance:MOCK_BALANCE,provider,signer,connecting:false,error:null });
+    } catch(e) {
+      setState(s=>({...s,connecting:false,error:e.code===4001?"Rejected.":e.message||"Failed to connect."}));
+    }
+  }
+
+  async function connect() { USE_REAL_WALLET ? connectReal() : connectMock(); }
+
+  function disconnect() { setState({ connected:false,address:null,balance:MOCK_BALANCE,provider:null,signer:null,connecting:false,error:null }); }
+  function addBalance(amt) { setState(s=>({...s,balance:parseFloat((s.balance+amt).toFixed(2))})); }
+
+  async function signJob(data) {
+    if (!USE_REAL_WALLET) {
+      // Mock: pause briefly to simulate signing delay, return a fake signature
+      await new Promise(r=>setTimeout(r,1200));
+      return "0x" + Array.from({length:65},()=>Math.floor(Math.random()*256).toString(16).padStart(2,"0")).join("");
+    }
+    if (!state.signer || state.signer==="mock") throw new Error("Real signer not available");
+    const domain = { name:"IPC Compute",version:"1",chainId:CHAIN_ID };
+    const types  = { Job:[{name:"prompt",type:"string"},{name:"model",type:"string"},{name:"maxTokens",type:"uint256"},{name:"temperature",type:"uint256"},{name:"nonce",type:"uint256"},{name:"deadline",type:"uint256"}] };
+    const value  = { prompt:data.prompt,model:data.model,maxTokens:data.maxTokens,temperature:Math.round(data.temperature*100),nonce:Math.floor(Math.random()*1e6),deadline:Math.floor(Date.now()/1000)+3600 };
+    return await state.signer._signTypedData(domain,types,value);
+  }
+
+  return {...state, connect, disconnect, addBalance, signJob};
+}
+
+/* ── JOB STORE ────────────────────── */
+function useJobs() {
+  const [jobs,setJobs]=useState(()=>{
+    try { const s=JSON.parse(localStorage.getItem("ipc_jobs")||"[]"); return s.length?s:MOCK_JOBS_INIT; }
+    catch { return MOCK_JOBS_INIT; }
+  });
+  useEffect(()=>{ try{localStorage.setItem("ipc_jobs",JSON.stringify(jobs));}catch(e){} },[jobs]);
+  function addJob(j) { setJobs(p=>[j,...p]); }
+  function updateJob(id,u) { setJobs(p=>p.map(j=>j.id===id?{...j,...u}:j)); }
+  return {jobs,addJob,updateJob};
+}
+
+/* ── BLOCK TICKER ─────────────────── */
+function useBlock(start=412850) {
+  const [b,setB]=useState(start);
+  useEffect(()=>{ const id=setInterval(()=>setB(x=>x+Math.floor(Math.random()*2)),2000); return ()=>clearInterval(id); },[]);
+  return b;
+}
+
+/* ══════════════════════════════════════
+   APP
+══════════════════════════════════════ */
+function App() {
+  const wallet = useWallet();
+  const {jobs,addJob,updateJob} = useJobs();
+  const block = useBlock();
+  const [view,setView] = useState("new-job");
+  const [selectedId,setSelectedId] = useState(null);
+  const [topUpOpen,setTopUpOpen] = useState(false);
+  const [activeId,setActiveId] = useState(null);
+
+  function openResults(id) { setSelectedId(id); setView("results"); }
+
+  function simulateJob(job) {
+    setActiveId(job.id);
+    const blk = block+2;
+    setTimeout(()=>updateJob(job.id,{status:"picked_up",worker:"val-2.ipc-fil.io"}),900);
+    setTimeout(()=>updateJob(job.id,{status:"running"}),3500);
+    setTimeout(()=>{
+      const used=Math.floor(job.maxTokens*0.7+Math.random()*150);
+      updateJob(job.id,{ status:"completed", completedAt:Date.now(), txHash:mockTx(), resultTxHash:mockTx(),
+        cid:"bafybeig7xq2m...r4p9wk", block:blk, tokensUsed:used,
+        cost:parseFloat(estimateCost(used,job.model)), hasReport:true });
+      setActiveId(null);
+    },12000);
+  }
+
+  const activeJob = jobs.find(j=>j.id===activeId);
+  const selectedJob = jobs.find(j=>j.id===selectedId);
+
+  return (
+    <div style={{ display:"flex",height:"100vh",background:C.bg,overflow:"hidden" }}>
+
+      {/* SIDEBAR */}
+      <aside style={{ width:228,background:C.surf,borderRight:`1px solid ${C.bdr}`,display:"flex",flexDirection:"column",flexShrink:0 }}>
+        {/* Logo */}
+        <div style={{ padding:"18px 16px 14px",borderBottom:`1px solid ${C.bdr}` }}>
+          <div style={{ display:"flex",alignItems:"center",gap:9 }}>
+            <div style={{ width:26,height:26,borderRadius:7,background:C.tealDim,border:`1px solid ${C.tealBdr}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><polygon points="6.5,1 12,4 12,9 6.5,12 1,9 1,4" stroke={C.teal} strokeWidth="1.2" fill="none"/><circle cx="6.5" cy="6.5" r="1.8" fill={C.teal} opacity="0.7"/></svg>
+            </div>
+            <div>
+              <div style={{ fontFamily:C.display,fontSize:14,color:C.txt,letterSpacing:"-0.01em" }}>IPC Compute</div>
+              <div style={{ fontSize:9,fontFamily:C.mono,color:C.txt3,marginTop:1 }}>powered by IPC Chain</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Wallet */}
+        <div style={{ padding:"12px 14px",borderBottom:`1px solid ${C.bdr}` }}>
+          {!wallet.connected ? (
+            <button onClick={wallet.connect} disabled={wallet.connecting}
+              style={{ width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${C.bdr}`,background:"transparent",color:C.txt2,fontSize:12,fontFamily:C.sans,cursor:"pointer",display:"flex",alignItems:"center",gap:7,transition:"all 0.15s" }}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=C.tealBdr;e.currentTarget.style.color=C.teal;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=C.bdr;e.currentTarget.style.color=C.txt2;}}>
+              {wallet.connecting?<Spinner size={12}/>:<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="3" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 3V2.5a2 2 0 014 0V3" stroke="currentColor" strokeWidth="1.2"/><circle cx="8.5" cy="6.5" r="1" fill="currentColor"/></svg>}
+              {wallet.connecting?"Connecting...":"Connect wallet"}
+            </button>
+          ) : (
+            <div>
+              <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:8 }}>
+                <div style={{ width:7,height:7,borderRadius:"50%",background:C.teal,flexShrink:0 }}/>
+                <span style={{ fontFamily:C.mono,fontSize:11,color:C.txt }}>{trunc(wallet.address,5)}</span>
+                <button onClick={wallet.disconnect} style={{ marginLeft:"auto",fontSize:9,fontFamily:C.mono,color:C.txt3,background:"transparent",border:"none",cursor:"pointer" }}>disconnect</button>
+              </div>
+              <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:C.surf2,borderRadius:8,border:`1px solid ${C.bdr}` }}>
+                <div>
+                  <div style={{ fontSize:9.5,fontFamily:C.mono,color:C.txt3,marginBottom:2 }}>USDFC balance</div>
+                  <div style={{ fontFamily:C.mono,fontSize:15,fontWeight:500,color:wallet.balance<1?C.amber:C.txt }}>${wallet.balance.toFixed(2)}</div>
+                </div>
+                <button onClick={()=>setTopUpOpen(true)} style={{ fontSize:10,fontFamily:C.mono,color:C.teal,background:C.tealDim,border:`1px solid ${C.tealBdr}`,borderRadius:5,padding:"3px 8px",cursor:"pointer" }}>top up</button>
+              </div>
+            </div>
+          )}
+          {wallet.error&&<div style={{ fontSize:10,color:C.amber,marginTop:8,fontFamily:C.sans,lineHeight:1.6,padding:"8px 10px",background:"rgba(245,166,35,0.07)",borderRadius:6,border:"1px solid rgba(245,166,35,0.2)" }}>{wallet.error}</div>}
+        </div>
+
+        {/* Nav */}
+        <nav style={{ padding:"10px",flex:1 }}>
+          {[{id:"new-job",label:"New job"},{id:"jobs",label:"Jobs",badge:jobs.filter(j=>j.status==="completed").length}].map(item=>{
+            const active=view===item.id;
+            return (
+              <button key={item.id} onClick={()=>setView(item.id)}
+                style={{ width:"100%",display:"flex",alignItems:"center",gap:9,padding:"8px 10px",borderRadius:8,border:"none",background:active?C.tealDim:"transparent",color:active?C.teal:C.txt2,fontSize:13,cursor:"pointer",transition:"all 0.15s",marginBottom:1 }}
+                onMouseEnter={e=>{if(!active){e.currentTarget.style.background=C.surf2;e.currentTarget.style.color=C.txt;}}}
+                onMouseLeave={e=>{if(!active){e.currentTarget.style.background="transparent";e.currentTarget.style.color=C.txt2;}}}>
+                <span style={{ flex:1,textAlign:"left" }}>{item.label}</span>
+                {item.badge>0&&<span style={{ fontFamily:C.mono,fontSize:9.5,padding:"1px 6px",borderRadius:10,background:C.surf3,color:C.txt3 }}>{item.badge}</span>}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Active job */}
+        {activeJob&&(
+          <div style={{ margin:"0 10px 10px",padding:"9px 10px",background:C.amberDim,border:`1px solid ${C.amberBdr}`,borderRadius:8 }}>
+            <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:3 }}>
+              <Spinner size={10} color={C.amber}/>
+              <span style={{ fontSize:10,fontFamily:C.mono,color:C.amber }}>job running</span>
+            </div>
+            <div style={{ fontFamily:C.mono,fontSize:10,color:C.txt2 }}>{activeJob.id} · {activeJob.status}</div>
+          </div>
+        )}
+
+        {/* Network */}
+        <div style={{ padding:"10px 14px",borderTop:`1px solid ${C.bdr}` }}>
+          <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+            <div style={{ width:5,height:5,borderRadius:"50%",background:C.teal,animation:"ticker 2s ease-in-out infinite",flexShrink:0 }}/>
+            <span style={{ fontFamily:C.mono,fontSize:9.5,color:C.txt3 }}>IPC Filecoin Calibration</span>
+          </div>
+          <div style={{ fontFamily:C.mono,fontSize:9.5,color:C.txt3,marginTop:3 }}>block <span style={{ color:C.txt2 }}>{block.toLocaleString()}</span></div>
+        </div>
+      </aside>
+
+      {/* MAIN */}
+      <main style={{ flex:1,overflow:"auto",padding:"28px 32px" }}>
+        {view==="new-job"&&<NewJobView wallet={wallet} addJob={addJob} simulateJob={simulateJob} onTopUp={()=>setTopUpOpen(true)} onViewJobs={()=>setView("jobs")} block={block}/>}
+        {view==="jobs"&&<JobsView jobs={jobs} onSelect={openResults} activeId={activeId} onRerun={j=>{setView("new-job");}}/>}
+        {view==="results"&&selectedJob&&<ResultsView job={selectedJob} onNewJob={()=>setView("new-job")} onBack={()=>setView("jobs")}/>}
+      </main>
+
+      {topUpOpen&&<TopUpModal wallet={wallet} onClose={()=>setTopUpOpen(false)}/>}
+    </div>
+  );
+}
+
+/* ── NEW JOB ──────────────────────── */
+function NewJobView({ wallet, addJob, simulateJob, onTopUp, onViewJobs, block }) {
+  const [prompt,setPrompt]=useState(DEFAULT_PROMPT);
+  const [model,setModel]=useState(MODELS[0].id);
+  const [maxTokens,setMaxTokens]=useState(2048);
+  const [temperature,setTemperature]=useState(0.3);
+  const [signing,setSigning]=useState(false);
+  const [signError,setSignError]=useState(null);
+  const [submitted,setSubmitted]=useState(null);
+
+  const estCost = parseFloat(estimateCost(maxTokens,model));
+  const lowBalance = wallet.connected&&wallet.balance<estCost;
+  const canSubmit = wallet.connected&&!lowBalance&&prompt.trim().length>10&&!signing;
+  const tokenCount = Math.floor(prompt.length/4);
+  const selectedModel = MODELS.find(m=>m.id===model)||MODELS[0];
+
+  async function handleSubmit() {
+    if (!canSubmit) return;
+    setSigning(true); setSignError(null);
+    try {
+      const sig = await wallet.signJob({prompt,model,maxTokens,temperature});
+      const job = { id:jobId(),prompt,model,maxTokens,temperature,status:"queued",submittedAt:Date.now(),sig:sig.slice(0,18)+"...",txHash:mockTx(),resultTxHash:null,cid:null,block:null,tokensUsed:0,cost:0,hasReport:false,worker:null };
+      addJob(job); simulateJob(job); setSubmitted(job.id); setSigning(false);
+    } catch(e) {
+      setSignError(e.code===4001?"Signature rejected.":"Signing failed."); setSigning(false);
+    }
+  }
+
+  if (submitted) return (
+    <div className="fa" style={{ maxWidth:580 }}>
+      <div style={{ padding:"20px 22px",background:C.tealDim,border:`1px solid ${C.tealBdr}`,borderRadius:12,marginBottom:16 }}>
+        <div style={{ fontFamily:C.display,fontSize:20,color:C.teal,marginBottom:6 }}>Job submitted</div>
+        <div style={{ fontSize:13,color:C.txt2,marginBottom:14 }}>Transaction signed and committed to IPC Chain. Your job is queued for execution.</div>
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
+          <div style={{ padding:"9px 11px",background:C.surf2,borderRadius:8,border:`1px solid ${C.bdr}` }}>
+            <div style={{ fontSize:9.5,fontFamily:C.mono,color:C.txt3,marginBottom:3 }}>JOB ID</div>
+            <div style={{ fontFamily:C.mono,fontSize:11,color:C.teal }}>{submitted}</div>
+          </div>
+          <div style={{ padding:"9px 11px",background:C.surf2,borderRadius:8,border:`1px solid ${C.bdr}` }}>
+            <div style={{ fontSize:9.5,fontFamily:C.mono,color:C.txt3,marginBottom:3 }}>EST. COST</div>
+            <div style={{ fontFamily:C.mono,fontSize:11,color:C.txt }}>${estCost} USDFC</div>
+          </div>
+        </div>
+      </div>
+      <div style={{ display:"flex",gap:10 }}>
+        <Btn onClick={onViewJobs} variant="primary">Watch execution →</Btn>
+        <Btn onClick={()=>setSubmitted(null)}>New job</Btn>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth:660 }}>
+      <div style={{ marginBottom:22 }}>
+        <h1 style={{ fontFamily:C.display,fontSize:22,color:C.txt,letterSpacing:"-0.02em",marginBottom:4 }}>New job</h1>
+        <p style={{ fontSize:13,color:C.txt2 }}>Configure and submit a compute task to the IPC chain.</p>
+      </div>
+      <div style={{ display:"grid",gap:14 }}>
+
+        {/* Model + params */}
+        <div style={{ background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:12,padding:"16px 18px" }}>
+          <div style={{ fontSize:10,fontFamily:C.mono,color:C.txt3,letterSpacing:"0.06em",marginBottom:14 }}>MODEL & PARAMETERS</div>
+          <Field label="MODEL" style={{ marginBottom:14 }}>
+            <div style={{ position:"relative" }}>
+              <select value={model} onChange={e=>setModel(e.target.value)} style={{ width:"100%",padding:"8px 10px",background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:8,color:C.txt,fontSize:12,fontFamily:C.sans,cursor:"pointer",appearance:"none" }}>
+                {MODELS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+              <div style={{ position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:C.txt3,fontSize:10 }}>▾</div>
+            </div>
+          </Field>
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
+            <Field label={`MAX TOKENS — ${maxTokens.toLocaleString()}`}>
+              <input type="range" min={256} max={4096} step={128} value={maxTokens} onChange={e=>setMaxTokens(+e.target.value)} style={{ width:"100%",marginTop:4 }}/>
+              <div style={{ display:"flex",justifyContent:"space-between",marginTop:3 }}>
+                <span style={{ fontFamily:C.mono,fontSize:9,color:C.txt3 }}>256</span>
+                <span style={{ fontFamily:C.mono,fontSize:9,color:C.txt3 }}>4096</span>
+              </div>
+            </Field>
+            <Field label={`TEMPERATURE — ${temperature.toFixed(1)}`}>
+              <input type="range" min={0} max={10} step={1} value={Math.round(temperature*10)} onChange={e=>setTemperature(e.target.value/10)} style={{ width:"100%",marginTop:4 }}/>
+              <div style={{ display:"flex",justifyContent:"space-between",marginTop:3 }}>
+                <span style={{ fontFamily:C.mono,fontSize:9,color:C.txt3 }}>0.0</span>
+                <span style={{ fontFamily:C.mono,fontSize:9,color:C.txt3 }}>1.0</span>
+              </div>
+            </Field>
+          </div>
+        </div>
+
+        {/* Prompt */}
+        <div style={{ background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:12,padding:"16px 18px" }}>
+          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10 }}>
+            <div style={{ fontSize:10,fontFamily:C.mono,color:C.txt3,letterSpacing:"0.06em" }}>PROMPT</div>
+            <span style={{ fontFamily:C.mono,fontSize:9.5,color:C.txt3 }}>~{tokenCount} tokens</span>
+          </div>
+          <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} rows={9}
+            style={{ width:"100%",fontFamily:C.mono,fontSize:11.5,color:C.txt,lineHeight:1.75,background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:8,padding:"10px 12px" }}
+            placeholder="Enter your prompt..."/>
+        </div>
+
+        {/* Submit */}
+        <div style={{ background:C.surf,border:`1px solid ${lowBalance?C.amberBdr:C.bdr}`,borderRadius:12,padding:"14px 18px" }}>
+          {lowBalance&&(
+            <div style={{ display:"flex",alignItems:"center",gap:9,padding:"9px 12px",background:C.amberDim,border:`1px solid ${C.amberBdr}`,borderRadius:8,marginBottom:12 }} className="fa">
+              <div style={{ width:7,height:7,borderRadius:"50%",background:C.amber,flexShrink:0 }}/>
+              <span style={{ fontSize:12,color:C.amber,flex:1 }}>Insufficient balance. Job costs ${estCost} — balance is ${wallet.balance.toFixed(2)} USDFC.</span>
+              <button onClick={onTopUp} style={{ fontFamily:C.sans,fontSize:11,color:C.amber,background:C.amberDim,border:`1px solid ${C.amberBdr}`,borderRadius:6,padding:"4px 10px",cursor:"pointer",flexShrink:0 }}>Top up →</button>
+            </div>
+          )}
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10 }}>
+            <div style={{ display:"flex",gap:16 }}>
+              <div><div style={{ fontSize:9.5,fontFamily:C.mono,color:C.txt3,marginBottom:2 }}>EST. COST</div><div style={{ fontFamily:C.mono,fontSize:14,color:C.txt }}>${estCost} USDFC</div></div>
+              <div><div style={{ fontSize:9.5,fontFamily:C.mono,color:C.txt3,marginBottom:2 }}>MODEL</div><div style={{ fontFamily:C.mono,fontSize:11,color:C.txt2 }}>{selectedModel.label}</div></div>
+            </div>
+            <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+              {signError&&<span style={{ fontFamily:C.mono,fontSize:11,color:C.red }}>{signError}</span>}
+              {!wallet.connected
+                ?<Btn onClick={wallet.connect} variant="primary" size="lg">{wallet.connecting?"Connecting...":"Connect wallet to submit"}</Btn>
+                :lowBalance
+                ?<Btn onClick={onTopUp} variant="amber" size="lg">Top up USDFC →</Btn>
+                :<Btn onClick={handleSubmit} disabled={!canSubmit||signing} variant="primary" size="lg">
+                  {signing?<span style={{ display:"flex",alignItems:"center",gap:8 }}><Spinner size={12}/>Waiting for signature...</span>:"Sign & submit →"}
+                </Btn>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── JOBS VIEW ────────────────────── */
+function JobsView({ jobs, onSelect, activeId, onRerun }) {
+  return (
+    <div>
+      <div style={{ marginBottom:22 }}>
+        <h1 style={{ fontFamily:C.display,fontSize:22,color:C.txt,letterSpacing:"-0.02em",marginBottom:4 }}>Jobs</h1>
+        <p style={{ fontSize:13,color:C.txt2 }}>{jobs.length} total · {jobs.filter(j=>j.status==="completed").length} completed</p>
+      </div>
+      <div style={{ background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:12,overflow:"hidden" }}>
+        <div style={{ display:"grid",gridTemplateColumns:"110px 1fr 150px 80px 75px 90px",gap:8,padding:"9px 16px",background:C.surf2,borderBottom:`1px solid ${C.bdr}` }}>
+          {["Status","Prompt","Model","Submitted","Cost",""].map(h=>(
+            <span key={h} style={{ fontSize:9.5,fontFamily:C.mono,color:C.txt3,letterSpacing:"0.05em" }}>{h}</span>
+          ))}
+        </div>
+        {jobs.map((job,i)=>(
+          <div key={job.id} className={job.id===activeId?"si":""}
+            style={{ display:"grid",gridTemplateColumns:"110px 1fr 150px 80px 75px 90px",gap:8,padding:"12px 16px",borderBottom:i<jobs.length-1?`1px solid ${C.bdr}`:"none",alignItems:"center",background:job.id===activeId?C.amberDim:"transparent",transition:"background 0.3s",cursor:"default" }}
+            onMouseEnter={e=>{if(job.id!==activeId)e.currentTarget.style.background=C.surf2;}}
+            onMouseLeave={e=>{if(job.id!==activeId)e.currentTarget.style.background="transparent";}}>
+            <StatusChip status={job.status}/>
+            <div>
+              <div style={{ fontFamily:C.mono,fontSize:10,color:C.txt3,marginBottom:2 }}>{job.id}</div>
+              <div style={{ fontSize:12,color:C.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{job.prompt.split("\n")[0].slice(0,55)}...</div>
+            </div>
+            <span style={{ fontFamily:C.mono,fontSize:10,color:C.txt2 }}>{(MODELS.find(m=>m.id===job.model)||MODELS[0]).label.split(" ").slice(0,2).join(" ")}</span>
+            <span style={{ fontFamily:C.mono,fontSize:10,color:C.txt3 }}>{timeAgo(job.submittedAt)}</span>
+            <span style={{ fontFamily:C.mono,fontSize:10,color:C.txt2 }}>{job.cost>0?`$${job.cost}`:"—"}</span>
+            <div style={{ display:"flex",gap:5,justifyContent:"flex-end" }}>
+              {job.status==="completed"&&<Btn onClick={()=>onSelect(job.id)} size="sm">View</Btn>}
+              {job.status==="failed"&&<Btn onClick={()=>onRerun(job)} size="sm" variant="amber">Rerun</Btn>}
+              {(job.status==="queued"||job.status==="picked_up"||job.status==="running")&&(
+                <div style={{ display:"flex",alignItems:"center",gap:5 }}>
+                  <Spinner size={11} color={C.amber}/>
+                  <span style={{ fontFamily:C.mono,fontSize:9.5,color:C.amber }}>{job.worker||"queued"}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── RESULTS VIEW ─────────────────── */
+function ResultsView({ job, onNewJob, onBack }) {
+  const [tab,setTab]=useState("output");
+  return (
+    <div style={{ maxWidth:780 }}>
+      <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:22 }}>
+        <button onClick={onBack} style={{ fontFamily:C.mono,fontSize:10,color:C.txt3,background:"transparent",border:"none",cursor:"pointer" }}>← Jobs</button>
+        <div style={{ width:1,height:14,background:C.bdr }}/>
+        <div style={{ fontFamily:C.mono,fontSize:12,color:C.txt2 }}>{job.id}</div>
+        <StatusChip status={job.status}/>
+        {job.cid&&<Badge color={C.violet} style={{ marginLeft:"auto" }}>{trunc(job.cid,8)}</Badge>}
+      </div>
+      <div style={{ display:"flex",gap:2,borderBottom:`1px solid ${C.bdr}`,marginBottom:20 }}>
+        {["output","on-chain","cost","spawn"].map(t=>(
+          <button key={t} onClick={()=>setTab(t)} style={{ fontFamily:C.sans,fontSize:12,padding:"8px 16px",background:"transparent",border:"none",cursor:"pointer",color:tab===t?C.teal:C.txt2,borderBottom:tab===t?`2px solid ${C.teal}`:"2px solid transparent",transition:"all 0.15s",marginBottom:-1 }}>
+            {t==="spawn"?"spawn new job":t}
+          </button>
+        ))}
+      </div>
+      {tab==="output"  &&<OutputTab job={job}/>}
+      {tab==="on-chain"&&<OnChainTab job={job}/>}
+      {tab==="cost"    &&<CostTab job={job}/>}
+      {tab==="spawn"   &&<SpawnTab onNewJob={onNewJob}/>}
+    </div>
+  );
+}
+
+function OutputTab({ job }) {
+  if (!job.hasReport) return <div style={{ padding:"32px 0",textAlign:"center",color:C.txt2,fontSize:13 }}>No output available.</div>;
+  return (
+    <div className="fa" style={{ background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:12,overflow:"hidden" }}>
+      <div style={{ padding:"10px 14px",background:C.surf2,borderBottom:`1px solid ${C.bdr}`,display:"flex",alignItems:"center",gap:8 }}>
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1" y="1" width="9" height="9" rx="1.5" stroke={C.violet} strokeWidth="1.2"/><path d="M3 4h5M3 6h5M3 8h3" stroke={C.violet} strokeWidth="1" strokeLinecap="round"/></svg>
+        <span style={{ fontFamily:C.mono,fontSize:10.5,color:C.violet }}>report.md</span>
+        <span style={{ fontFamily:C.mono,fontSize:9,color:C.txt3,marginLeft:"auto" }}>IPC Storage · {job.cid}</span>
+      </div>
+      <div style={{ padding:"20px 24px" }}>
+        <h2 style={{ fontFamily:C.display,fontSize:20,color:C.txt,letterSpacing:"-0.02em",marginBottom:4 }}>Filecoin Storage Provider Reliability Report</h2>
+        <p style={{ fontSize:11,fontFamily:C.mono,color:C.txt3,marginBottom:20 }}>Analysis Date: March 19, 2026 · 597 providers analysed</p>
+        <h3 style={{ fontSize:12,fontWeight:500,color:C.teal,marginBottom:8,letterSpacing:"0.04em" }}>METHODOLOGY</h3>
+        <p style={{ fontSize:13,color:C.txt2,lineHeight:1.75,marginBottom:20 }}>Data sourced from the Filrep API (597 active storage providers). Reliability scoring uses five weighted signals: uptime consistency (35 pts), deal fulfillment (30 pts), sector maintenance (20 pts), network reputation (10 pts), and storage capacity (5 pts).</p>
+        <h3 style={{ fontSize:12,fontWeight:500,color:C.teal,marginBottom:10,letterSpacing:"0.04em" }}>TOP 15 MOST RELIABLE STORAGE PROVIDERS</h3>
+        <div style={{ overflowX:"auto",marginBottom:20 }}>
+          <table style={{ width:"100%",borderCollapse:"collapse",fontSize:11.5,fontFamily:C.mono }}>
+            <thead>
+              <tr style={{ borderBottom:`1px solid ${C.bdr}` }}>
+                {["#","Provider ID","Score","Uptime","Deals","Power"].map(h=>(
+                  <th key={h} style={{ padding:"7px 10px",textAlign:"left",color:C.txt3,fontSize:10,fontWeight:400,letterSpacing:"0.05em",whiteSpace:"nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {REPORT_TABLE.map((row,i)=>(
+                <tr key={row.id} style={{ borderBottom:`1px solid ${C.bdr}`,background:i%2===0?"transparent":C.surf2 }}>
+                  <td style={{ padding:"7px 10px",color:C.txt3 }}>#{row.rank}</td>
+                  <td style={{ padding:"7px 10px",color:i<3?C.teal:C.txt }}>{row.id}</td>
+                  <td style={{ padding:"7px 10px",color:i<3?C.teal:C.amber,fontWeight:500 }}>{row.score.toFixed(2)}</td>
+                  <td style={{ padding:"7px 10px",color:C.txt2 }}>{row.uptime.toFixed(1)}%</td>
+                  <td style={{ padding:"7px 10px",color:C.txt2 }}>{row.deals.toLocaleString()}</td>
+                  <td style={{ padding:"7px 10px",color:C.txt3 }}>{row.power}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <h3 style={{ fontSize:12,fontWeight:500,color:C.teal,marginBottom:10,letterSpacing:"0.04em" }}>KEY FINDINGS</h3>
+        {[
+          "The top-tier storage providers demonstrate exceptional operational stability with uptime averages above 88%, significantly above the network mean of 42.2%. The #1 ranked provider f0116628 maintains 96.15% uptime while handling over 100 deals with a perfect success rate.",
+          "All 15 top providers maintain 100% deal success rates with zero slashing events. This is particularly notable for high-volume operators like f044160 which manages 1,268 deals flawlessly — demonstrating sophisticated deal management and proactive monitoring.",
+          "Geographically, all top 15 providers operate from Asia, suggesting a concentration of professional-grade storage infrastructure in this region. The absence of any slashing history across the entire top-15 cohort validates the reliability scoring methodology.",
+        ].map((p,i)=><p key={i} style={{ fontSize:13,color:C.txt2,lineHeight:1.75,marginBottom:12 }}>{p}</p>)}
+      </div>
+    </div>
+  );
+}
+
+function OnChainTab({ job }) {
+  return (
+    <div className="fa" style={{ display:"grid",gap:9 }}>
+      {[["JOB TRANSACTION",job.txHash],["RESULT TRANSACTION",job.resultTxHash],["IPC STORAGE CID",job.cid],["BLOCK HEIGHT",job.block?job.block.toLocaleString():null],["WORKER NODE",job.worker],["EIP-712 SIGNATURE",job.sig]].map(([l,v])=>(
+        <CopyRow key={l} label={l} value={v||"—"}/>
+      ))}
+    </div>
+  );
+}
+
+function CostTab({ job }) {
+  const m = MODELS.find(x=>x.id===job.model)||MODELS[0];
+  const promptTok = Math.floor((job.prompt?.length||0)/4);
+  const compTok   = Math.max(0,(job.tokensUsed||0)-promptTok);
+  return (
+    <div className="fa" style={{ background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:12,overflow:"hidden" }}>
+      <table style={{ width:"100%",borderCollapse:"collapse",fontSize:12 }}>
+        <thead>
+          <tr style={{ borderBottom:`1px solid ${C.bdr}`,background:C.surf2 }}>
+            {["Component","Tokens","Rate","Cost"].map(h=>(
+              <th key={h} style={{ padding:"10px 16px",textAlign:"left",fontFamily:C.mono,fontSize:10,color:C.txt3,fontWeight:400,letterSpacing:"0.05em" }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {[["Prompt",promptTok,`$${m.ppt}/token`,`$${(promptTok*m.ppt).toFixed(4)}`],["Completion",compTok,`$${m.ppt}/token`,`$${(compTok*m.ppt).toFixed(4)}`],["Storage write","—","flat rate","$0.001"],["Chain txs (×2)","—","gas","$0.002"]].map(([c,t,r,cost])=>(
+            <tr key={c} style={{ borderBottom:`1px solid ${C.bdr}` }}>
+              <td style={{ padding:"10px 16px",color:C.txt }}>{c}</td>
+              <td style={{ padding:"10px 16px",fontFamily:C.mono,color:C.txt2 }}>{typeof t==="number"?t.toLocaleString():t}</td>
+              <td style={{ padding:"10px 16px",fontFamily:C.mono,fontSize:11,color:C.txt3 }}>{r}</td>
+              <td style={{ padding:"10px 16px",fontFamily:C.mono,color:C.teal }}>{cost}</td>
+            </tr>
+          ))}
+          <tr style={{ background:C.surf2 }}>
+            <td colSpan={3} style={{ padding:"10px 16px",fontWeight:500,color:C.txt }}>Total</td>
+            <td style={{ padding:"10px 16px",fontFamily:C.mono,fontSize:14,fontWeight:500,color:C.teal }}>${job.cost>0?job.cost.toFixed(3):"0.000"} USDFC</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SpawnTab({ onNewJob }) {
+  return (
+    <div className="fa">
+      <p style={{ fontSize:13,color:C.txt2,lineHeight:1.7,marginBottom:14 }}>Use the output of this job as the basis for a new task — run a deeper analysis, trigger a downstream action, or build on the results.</p>
+      <div style={{ display:"grid",gap:8,marginBottom:16 }}>
+        {["Fetch deal history for top 5 providers and compute month-over-month reliability trends","Generate a Solidity function call to route uploads to the top 3 providers in this report","Cross-reference top providers against the Filecoin Plus verified client dataset"].map((s,i)=>(
+          <div key={i} onClick={onNewJob} style={{ padding:"10px 14px",background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:9,fontSize:12,color:C.txt2,cursor:"pointer",lineHeight:1.6,transition:"all 0.15s" }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=C.tealBdr;e.currentTarget.style.color=C.txt;}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=C.bdr;e.currentTarget.style.color=C.txt2;}}>
+            {s}
+          </div>
+        ))}
+      </div>
+      <Btn onClick={onNewJob} variant="primary" size="lg">Open in new job →</Btn>
+    </div>
+  );
+}
+
+/* ── TOP-UP MODAL ─────────────────── */
+function TopUpModal({ wallet, onClose }) {
+  const [amount,setAmount]=useState(10);
+  const [custom,setCustom]=useState("");
+  const [cardNum,setCardNum]=useState("");
+  const [expiry,setExpiry]=useState("");
+  const [cvc,setCvc]=useState("");
+  const [autoOn,setAutoOn]=useState(false);
+  const [threshold,setThreshold]=useState(2);
+  const [autoAmt,setAutoAmt]=useState(10);
+  const [phase,setPhase]=useState("form");
+  const [f3t,setF3t]=useState(0);
+
+  const finalAmt = custom?parseFloat(custom)||0:amount;
+
+  function handlePay() {
+    if (!cardNum||!expiry||!cvc) return;
+    setPhase("processing");
+    let t=0;
+    const id=setInterval(()=>{
+      t=parseFloat(Math.min(t+0.15,0.8).toFixed(2));
+      setF3t(t);
+      if (t>=0.8){ clearInterval(id); setPhase("confirmed"); wallet.addBalance(finalAmt); }
+    },60);
+  }
+
+  function fmtCard(v) { return v.replace(/\D/g,"").slice(0,16).replace(/(.{4})/g,"$1 ").trim(); }
+  function fmtExp(v)  { return v.replace(/\D/g,"").slice(0,4).replace(/(.{2})/,"$1/"); }
+
+  return (
+    <div style={{ position:"fixed",inset:0,background:"rgba(7,8,16,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20 }}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{ background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:16,width:"100%",maxWidth:400,overflow:"hidden" }} className="fa">
+        <div style={{ padding:"16px 20px",borderBottom:`1px solid ${C.bdr}`,display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+          <div style={{ fontFamily:C.display,fontSize:16,color:C.txt }}>Top up USDFC</div>
+          <button onClick={onClose} style={{ background:"transparent",border:"none",color:C.txt3,cursor:"pointer",fontSize:18,lineHeight:1 }}>×</button>
+        </div>
+
+        {phase==="form"&&(
+          <div style={{ padding:"20px" }}>
+            <div style={{ fontSize:10,fontFamily:C.mono,color:C.txt3,letterSpacing:"0.06em",marginBottom:10 }}>AMOUNT (USDFC)</div>
+            <div style={{ display:"flex",gap:6,marginBottom:10 }}>
+              {[5,10,25].map(n=>(
+                <button key={n} onClick={()=>{setAmount(n);setCustom("");}} style={{ flex:1,padding:"8px 0",borderRadius:8,border:`1px solid ${amount===n&&!custom?C.tealBdr:C.bdr}`,background:amount===n&&!custom?C.tealDim:"transparent",color:amount===n&&!custom?C.teal:C.txt2,fontSize:13,fontFamily:C.mono,cursor:"pointer",transition:"all 0.15s" }}>${n}</button>
+              ))}
+              <input placeholder="Custom" value={custom} onChange={e=>setCustom(e.target.value.replace(/[^0-9.]/g,""))} style={{ flex:1,padding:"8px 10px",borderRadius:8,border:`1px solid ${custom?C.tealBdr:C.bdr}`,background:custom?C.tealDim:"transparent",color:custom?C.teal:C.txt2,fontSize:13,fontFamily:C.mono,textAlign:"center" }}/>
+            </div>
+            <div style={{ height:1,background:C.bdr,margin:"16px 0" }}/>
+            <div style={{ fontSize:10,fontFamily:C.mono,color:C.txt3,letterSpacing:"0.06em",marginBottom:12 }}>PAYMENT METHOD</div>
+            <div style={{ display:"grid",gap:8 }}>
+              <input value={fmtCard(cardNum)} onChange={e=>setCardNum(e.target.value)} placeholder="Card number" style={{ padding:"9px 12px",background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:8,color:C.txt,fontSize:13,fontFamily:C.mono }}/>
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
+                <input value={fmtExp(expiry)} onChange={e=>setExpiry(e.target.value)} placeholder="MM/YY" style={{ padding:"9px 12px",background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:8,color:C.txt,fontSize:13,fontFamily:C.mono }}/>
+                <input value={cvc.replace(/\D/g,"").slice(0,4)} onChange={e=>setCvc(e.target.value)} placeholder="CVC" style={{ padding:"9px 12px",background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:8,color:C.txt,fontSize:13,fontFamily:C.mono }}/>
+              </div>
+            </div>
+            <div style={{ height:1,background:C.bdr,margin:"16px 0" }}/>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:autoOn?12:0 }}>
+              <div>
+                <div style={{ fontSize:12,color:C.txt,marginBottom:2 }}>Automatic top-up</div>
+                <div style={{ fontSize:11,color:C.txt2 }}>Top up when balance runs low</div>
+              </div>
+              <div onClick={()=>setAutoOn(s=>!s)} style={{ width:36,height:20,borderRadius:10,background:autoOn?C.teal:C.bdrHi,cursor:"pointer",position:"relative",transition:"background 0.2s",flexShrink:0 }}>
+                <div style={{ position:"absolute",top:2,left:autoOn?18:2,width:16,height:16,borderRadius:"50%",background:"white",transition:"left 0.2s" }}/>
+              </div>
+            </div>
+            {autoOn&&(
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }} className="fa">
+                <div style={{ padding:"9px 12px",background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:8 }}>
+                  <div style={{ fontSize:9.5,fontFamily:C.mono,color:C.txt3,marginBottom:4 }}>TOP UP WHEN BELOW</div>
+                  <div style={{ display:"flex",alignItems:"center",gap:4 }}>
+                    <span style={{ fontFamily:C.mono,fontSize:11,color:C.txt2 }}>$</span>
+                    <input type="number" value={threshold} onChange={e=>setThreshold(+e.target.value)} style={{ fontFamily:C.mono,fontSize:13,color:C.txt,width:50 }}/>
+                    <span style={{ fontFamily:C.mono,fontSize:11,color:C.txt2 }}>USDFC</span>
+                  </div>
+                </div>
+                <div style={{ padding:"9px 12px",background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:8 }}>
+                  <div style={{ fontSize:9.5,fontFamily:C.mono,color:C.txt3,marginBottom:4 }}>ADD AMOUNT</div>
+                  <div style={{ display:"flex",alignItems:"center",gap:4 }}>
+                    <span style={{ fontFamily:C.mono,fontSize:11,color:C.txt2 }}>$</span>
+                    <input type="number" value={autoAmt} onChange={e=>setAutoAmt(+e.target.value)} style={{ fontFamily:C.mono,fontSize:13,color:C.txt,width:50 }}/>
+                    <span style={{ fontFamily:C.mono,fontSize:11,color:C.txt2 }}>USDFC</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <button onClick={handlePay} disabled={!cardNum||!expiry||!cvc||finalAmt<=0}
+              style={{ width:"100%",marginTop:16,padding:"11px 0",borderRadius:9,border:"none",background:(!cardNum||!expiry||!cvc||finalAmt<=0)?C.surf3:C.teal,color:(!cardNum||!expiry||!cvc||finalAmt<=0)?C.txt3:C.bg,fontSize:13,fontFamily:C.sans,fontWeight:500,cursor:(!cardNum||!expiry||!cvc)?"not-allowed":"pointer",transition:"all 0.2s" }}>
+              Pay ${finalAmt} USDFC
+            </button>
+            <div style={{ marginTop:8,fontSize:10,fontFamily:C.mono,color:C.txt3,textAlign:"center" }}>Settled on IPC Chain · sub-second finality</div>
+          </div>
+        )}
+
+        {phase==="processing"&&(
+          <div style={{ padding:"40px 20px",textAlign:"center" }} className="fa">
+            <div style={{ fontFamily:C.mono,fontSize:9,color:C.txt3,letterSpacing:"0.1em",marginBottom:10 }}>IPC CHAIN FINALITY</div>
+            <div style={{ fontFamily:C.display,fontSize:60,lineHeight:1,color:C.teal,marginBottom:12 }}>{f3t.toFixed(2)}s</div>
+            <div style={{ fontSize:12,color:C.txt2 }}>Settling on IPC Chain...</div>
+          </div>
+        )}
+
+        {phase==="confirmed"&&(
+          <div style={{ padding:"36px 20px",textAlign:"center" }} className="fa">
+            <div style={{ width:52,height:52,borderRadius:"50%",background:C.tealDim,border:`1px solid ${C.tealBdr}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:22,color:C.teal }}>✓</div>
+            <div style={{ fontFamily:C.display,fontSize:20,color:C.teal,marginBottom:6 }}>${finalAmt} USDFC added</div>
+            <div style={{ fontSize:12,color:C.txt2,marginBottom:4 }}>New balance: <span style={{ fontFamily:C.mono,color:C.teal }}>${wallet.balance.toFixed(2)}</span></div>
+            <div style={{ fontFamily:C.mono,fontSize:10,color:C.txt3,marginBottom:20 }}>Finalized in 0.80s · IPC Chain</div>
+            {autoOn&&<div style={{ fontSize:11,color:C.txt2,padding:"9px 12px",background:C.surf2,borderRadius:8,marginBottom:16,border:`1px solid ${C.bdr}` }}>Auto top-up active: top up ${autoAmt} when balance &lt; ${threshold}</div>}
+            <Btn onClick={onClose} variant="primary" size="lg">Done →</Btn>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
