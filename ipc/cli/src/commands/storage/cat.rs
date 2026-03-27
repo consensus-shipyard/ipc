@@ -8,6 +8,8 @@ use clap::Args;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
+use async_trait::async_trait;
+
 use crate::commands::storage::{client::GatewayClient, config::StorageConfig, path};
 use crate::{CommandLineHandler, GlobalArguments};
 
@@ -28,6 +30,7 @@ pub struct CatArgs {
 
 pub struct CatStorage;
 
+#[async_trait]
 impl CommandLineHandler for CatStorage {
     type Arguments = CatArgs;
 

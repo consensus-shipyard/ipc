@@ -91,6 +91,7 @@ impl CommandLineHandler for InitStorage {
             objects_listen_addr: "127.0.0.1:8080".to_string(),
             iroh_gateway_path: storage_dir.join("iroh-gateway"),
             iroh_gateway_v4_addr: Some("0.0.0.0:11205".to_string()),
+            gateway_url: None,
         };
 
         storage_cfg

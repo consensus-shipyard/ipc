@@ -14,7 +14,8 @@ use fendermint_actor_blobs_shared::bytes::B256;
 use fendermint_rpc::{message::GasParams, tx::{BoundClient, TxClient, TxCommit}, QueryClient};
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_ipld_encoding::RawBytes;
-use fvm_shared::{address::Address, econ::TokenAmount};
+use fvm_shared::{address::Address, chainid::ChainID, econ::TokenAmount};
+use num_traits::Zero;
 use std::collections::HashMap;
 
 /// Default gas parameters for bucket transactions
@@ -206,6 +207,37 @@ where
     }
 
     Ok(())
+}
+
+/// Query the chain ID from the network
+pub async fn query_chain_id<C>(client: &C) -> Result<ChainID>
+where
+    C: QueryClient + Send + Sync,
+{
+    let state_params = client
+        .state_params(FvmQueryHeight::default())
+        .await
+        .context("Failed to query state params for chain ID")?;
+
+    Ok(ChainID::from(state_params.value.chain_id))
+}
+
+/// Convert a hex string to a B256, with length validation.
+///
+/// Accepts with or without "0x" prefix. Returns an error if the decoded
+/// bytes are not exactly 32 bytes long.
+pub fn hex_to_b256(hex_str: &str) -> Result<B256> {
+    let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+    let bytes = hex::decode(hex_str).context("Invalid hex string")?;
+    if bytes.len() != 32 {
+        return Err(anyhow!(
+            "Expected 32 bytes, got {} bytes from hex string",
+            bytes.len()
+        ));
+    }
+    let mut array = [0u8; 32];
+    array.copy_from_slice(&bytes);
+    Ok(B256(array))
 }
 
 /// Update object metadata

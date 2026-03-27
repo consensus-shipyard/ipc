@@ -14,9 +14,11 @@ use fs_err as fs;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use fendermint_actor_blobs_shared::bytes::B256;
+use async_trait::async_trait;
 use fendermint_rpc::client::FendermintClient;
-use iroh_blobs::Hash;
+use fendermint_rpc::message::SignedMessageFactory;
+use fendermint_rpc::QueryClient;
+use fvm_shared::chainid::ChainID;
 
 use crate::commands::storage::{bucket, client::GatewayClient, config::StorageConfig, path};
 use crate::{CommandLineHandler, GlobalArguments};
@@ -50,6 +52,7 @@ pub struct CopyArgs {
 
 pub struct CopyStorage;
 
+#[async_trait]
 impl CommandLineHandler for CopyStorage {
     type Arguments = CopyArgs;
 
@@ -152,19 +155,14 @@ async fn upload_file(
         upload_response.hash, upload_response.original_len, upload_response.num_chunks
     );
 
-    // Convert hash to B256
-    let blob_hash_hex = upload_response.hash.strip_prefix("0x").unwrap_or(&upload_response.hash);
-    let blob_hash_bytes = hex::decode(blob_hash_hex)?;
-    let mut hash_array = [0u8; 32];
-    hash_array.copy_from_slice(&blob_hash_bytes[..32]);
-    let blob_hash = B256(hash_array);
+    // Convert hash to B256 (with length validation)
+    let blob_hash = bucket::hex_to_b256(&upload_response.hash)
+        .context("Invalid blob hash from gateway")?;
 
-    // Get node info for source ID
+    // Get node info for source ID (with length validation)
     let node_info = gateway_client.get_node_info().await?;
-    let source_node_id_hex = hex::decode(&node_info.node_id)?;
-    let mut source_array = [0u8; 32];
-    source_array.copy_from_slice(&source_node_id_hex[..32]);
-    let source = B256(source_array);
+    let source = bucket::hex_to_b256(&node_info.node_id)
+        .context("Invalid node ID from gateway")?;
 
     // Register object on-chain
     println!("Registering object on-chain...");
@@ -175,19 +173,28 @@ async fn upload_file(
         None,
     )?;
 
+    // Query chain ID from the network
+    let chain_id = bucket::query_chain_id(&fm_client)
+        .await
+        .context("Failed to query chain ID")?;
+
     // Create bound client with secret key
-    let secret_key = fendermint_rpc::message::SignedMessageFactory::read_secret_key(
+    let secret_key = SignedMessageFactory::read_secret_key(
         &config.secret_key_file
     )?;
 
-    let chain_id = fvm_shared::chainid::ChainID::from(0); // TODO: Get from chain
-    let bound_client = fendermint_rpc::tx::BoundClientBuilder::new(fm_client)
-        .secret_key(secret_key)
-        .chain_id(chain_id)
-        .build()
-        .await?;
+    // Get account sequence (nonce)
+    let addr = fvm_shared::address::Address::new_secp256k1(
+        &secret_key.public_key().serialize(),
+    )?;
+    let state = fm_client
+        .actor_state(&addr, fendermint_vm_message::query::FvmQueryHeight::default())
+        .await
+        .context("Failed to get actor state")?;
+    let sequence = state.value.map(|(_, s)| s.sequence).unwrap_or(0);
 
-    let mut bound_client = bound_client;
+    let mf = SignedMessageFactory::new(secret_key, addr, sequence, ChainID::from(chain_id));
+    let mut bound_client = fm_client.bind(mf);
 
     // Add object to bucket
     bucket::add_object(
@@ -328,10 +335,100 @@ async fn download_directory(
 ) -> Result<()> {
     println!("Downloading directory {} recursively...", storage_base.to_uri());
 
-    // TODO: Implement by listing objects with prefix and downloading each
-    // This requires implementing the ls command first to reuse list_objects functionality
+    // Load config
+    let config_path = args.config.clone().unwrap_or_else(|| {
+        dirs::home_dir()
+            .unwrap()
+            .join(".ipc")
+            .join("storage_default.yaml")
+    });
 
-    Err(anyhow!("Directory download not yet implemented. Use 'ipc-cli storage ls' to see files and download individually."))
+    let mut config = if config_path.exists() {
+        StorageConfig::load(&config_path)?
+    } else {
+        return Err(anyhow!(
+            "Storage config not found at {}. Run 'ipc-cli storage init' first.",
+            config_path.display()
+        ));
+    };
+
+    let gateway_url = config.get_gateway_url(
+        args.gateway.as_deref(),
+        Some(&config_path),
+        true,
+    )?;
+
+    let gateway_client = GatewayClient::new(gateway_url)?;
+
+    // List all objects with the prefix
+    let fm_client = FendermintClient::new_http(
+        config.tendermint_rpc_url.parse()?,
+        None,
+    )?;
+
+    let prefix = if storage_base.is_bucket_root() {
+        None
+    } else {
+        Some(storage_base.key.clone())
+    };
+
+    let mut start_key = None;
+    let mut downloaded_count = 0;
+
+    loop {
+        let list_result = bucket::list_objects(
+            &fm_client,
+            storage_base.bucket_address,
+            prefix.clone(),
+            None, // no delimiter for recursive listing
+            start_key,
+            100,
+        )
+        .await
+        .context("Failed to list objects")?;
+
+        if list_result.objects.is_empty() {
+            break;
+        }
+
+        for (key_bytes, _) in &list_result.objects {
+            let key_str = String::from_utf8_lossy(key_bytes).to_string();
+
+            // Compute relative path by stripping the prefix
+            let rel_path = if let Some(ref pfx) = prefix {
+                key_str.strip_prefix(pfx).unwrap_or(&key_str)
+            } else {
+                &key_str
+            };
+            let rel_path = rel_path.trim_start_matches('/');
+
+            let dest_file = local_dir.join(rel_path);
+
+            // Create parent directories
+            if let Some(parent) = dest_file.parent() {
+                fs::create_dir_all(parent)?;
+            }
+
+            // Download the object
+            println!("Downloading {} -> {}", key_str, dest_file.display());
+            let data = gateway_client
+                .download_object(&storage_base.bucket_address, &key_str, None)
+                .await
+                .with_context(|| format!("Failed to download object: {}", key_str))?;
+
+            fs::write(&dest_file, data)?;
+            downloaded_count += 1;
+        }
+
+        if list_result.next_key.is_none() {
+            break;
+        }
+
+        start_key = list_result.next_key.map(|k| String::from_utf8_lossy(&k).to_string());
+    }
+
+    println!("✓ Downloaded {} files", downloaded_count);
+    Ok(())
 }
 
 /// Copy an object between storage buckets

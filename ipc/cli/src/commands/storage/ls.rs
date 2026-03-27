@@ -10,6 +10,8 @@ use std::path::PathBuf;
 use fendermint_rpc::client::FendermintClient;
 use serde_json::json;
 
+use async_trait::async_trait;
+
 use crate::commands::storage::{bucket, config::StorageConfig, path};
 use crate::{CommandLineHandler, GlobalArguments};
 
@@ -42,6 +44,7 @@ pub struct ListArgs {
 
 pub struct ListStorage;
 
+#[async_trait]
 impl CommandLineHandler for ListStorage {
     type Arguments = ListArgs;
 
@@ -133,7 +136,7 @@ fn print_json(
 
 fn print_table(
     result: &fendermint_actor_bucket::ListObjectsReturn,
-    prefix: &Option<String>,
+    _prefix: &Option<String>,
     long: bool,
 ) -> Result<()> {
     if result.objects.is_empty() && result.common_prefixes.is_empty() {

@@ -11,6 +11,7 @@ mod node;
 mod subnet;
 mod ui;
 mod util;
+mod storage;
 mod validator;
 mod wallet;
 
@@ -39,6 +40,7 @@ use std::str::FromStr;
 use crate::commands::config::ConfigCommandsArgs;
 use crate::commands::deploy::{DeployCommand, DeployCommandArgs};
 use crate::commands::node::NodeCommandsArgs;
+use crate::commands::storage::StorageCommandsArgs;
 use crate::commands::validator::ValidatorCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
 use crate::CommandLineHandler;
@@ -62,6 +64,7 @@ enum Commands {
     Deploy(DeployCommandArgs),
     Ui(UICommandArgs),
     Node(NodeCommandsArgs),
+    Storage(StorageCommandsArgs),
 }
 
 #[derive(Debug, Parser)]
@@ -157,6 +160,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Deploy(args) => DeployCommand::handle(global, args).await,
                 Commands::Ui(args) => run_ui_command(global.clone(), args.clone()).await,
                 Commands::Node(args) => args.handle(global).await,
+                Commands::Storage(args) => args.handle(global).await,
             };
 
             r.with_context(|| format!("error processing command {:?}", args.command))

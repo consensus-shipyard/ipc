@@ -7,10 +7,13 @@ use anyhow::{anyhow, Context, Result};
 use clap::Args;
 use std::path::PathBuf;
 
-use fendermint_actor_blobs_shared::bytes::B256;
+use async_trait::async_trait;
 use fendermint_rpc::client::FendermintClient;
+use fendermint_rpc::message::SignedMessageFactory;
+use fendermint_rpc::QueryClient;
+use fvm_shared::chainid::ChainID;
 
-use crate::commands::storage::{bucket, config::StorageConfig, path};
+use crate::commands::storage::{bucket, client::GatewayClient, config::StorageConfig, path};
 use crate::{CommandLineHandler, GlobalArguments};
 
 #[derive(Debug, Args)]
@@ -23,6 +26,10 @@ pub struct MoveArgs {
     #[arg(value_name = "DEST")]
     pub dest: String,
 
+    /// Gateway URL (overrides config and env var)
+    #[arg(long)]
+    pub gateway: Option<String>,
+
     /// Storage config file
     #[arg(long)]
     pub config: Option<PathBuf>,
@@ -30,6 +37,7 @@ pub struct MoveArgs {
 
 pub struct MoveStorage;
 
+#[async_trait]
 impl CommandLineHandler for MoveStorage {
     type Arguments = MoveArgs;
 
@@ -51,7 +59,7 @@ impl CommandLineHandler for MoveStorage {
                 .join("storage_default.yaml")
         });
 
-        let config = if config_path.exists() {
+        let mut config = if config_path.exists() {
             StorageConfig::load(&config_path)?
         } else {
             return Err(anyhow!(
@@ -78,27 +86,42 @@ impl CommandLineHandler for MoveStorage {
 
         let source_object = source_object.ok_or_else(|| anyhow!("Source object not found: {}", source_path.key))?;
 
+        // Query chain ID from the network
+        let chain_id = bucket::query_chain_id(&fm_client)
+            .await
+            .context("Failed to query chain ID")?;
+
         // Create bound client for transactions
-        let secret_key = fendermint_rpc::message::SignedMessageFactory::read_secret_key(
+        let secret_key = SignedMessageFactory::read_secret_key(
             &config.secret_key_file
         )?;
 
-        let chain_id = fvm_shared::chainid::ChainID::from(0); // TODO: Get from chain
-        let bound_client = fendermint_rpc::tx::BoundClientBuilder::new(fm_client)
-            .secret_key(secret_key)
-            .chain_id(chain_id)
-            .build()
-            .await?;
+        let addr = fvm_shared::address::Address::new_secp256k1(
+            &secret_key.public_key().serialize(),
+        )?;
+        let state = fm_client
+            .actor_state(&addr, fendermint_vm_message::query::FvmQueryHeight::default())
+            .await
+            .context("Failed to get actor state")?;
+        let sequence = state.value.map(|(_, s)| s.sequence).unwrap_or(0);
 
-        let mut bound_client = bound_client;
+        let mf = SignedMessageFactory::new(secret_key, addr, sequence, ChainID::from(chain_id));
+        let mut bound_client = fm_client.bind(mf);
 
         // If moving within the same bucket, we can reuse the blob hash
         if source_path.bucket_address == dest_path.bucket_address {
             println!("Moving within same bucket (reusing blob)...");
 
-            // Add object at new location with same hash
-            // We need to extract source node ID from somewhere - using zero for now
-            let source_node = B256([0u8; 32]); // TODO: Get actual source node ID
+            // Get source node ID from gateway
+            let gateway_url = config.get_gateway_url(
+                args.gateway.as_deref(),
+                Some(&config_path),
+                true,
+            )?;
+            let gateway_client = GatewayClient::new(gateway_url)?;
+            let node_info = gateway_client.get_node_info().await?;
+            let source_node = bucket::hex_to_b256(&node_info.node_id)
+                .context("Invalid node ID from gateway")?;
 
             bucket::add_object(
                 &mut bound_client,

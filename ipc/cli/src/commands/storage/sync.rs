@@ -7,6 +7,8 @@ use anyhow::{anyhow, Result};
 use clap::Args;
 use std::path::PathBuf;
 
+use async_trait::async_trait;
+
 use crate::commands::storage::path;
 use crate::{CommandLineHandler, GlobalArguments};
 
@@ -39,6 +41,7 @@ pub struct SyncArgs {
 
 pub struct SyncStorage;
 
+#[async_trait]
 impl CommandLineHandler for SyncStorage {
     type Arguments = SyncArgs;
 

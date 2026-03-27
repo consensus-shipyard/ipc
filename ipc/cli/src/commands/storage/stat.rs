@@ -10,6 +10,8 @@ use std::path::PathBuf;
 use fendermint_rpc::client::FendermintClient;
 use serde_json::json;
 
+use async_trait::async_trait;
+
 use crate::commands::storage::{bucket, config::StorageConfig, path};
 use crate::{CommandLineHandler, GlobalArguments};
 
@@ -30,6 +32,7 @@ pub struct StatArgs {
 
 pub struct StatStorage;
 
+#[async_trait]
 impl CommandLineHandler for StatStorage {
     type Arguments = StatArgs;
 

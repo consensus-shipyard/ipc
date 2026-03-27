@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 pub mod bucket;
+pub mod bucket_cmd;
 pub mod cat;
+pub mod credit;
 pub mod client;
 pub mod config;
 pub mod cp;
@@ -15,7 +17,9 @@ pub mod run;
 pub mod stat;
 pub mod sync;
 
+use crate::commands::storage::bucket_cmd::BucketCommandArgs;
 use crate::commands::storage::cat::{CatArgs, CatStorage};
+use crate::commands::storage::credit::CreditCommandArgs;
 use crate::commands::storage::cp::{CopyArgs, CopyStorage};
 use crate::commands::storage::init::{InitStorage, InitStorageArgs};
 use crate::commands::storage::ls::{ListArgs, ListStorage};
@@ -38,6 +42,8 @@ pub(crate) struct StorageCommandsArgs {
 impl StorageCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
+            Commands::Bucket(args) => args.handle(global).await,
+            Commands::Credit(args) => args.handle(global).await,
             Commands::Init(args) => InitStorage::handle(global, args).await,
             Commands::Run(args) => RunStorage::handle(global, args).await,
             Commands::Cp(args) => CopyStorage::handle(global, args).await,
@@ -53,6 +59,10 @@ impl StorageCommandsArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
+    /// Create and manage storage buckets
+    Bucket(BucketCommandArgs),
+    /// Buy and query storage credits
+    Credit(CreditCommandArgs),
     /// Initialize storage configuration
     Init(InitStorageArgs),
     /// Run storage node and/or gateway
