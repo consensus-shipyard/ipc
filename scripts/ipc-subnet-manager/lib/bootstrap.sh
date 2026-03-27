@@ -5,7 +5,7 @@
 # Usage: bootstrap_validator_host <validator_idx> [branch]
 bootstrap_validator_host() {
     local validator_idx="$1"
-    local branch="${2:-main}"
+    local branch="${2:-storage-node-fix}"
     local with_storage="${3:-false}"
 
     local name="${VALIDATORS[$validator_idx]}"
@@ -194,7 +194,7 @@ bootstrap_validator_host() {
 # Bootstrap all validator hosts
 # Usage: bootstrap_all_hosts [branch]
 bootstrap_all_hosts() {
-    local branch="${1:-main}"
+    local branch="${1:-storage-node-fix}"
     local with_storage="${2:-false}"
 
     log_header "Bootstrap Validator Hosts"

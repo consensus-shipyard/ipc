@@ -2130,7 +2130,7 @@ update_validator_binaries() {
 # Build IPC binaries locally (with cross-compilation for macOS->Linux)
 # On success, writes binary directory path to $3 (result file). Returns 0/1.
 build_ipc_locally() {
-    local branch="${1:-main}"
+    local branch="${1:-storage-node-fix}"
     local local_repo="$2"
     local result_file="$3"
     local with_storage="${4:-false}"
@@ -2414,7 +2414,7 @@ deploy_binaries_only() {
 
 # Update binaries on all validators
 update_all_binaries() {
-    local branch="${1:-main}"
+    local branch="${1:-storage-node-fix}"
     local compile_mode="${2:-remote}"
     local with_storage="${3:-false}"
     local do_git_pull="${4:-false}"

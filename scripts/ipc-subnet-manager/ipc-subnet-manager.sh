@@ -30,6 +30,7 @@ source "${SCRIPT_DIR}/lib/bootstrap.sh"
 source "${SCRIPT_DIR}/lib/dashboard.sh"
 
 # Global variables
+DEFAULT_BUILD_BRANCH="storage-node-fix"
 VALIDATORS=()
 DRY_RUN=false
 DEBUG=false
@@ -74,7 +75,7 @@ Options:
     --dry-run            Preview actions without executing
     --yes                Skip confirmation prompts
     --debug              Show verbose debug output
-    --branch NAME        For bootstrap/update-binaries: git branch to pull from (default: main)
+    --branch NAME        For bootstrap/update-binaries: git branch to pull from (default: $DEFAULT_BUILD_BRANCH)
     --compile MODE       For update-binaries: 'local' or 'remote' (default: remote)
     --git-pull           For update-binaries: fetch/pull latest changes before build (default: off)
     --with-storage       For bootstrap/update-binaries: build ipc-storage feature and storage binaries
@@ -94,14 +95,14 @@ Examples:
     $0 restart --mode local --yes              # Restart local subnet
 
     # Remote mode (multiple machines via SSH)
-    $0 bootstrap --branch main --with-storage  # First: bootstrap fresh hosts (with storage binaries)
+    $0 bootstrap --branch $DEFAULT_BUILD_BRANCH --with-storage  # First: bootstrap fresh hosts (with storage binaries)
     $0 init                                    # Then: initialize subnet from scratch
     $0 init --resume                           # Resume after deploy (skip wipe/deploy)
     $0 init --debug                            # Initialize with verbose debug output
     $0 check                                   # Run health checks
-    $0 update-binaries --branch main           # Update binaries from main branch
-    $0 update-binaries -C local --branch main  # Build locally, deploy to validators
-    $0 update-binaries --branch main --with-storage  # Update binaries with storage support
+    $0 update-binaries --branch $DEFAULT_BUILD_BRANCH           # Update binaries from default branch
+    $0 update-binaries -C local --branch $DEFAULT_BUILD_BRANCH  # Build locally, deploy to validators
+    $0 update-binaries --branch $DEFAULT_BUILD_BRANCH --with-storage  # Update binaries with storage support
     $0 deploy-binaries --path ./target/release # Copy binaries to all validators
     $0 watch-finality                          # Monitor parent finality progress
     $0 watch-blocks                            # Monitor block production
@@ -154,7 +155,7 @@ confirm() {
 
 # Bootstrap validator hosts - install deps and build IPC
 cmd_bootstrap() {
-    local branch="main"
+    local branch="$DEFAULT_BUILD_BRANCH"
     local with_storage=false
 
     while [[ $# -gt 0 ]]; do
@@ -182,7 +183,7 @@ Bootstrap validator hosts with IPC and dependencies
 Usage: $0 bootstrap [options]
 
 Options:
-    --branch NAME    Git branch to clone (default: main)
+    --branch NAME    Git branch to clone (default: $DEFAULT_BUILD_BRANCH)
     --with-storage   Build ipc-storage feature and storage binaries
     --config FILE    Path to config file
     --dry-run        Preview without executing
@@ -443,7 +444,7 @@ cmd_init() {
 
 # Update binaries on all validators
 cmd_update_binaries() {
-    local branch="main"
+    local branch="$DEFAULT_BUILD_BRANCH"
     local compile_mode="remote"
     local with_storage=false
     local git_pull=false
@@ -470,7 +471,7 @@ Update IPC binaries on all validators
 Usage: $0 update-binaries [options]
 
 Options:
-    --branch NAME       Git branch to build from (default: main)
+    --branch NAME       Git branch to build from (default: $DEFAULT_BUILD_BRANCH)
     --compile MODE      Where to build: 'local' or 'remote' (default: remote)
     -C MODE             Short for --compile
     --git-pull          Fetch/pull latest changes before build (default: off)
@@ -485,11 +486,11 @@ Compile modes:
           Requires: cargo-zigbuild + zig (recommended) or cross (needs Docker).
 
 Examples:
-    $0 update-binaries --branch main
-    $0 update-binaries --branch main --compile local
-    $0 update-binaries -C local --branch main
-    $0 update-binaries --branch main --git-pull
-    $0 update-binaries --branch main --with-storage
+    $0 update-binaries --branch $DEFAULT_BUILD_BRANCH
+    $0 update-binaries --branch $DEFAULT_BUILD_BRANCH --compile local
+    $0 update-binaries -C local --branch $DEFAULT_BUILD_BRANCH
+    $0 update-binaries --branch $DEFAULT_BUILD_BRANCH --git-pull
+    $0 update-binaries --branch $DEFAULT_BUILD_BRANCH --with-storage
 EOF
                 exit 0
                 ;;
