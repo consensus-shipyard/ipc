@@ -1,0 +1,24 @@
+[package]
+name = "ipc-reputation-actor"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+fvm_sdk = { version = "4", default-features = false }
+fvm_shared = { version = "4", default-features = false }
+fvm_ipld_encoding = { version = "0.4" }
+fvm_ipld_blockstore = { version = "0.2" }
+libsecp256k1 = { version = "0.7", default-features = false, features = ["static-context", "hmac"] }
+serde = { version = "1", features = ["derive"] }
+tiny-keccak = { version = "2", features = ["keccak"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+panic = "abort"
+overflow-checks = true
+
+[workspace]
