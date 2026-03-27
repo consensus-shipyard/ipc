@@ -229,7 +229,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         Params memory params = Params({
             root: rootNetwork,
             subnet: tokenL2Subnet,
-            subnetL3: nativeL3SubnetsWithTokenParent[0],
+            subnetL3: tokenL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
@@ -251,7 +251,38 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenL2Subnet, tokenL3SubnetsWithTokenParent);
     }
 
-    // Error scenarios
+    function testL2PlusSubnet_RejectNonDirectMessage() public {
+        TestSubnetDefinition memory nativeL3Subnet = nativeL3Subnets[0];
+        MockIpcContractResult caller = new MockIpcContractResult();
+        address callerAddr = address(caller);
+        address recipientAddr = address(new MockIpcContractPayable());
+
+        registerSubnet(nativeL2Subnet.subnetActorAddr, rootNetwork.gateway);
+        registerSubnet(nativeL3Subnet.subnetActorAddr, nativeL2Subnet.gateway);
+
+        // L3 -> L1
+        IpcEnvelope memory l3_to_l1 = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: nativeL3Subnet.id, rawAddress: FvmAddressHelper.from(callerAddr)}),
+            IPCAddress({subnetId: rootNetwork.id, rawAddress: FvmAddressHelper.from(recipientAddr)}),
+            0 ether,
+            0
+        );
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.NonDirect));
+        vm.prank(callerAddr);
+        nativeL3Subnets[0].gateway.messenger().sendContractXnetMessage{value: 0}(l3_to_l1);
+
+        // L1 -> L3
+        IpcEnvelope memory l1_to_l3 = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: rootNetwork.id, rawAddress: FvmAddressHelper.from(recipientAddr)}),
+            IPCAddress({subnetId: nativeL3Subnet.id, rawAddress: FvmAddressHelper.from(callerAddr)}),
+            0 ether,
+            0
+        );
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.NonDirect));
+        vm.prank(callerAddr);
+        rootNetwork.gateway.messenger().sendContractXnetMessage{value: 0}(l1_to_l3);
+    }
+
     function testL2PlusSubnet_Native_SendCrossMessageFromChildToNonExistingActorError() public {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
@@ -314,7 +345,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         Params memory params = Params({
             root: rootNetwork,
             subnet: tokenL2Subnet,
-            subnetL3: nativeL3SubnetsWithTokenParent[0],
+            subnetL3: tokenL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
             recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
@@ -326,135 +357,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         });
 
         sendCrossMessageFromParentToChildWithResult(params);
-    }
-
-    function testL2PlusSubnet_ParentToChildTopDownNoncePropagatedCorrectly() public {
-        MockIpcContractResult caller = new MockIpcContractResult();
-        Params memory params = Params({
-            root: rootNetwork,
-            subnet: nativeL2Subnet,
-            subnetL3: nativeL3Subnets[0],
-            caller: caller,
-            callerAddr: address(caller),
-            recipientAddr: address(new MockIpcContractPayable()),
-            amount: 3,
-            expectedOutcome: OutcomeType.Ok,
-            expectedRet: abi.encode(EMPTY_BYTES),
-            callerAmount: 1 ether,
-            fundAmount: 100000
-        });
-
-        // register L2 into root network
-        registerSubnet(params.subnet.subnetActorAddr, params.root.gateway);
-        // register L3 into L2 subnet
-        registerSubnet(params.subnetL3.subnetActorAddr, params.subnet.gateway);
-
-        vm.deal(params.callerAddr, params.callerAmount);
-
-        IpcEnvelope memory fundCrossMessage = CrossMsgHelper.createFundMsg({
-            subnet: params.subnet.id,
-            signer: params.callerAddr,
-            to: FvmAddressHelper.from(params.callerAddr),
-            value: params.amount
-        });
-
-        // 0 is default but we set it explicitly here to make it clear
-        fundCrossMessage.localNonce = 0;
-
-        vm.prank(params.callerAddr);
-        vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({
-            subnet: params.subnet.subnetActorAddr,
-            message: fundCrossMessage,
-            id: fundCrossMessage.toTracingId()
-        });
-
-        params.root.gateway.manager().fund{value: params.amount}(
-            params.subnet.id,
-            FvmAddressHelper.from(params.callerAddr)
-        );
-
-        IpcEnvelope memory callCrossMessage = TestUtils.newXnetCallMsg(
-            IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
-            IPCAddress({subnetId: params.subnetL3.id, rawAddress: FvmAddressHelper.from(params.recipientAddr)}),
-            params.amount,
-            1
-        );
-
-        // send the cross message from the root network to the L3 subnet
-        vm.prank(params.callerAddr);
-        vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({
-            subnet: params.subnet.subnetActorAddr,
-            message: callCrossMessage,
-            id: callCrossMessage.toTracingId()
-        });
-
-        params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(callCrossMessage);
-        (, uint64 rootTopDownNonce) = params.root.gateway.getter().getTopDownNonce(params.subnet.id);
-        assertEq(rootTopDownNonce, 2, "wrong root top down nonce");
-
-        IpcEnvelope[] memory msgsForL2 = new IpcEnvelope[](2);
-        msgsForL2[0] = fundCrossMessage;
-        msgsForL2[1] = callCrossMessage;
-
-        // the expected nonce for the top down message for L3 subnet is 0 because no previous message was sent
-        // from L2 to L3
-        msgsForL2[1].localNonce = 0;
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        vm.expectEmit(true, true, true, true, params.subnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({
-            subnet: params.subnetL3.subnetActorAddr,
-            message: callCrossMessage,
-            id: callCrossMessage.toTracingId()
-        });
-
-        // nonce needs to be 1 because of the fund message.
-        msgsForL2[1].localNonce = 1;
-        params.subnet.gateway.xnetMessenger().applyCrossMessages(msgsForL2);
-
-        uint64 subnetAppliedTopDownNonce = params.subnet.gateway.getter().appliedTopDownNonce();
-        assertEq(subnetAppliedTopDownNonce, 2, "wrong L2 subnet applied top down nonce");
-
-        IpcEnvelope[] memory msgsForL3 = new IpcEnvelope[](1);
-        msgsForL3[0] = callCrossMessage;
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        // nonce is zero because this is a first message touching the L3 subnet
-        msgsForL3[0].localNonce = 0;
-        params.subnetL3.gateway.xnetMessenger().applyCrossMessages(msgsForL3);
-
-        uint64 subnetL3AppliedTopDownNonce = params.subnetL3.gateway.getter().appliedTopDownNonce();
-        assertEq(subnetL3AppliedTopDownNonce, 1, "wrong L3 subnet applied top down nonce");
-
-        // now fund from L2 to L3 to check to nonce propagation
-        vm.deal(params.callerAddr, params.callerAmount);
-
-        IpcEnvelope memory fundCrossMessageL3 = CrossMsgHelper.createFundMsg({
-            subnet: params.subnetL3.id,
-            signer: params.callerAddr,
-            to: FvmAddressHelper.from(params.callerAddr),
-            value: params.amount
-        });
-
-        // nonce should be 1 because this is the first cross message from L1 to L3
-        fundCrossMessageL3.localNonce = 1;
-
-        vm.prank(params.callerAddr);
-        vm.expectEmit(true, true, true, true, params.subnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({
-            subnet: params.subnetL3.subnetActorAddr,
-            message: fundCrossMessageL3,
-            id: fundCrossMessageL3.toTracingId()
-        });
-
-        params.subnet.gateway.manager().fund{value: params.amount}(
-            params.subnetL3.id,
-            FvmAddressHelper.from(params.callerAddr)
-        );
-
-        uint64 subnetL3AppliedTopDownNonceAfterFund = params.subnetL3.gateway.getter().appliedTopDownNonce();
-        assertEq(subnetL3AppliedTopDownNonceAfterFund, 1, "wrong L3 subnet applied top down nonce");
     }
 
     function fundSubnet(
@@ -494,7 +396,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // create the xnet message on the subnet L3 - it's local gateway
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: params.subnetL3.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
-            IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.recipientAddr)}),
+            IPCAddress({subnetId: params.subnet.id, rawAddress: FvmAddressHelper.from(params.recipientAddr)}),
             params.amount,
             0
         );
@@ -509,36 +411,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         _msgs[0] = crossMessage;
         execBottomUpMsgBatch(_checkpoint, _msgs, params.subnetL3.subnetActor);
 
-        // create checkpoint in L2 and submit it to the root network (L2 subnet actor)
-        vm.recordLogs();
-        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory l2_batch) = XnetUtil
-            .callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway);
-
         // expected result top down message from root to L2. This is a response to the xnet call.
-        IpcEnvelope memory resultMessage = crossMessage.createResultMsg(params.expectedOutcome, params.expectedRet);
-        resultMessage.localNonce = 1;
-
-        submitBottomUpCheckpointAndExpectTopDownMessageEvent(
-            checkpoint,
-            l2_batch,
-            params.subnet.subnetActor,
-            resultMessage,
-            params.subnet.subnetActorAddr,
-            params.root.gatewayAddr
-        );
-
-        // apply the result message in the L2 subnet and expect another top down message to be emitted
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        msgs[0] = cloneIpcEnvelopeWithDifferentNonce(resultMessage, 0);
-
-        commitParentFinality(params.subnet.gatewayAddr);
-        executeTopDownMsgsAndExpectTopDownMessageEvent(
-            msgs,
-            params.subnet.gateway,
-            resultMessage,
-            params.subnetL3.subnetActorAddr,
-            params.subnet.gatewayAddr
-        );
+        msgs[0] = crossMessage.createResultMsg(params.expectedOutcome, params.expectedRet);
 
         // apply the result and check it was propagated to the correct actor
         commitParentFinality(params.subnetL3.gatewayAddr);
@@ -559,9 +434,10 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         vm.prank(params.callerAddr);
 
         fundSubnet(params.root.gateway, params.subnet, params.callerAddr, params.fundAmount);
+        fundSubnet(params.subnet.gateway, params.subnetL3, params.callerAddr, params.fundAmount);
 
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
-            IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
+            IPCAddress({subnetId: params.subnet.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
             IPCAddress({subnetId: params.subnetL3.id, rawAddress: FvmAddressHelper.from(params.recipientAddr)}),
             params.amount,
             0
@@ -574,37 +450,29 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             IERC20(subnetSupply.tokenAddress).transfer(params.callerAddr, params.amount);
             // increase allowance so that send xnet msg will make it
             vm.prank(params.callerAddr);
-            IERC20(subnetSupply.tokenAddress).approve(address(params.root.gatewayAddr), params.amount);
+            IERC20(subnetSupply.tokenAddress).approve(address(params.subnet.gatewayAddr), params.amount);
+        }
+        Asset memory subnetL3Supply = params.subnetL3.subnetActor.getter().supplySource();
+        if (subnetL3Supply.kind == AssetKind.ERC20) {
+            // increase callerAddr's L3 token balance
+            IERC20(subnetL3Supply.tokenAddress).transfer(params.callerAddr, params.amount);
+            // L2 gateway needs to lock L3's tokens, so approve L2 gateway for L3's token
+            vm.prank(params.callerAddr);
+            IERC20(subnetL3Supply.tokenAddress).approve(address(params.subnet.gatewayAddr), params.amount);
         }
 
-        crossMessage.localNonce = 1;
-        // send the cross message from the root network to the L3 subnet
+        // send the cross message from the L2 subnet to the L3 subnet
         vm.prank(params.callerAddr);
-        vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({
-            subnet: params.subnet.subnetActorAddr,
-            message: crossMessage,
-            id: crossMessage.toTracingId()
-        });
 
-        crossMessage.localNonce = 0;
         if (subnetSupply.kind == AssetKind.ERC20) {
-            params.root.gateway.messenger().sendContractXnetMessage(crossMessage);
+            params.subnet.gateway.messenger().sendContractXnetMessage(crossMessage);
         } else {
-            params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
+            params.subnet.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
         }
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMessage;
 
-        // propagate the message from the L2 to the L3 subnet
-        executeTopDownMsgsAndExpectTopDownMessageEvent(
-            msgs,
-            params.subnet.gateway,
-            crossMessage,
-            params.subnetL3.subnetActorAddr,
-            params.subnet.gatewayAddr
-        );
         // apply the cross message in the L3 subnet
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
         // submit checkoint so the result message can be propagated to L2
@@ -613,13 +481,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             .callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway);
         submitBottomUpCheckpoint(l3_checkpoint, params.subnetL3.subnetActor);
         execBottomUpMsgBatch(l3_checkpoint, l3_batch, params.subnetL3.subnetActor);
-
-        // submit checkoint so the result message can be propagated to root network
-        vm.recordLogs();
-        (BottomUpCheckpoint memory l2_checkpoint, IpcEnvelope[] memory l2_batch) = XnetUtil
-            .callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway);
-        submitBottomUpCheckpoint(l2_checkpoint, params.subnet.subnetActor);
-        execBottomUpMsgBatch(l2_checkpoint, l2_batch, params.subnet.subnetActor);
 
         assertTrue(params.caller.hasResult(), "missing result");
         assertTrue(params.caller.result().outcome == params.expectedOutcome, "wrong result outcome");
@@ -659,58 +520,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             0
         );
 
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.NonDirect));
         vm.prank(callerAddr);
         subnetL3s[0].gateway.messenger().sendContractXnetMessage{value: amount}(crossMessage);
-
-        // submit the checkpoint from L3-0 to L2
-        vm.recordLogs();
-        (BottomUpCheckpoint memory checkpoint, ) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            subnetL3s[0].id,
-            subnetL3s[0].gateway
-        );
-
-        // submit the checkpoint in L2 produces top down message to L3-1
-        submitBottomUpCheckpointAndExpectTopDownMessageEvent(
-            checkpoint,
-            getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs()),
-            subnetL3s[0].subnetActor,
-            crossMessage,
-            subnetL3s[1].subnetActorAddr,
-            subnet.gatewayAddr
-        );
-
-        // mimics the execution of the top down messages in the L3-1 subnet
-        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        msgs[0] = crossMessage;
-
-        executeTopDownMsgs(msgs, subnetL3s[1].gateway);
-
-        // submit the checkpoint from L3-1 to L2 for result propagation
-        vm.recordLogs();
-        (checkpoint, ) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(subnetL3s[1].id, subnetL3s[1].gateway);
-
-        // expected result top down message from L2 to L3. This is a response to the xnet call.
-        IpcEnvelope memory resultMessage = crossMessage.createResultMsg(OutcomeType.Ok, abi.encode(EMPTY_BYTES));
-        resultMessage.localNonce = 1;
-
-        // submit the checkpoint in L2 produces top down message to L3-1
-        submitBottomUpCheckpointAndExpectTopDownMessageEvent(
-            checkpoint,
-            getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs()),
-            subnetL3s[1].subnetActor,
-            resultMessage,
-            subnetL3s[0].subnetActorAddr,
-            subnet.gatewayAddr
-        );
-
-        // apply the result message in the L3-1 subnet
-        resultMessage.localNonce = 0;
-        IpcEnvelope[] memory resultMsgs = new IpcEnvelope[](1);
-        resultMsgs[0] = resultMessage;
-
-        executeTopDownMsgs(resultMsgs, subnetL3s[0].gateway);
-        assertTrue(caller.hasResult(), "missing result");
-        assertTrue(caller.result().outcome == OutcomeType.Ok, "wrong result outcome");
     }
 
     function commitParentFinality(address gateway) internal {

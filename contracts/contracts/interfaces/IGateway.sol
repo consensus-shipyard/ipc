@@ -62,9 +62,6 @@ interface IGateway {
         IpcEnvelope calldata envelope
     ) external payable returns (IpcEnvelope memory committed);
 
-    /// @notice Propagates all the stored messages to destination subnet
-    function propagateAll() external payable;
-
     /// @notice commit the ipc parent finality into storage
     function commitParentFinality(ParentFinality calldata finality) external;
 }

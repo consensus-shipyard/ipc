@@ -56,7 +56,6 @@ error OldConfigurationNumber();
 error PQDoesNotContainAddress();
 error PQEmpty();
 error ParentFinalityAlreadyCommitted();
-error PostboxNotExist();
 error SignatureReplay();
 error SubnetAlreadyKilled();
 error SubnetNotActive();
@@ -91,7 +90,8 @@ enum InvalidXnetMessageReason {
     Kind,
     ReflexiveSend,
     NoRoute,
-    IncompatibleSupplySource
+    IncompatibleSupplySource,
+    NonDirect
 }
 
 string constant ERR_PERMISSIONED_AND_BOOTSTRAPPED = "Method not allowed if permissioned is enabled and subnet bootstrapped";

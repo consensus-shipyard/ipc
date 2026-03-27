@@ -35,10 +35,6 @@ library LibGateway {
     event QueuedBottomUpMessage(bytes32 indexed id);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
     event NewBottomUpMsgBatch(uint256 indexed epoch);
-    /// @dev event emmitted when a message is stored in the postbox - to be propagated further.
-    event MessageStoredInPostbox(bytes32 indexed id);
-    /// @dev event emmitted when a message is propagated further from the postbox.
-    event MessagePropagatedFromPostbox(bytes32 id);
 
     /// @notice returns the bottom-up batch
     function getBottomUpMsgBatch(uint256 epoch) internal view returns (bool exists, BottomUpMsgBatch storage batch) {
@@ -287,7 +283,7 @@ library LibGateway {
         }
     }
 
-    /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
+    /// @notice executes a cross message, assuming its destination is the current network.
     /// This function assumes that the relevant funds have been already minted or burnt
     /// when the top-down or bottom-up messages have been queued for execution.
     /// This function is not expected to revert. If a controlled failure happens, a new
@@ -354,28 +350,8 @@ library LibGateway {
             supplySource = AssetHelper.native();
         }
 
-        // If the crossnet destination is NOT the current network (network where the gateway is running),
-        // we add it to the postbox for further propagation.
-        // Even if we send for propagation, the execution of every message
-        // should increase the appliedNonce to allow the execution of the next message
-        // of the batch (this is way we have this after the nonce logic).
         if (!crossMsg.to.subnetId.equals(s.networkName)) {
-            (bool valid, InvalidXnetMessageReason reason) = validateCrossMessage(crossMsg);
-            if (!valid) {
-                sendReceipt(
-                    crossMsg,
-                    OutcomeType.SystemErr,
-                    abi.encodeWithSelector(InvalidXnetMessage.selector, reason)
-                );
-                return;
-            }
-
-            bytes32 cid = crossMsg.toHash();
-            s.postboxKeys.add(cid);
-            s.postbox[cid] = crossMsg;
-
-            emit MessageStoredInPostbox({id: crossMsg.toTracingId()});
-            return;
+            revert("Only direct messaging supported");
         }
 
         // execute the message and get the receipt.
@@ -439,11 +415,8 @@ library LibGateway {
 
         SubnetID memory to = crossMessage.to.subnetId;
         IPCMsgType applyType = crossMessage.applyType(s.networkName);
-        bool isLCA = to.commonParent(crossMessage.from.subnetId).equals(s.networkName);
 
-        // If the directionality is top-down, or if we're inverting the direction
-        // because we're the LCA, commit a top-down message.
-        if (applyType == IPCMsgType.TopDown || isLCA) {
+        if (applyType == IPCMsgType.TopDown) {
             (, SubnetID memory subnetId) = to.down(s.networkName);
             (, Subnet storage subnet) = getSubnet(subnetId);
             LibGateway.commitTopDownMsg(subnet, crossMessage);
@@ -470,52 +443,6 @@ library LibGateway {
         }
     }
 
-    /// Checks if the incoming and outgoing subnet supply sources can be mapped.
-    /// Caller should make sure the incoming/outgoing subnets and current subnet are immediate parent/child subnets.
-    function checkSubnetsSupplyCompatible(
-        bool isLCA,
-        IPCMsgType applyType,
-        SubnetID memory incoming,
-        SubnetID memory outgoing,
-        SubnetID memory current
-    ) internal view returns(bool) {
-        if (isLCA) {
-            // now, it's pivoting @ LCA (i.e. upwards => downwards)
-            // if incoming bottom up subnet and outgoing target subnet have the same 
-            // asset, we will allow it. This is because if they are using the 
-            // same asset, then the asset can be mapped in both subnets.
-            
-            (, SubnetID memory incDown) = incoming.down(current);
-            (, SubnetID memory outDown) = outgoing.down(current);
-
-            Asset memory incAsset = ISubnetActor(incDown.getActor()).supplySource();
-            Asset memory outAsset = ISubnetActor(outDown.getActor()).supplySource();
-
-            return incAsset.equals(outAsset);
-        }
-        
-        if (applyType == IPCMsgType.BottomUp) {
-            // The child subnet has supply source native, this is the same as 
-            // the current subnet's native source, the mapping makes sense, propagate up.
-            (, SubnetID memory incDown) = incoming.down(current);
-            return incDown.getActor().hasSupplyOfKind(AssetKind.Native);
-        }
-        
-        // Topdown handling
-
-        // The incoming subnet's supply source will be mapped to native coin in the 
-        // next child subnet. If the down subnet has native, then the mapping makes 
-        // sense.
-        (, SubnetID memory down) = outgoing.down(current);
-        return down.getActor().hasSupplyOfKind(AssetKind.Native);
-    }
-
-    /// @notice Validates a cross message before committing it.
-    function validateCrossMessage(IpcEnvelope memory envelope) internal view returns (bool, InvalidXnetMessageReason) {
-        (bool valid, InvalidXnetMessageReason reason, ) = checkCrossMessage(envelope);
-        return (valid, reason);
-    }
-
     /// @notice Validates a cross message and returns the applyType if the message is valid
     function checkCrossMessage(IpcEnvelope memory envelope) internal view returns (bool valid, InvalidXnetMessageReason reason, IPCMsgType applyType) {
         SubnetID memory toSubnetId = envelope.to.subnetId;
@@ -525,101 +452,22 @@ library LibGateway {
 
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         SubnetID memory currentNetwork = s.networkName;
+        applyType = envelope.applyType(currentNetwork);
 
         // We cannot send a cross message to the same subnet.
         if (toSubnetId.equals(currentNetwork)) {
             return (false, InvalidXnetMessageReason.ReflexiveSend, applyType);
         }
 
-        // Lowest common ancestor subnet
-        bool isLCA = toSubnetId.commonParent(envelope.from.subnetId).equals(currentNetwork);
-        applyType = envelope.applyType(currentNetwork);
+        // Allow only direct parent-child relationships, by checking route length difference.
+        bool isDirect = (applyType == IPCMsgType.TopDown)
+            ? toSubnetId.route.length == envelope.from.subnetId.route.length + 1
+            : envelope.from.subnetId.route.length == toSubnetId.route.length + 1;
 
-        // If the directionality is top-down, or if we're inverting the direction
-        // else we need to check if the common parent exists.
-        if (applyType == IPCMsgType.TopDown || isLCA) {
-            (bool foundChildSubnetId, SubnetID memory childSubnetId) = toSubnetId.down(currentNetwork);
-            if (!foundChildSubnetId) {
-                return (false, InvalidXnetMessageReason.DstSubnet, applyType);
-            }
-
-            (bool foundSubnet,) = LibGateway.getSubnet(childSubnetId);
-            if (!foundSubnet) {
-                return (false, InvalidXnetMessageReason.DstSubnet, applyType);
-            }
-        } else {
-            SubnetID memory commonParent = toSubnetId.commonParent(currentNetwork);
-            if (commonParent.isEmpty()) {
-                return (false, InvalidXnetMessageReason.NoRoute, applyType);
-            }
-        }
-
-        // starting/ending subnet, no need check supply sources
-        if (envelope.from.subnetId.equals(currentNetwork) || envelope.to.subnetId.equals(currentNetwork)) {
-            return (true, reason, applyType);
-        }
-
-        bool supplySourcesCompatible = checkSubnetsSupplyCompatible({
-            isLCA: isLCA,
-            applyType: applyType, 
-            incoming: envelope.from.subnetId,
-            outgoing: envelope.to.subnetId,
-            current: currentNetwork
-        });
-
-        if (!supplySourcesCompatible) {
-            return (false, InvalidXnetMessageReason.IncompatibleSupplySource, applyType);
+        if (!isDirect) {
+            return (false, InvalidXnetMessageReason.NonDirect, applyType);
         }
 
         return (true, reason, applyType);
     }
-    
-     /**
-     * @dev Propagates all the populated cross-net messages from the postbox.
-     */
-    function propagateAllPostboxMessages() internal {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-
-        uint256 keysLength = s.postboxKeys.length();
-
-        bytes32[] memory values = s.postboxKeys.values();
-
-        for (uint256 i = 0; i < keysLength; ) {
-            bytes32 msgCid = values[i];
-            LibGateway.propagatePostboxMessage(msgCid);
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-     /**
-     * @dev Propagates the populated cross-net message for the given `msgCid`.
-     * @param msgCid - the cid of the cross-net message
-     */
-    function propagatePostboxMessage(bytes32 msgCid) internal {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        IpcEnvelope storage crossMsg = s.postbox[msgCid];
-
-        if (crossMsg.isEmpty()) {
-            revert("Message not found in postbox");
-        }
-
-        bool shouldBurn = LibGateway.commitValidatedCrossMessage(crossMsg);
-
-        // Cache value before deletion to avoid re-entrancy
-        uint256 v = crossMsg.value;
-        bytes32 deterministicId = crossMsg.toTracingId();
-
-        // Remove the message to prevent re-entrancy and clean up state
-        delete s.postbox[msgCid];
-        s.postboxKeys.remove(msgCid);
-
-        // Execute side effects
-        LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
-
-        emit MessagePropagatedFromPostbox({id: deterministicId});
-    }
-
 }

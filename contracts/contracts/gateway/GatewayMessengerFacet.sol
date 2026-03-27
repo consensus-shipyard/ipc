@@ -85,11 +85,4 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         // which passes the struct by reference.
         return committed;
     }
-
-    /**
-     * @dev Propagates all the populated cross-net messages from the postbox.
-     */
-    function propagateAll() external payable {
-        LibGateway.propagateAllPostboxMessages();
-    }
 }
