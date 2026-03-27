@@ -4,11 +4,13 @@
 //! Remove command for deleting objects from storage
 
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use clap::Args;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
 use fendermint_rpc::client::FendermintClient;
+use fvm_shared::chainid::ChainID;
 
 use crate::commands::storage::{bucket, config::StorageConfig, path};
 use crate::{CommandLineHandler, GlobalArguments};
@@ -34,6 +36,7 @@ pub struct RemoveArgs {
 
 pub struct RemoveStorage;
 
+#[async_trait]
 impl CommandLineHandler for RemoveStorage {
     type Arguments = RemoveArgs;
 
@@ -96,14 +99,9 @@ async fn delete_file(storage_path: &path::StoragePath, args: &RemoveArgs) -> Res
         &config.secret_key_file
     )?;
 
-    let chain_id = fvm_shared::chainid::ChainID::from(0); // TODO: Get from chain
-    let bound_client = fendermint_rpc::tx::BoundClientBuilder::new(fm_client)
-        .secret_key(secret_key)
-        .chain_id(chain_id)
-        .build()
-        .await?;
-
-    let mut bound_client = bound_client;
+    let message_factory =
+        fendermint_rpc::message::SignedMessageFactory::new_secp256k1(secret_key, 0, ChainID::from(0));
+    let mut bound_client = fm_client.bind(message_factory);
 
     // Delete object
     println!("Deleting {}...", storage_path.key);
@@ -185,14 +183,9 @@ async fn delete_recursive(storage_path: &path::StoragePath, args: &RemoveArgs) -
             &config.secret_key_file
         )?;
 
-        let chain_id = fvm_shared::chainid::ChainID::from(0);
-        let bound_client = fendermint_rpc::tx::BoundClientBuilder::new(fm_client.clone())
-            .secret_key(secret_key)
-            .chain_id(chain_id)
-            .build()
-            .await?;
-
-        let mut bound_client = bound_client;
+        let message_factory =
+            fendermint_rpc::message::SignedMessageFactory::new_secp256k1(secret_key, 0, ChainID::from(0));
+        let mut bound_client = fm_client.clone().bind(message_factory);
 
         for (key, _) in &list_result.objects {
             let key_str = String::from_utf8_lossy(key).to_string();

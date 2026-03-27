@@ -9,6 +9,7 @@
 //! - ipc:// -> ipc:// : Copy between buckets
 
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use clap::Args;
 use fs_err as fs;
 use std::collections::HashMap;
@@ -16,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use fendermint_actor_blobs_shared::bytes::B256;
 use fendermint_rpc::client::FendermintClient;
-use iroh_blobs::Hash;
+use fvm_shared::chainid::ChainID;
 
 use crate::commands::storage::{bucket, client::GatewayClient, config::StorageConfig, path};
 use crate::{CommandLineHandler, GlobalArguments};
@@ -50,6 +51,7 @@ pub struct CopyArgs {
 
 pub struct CopyStorage;
 
+#[async_trait]
 impl CommandLineHandler for CopyStorage {
     type Arguments = CopyArgs;
 
@@ -180,14 +182,9 @@ async fn upload_file(
         &config.secret_key_file
     )?;
 
-    let chain_id = fvm_shared::chainid::ChainID::from(0); // TODO: Get from chain
-    let bound_client = fendermint_rpc::tx::BoundClientBuilder::new(fm_client)
-        .secret_key(secret_key)
-        .chain_id(chain_id)
-        .build()
-        .await?;
-
-    let mut bound_client = bound_client;
+    let message_factory =
+        fendermint_rpc::message::SignedMessageFactory::new_secp256k1(secret_key, 0, ChainID::from(0));
+    let mut bound_client = fm_client.bind(message_factory);
 
     // Add object to bucket
     bucket::add_object(
@@ -323,8 +320,8 @@ async fn download_file(
 /// Download a directory recursively (list objects with prefix)
 async fn download_directory(
     storage_base: &path::StoragePath,
-    local_dir: &Path,
-    args: &CopyArgs,
+    _local_dir: &Path,
+    _args: &CopyArgs,
 ) -> Result<()> {
     println!("Downloading directory {} recursively...", storage_base.to_uri());
 

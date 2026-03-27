@@ -4,11 +4,13 @@
 //! Move/rename command for storage objects
 
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use clap::Args;
 use std::path::PathBuf;
 
 use fendermint_actor_blobs_shared::bytes::B256;
 use fendermint_rpc::client::FendermintClient;
+use fvm_shared::chainid::ChainID;
 
 use crate::commands::storage::{bucket, config::StorageConfig, path};
 use crate::{CommandLineHandler, GlobalArguments};
@@ -30,6 +32,7 @@ pub struct MoveArgs {
 
 pub struct MoveStorage;
 
+#[async_trait]
 impl CommandLineHandler for MoveStorage {
     type Arguments = MoveArgs;
 
@@ -83,14 +86,12 @@ impl CommandLineHandler for MoveStorage {
             &config.secret_key_file
         )?;
 
-        let chain_id = fvm_shared::chainid::ChainID::from(0); // TODO: Get from chain
-        let bound_client = fendermint_rpc::tx::BoundClientBuilder::new(fm_client)
-            .secret_key(secret_key)
-            .chain_id(chain_id)
-            .build()
-            .await?;
-
-        let mut bound_client = bound_client;
+        let message_factory = fendermint_rpc::message::SignedMessageFactory::new_secp256k1(
+            secret_key,
+            0,
+            ChainID::from(0),
+        );
+        let mut bound_client = fm_client.bind(message_factory);
 
         // If moving within the same bucket, we can reuse the blob hash
         if source_path.bucket_address == dest_path.bucket_address {

@@ -15,6 +15,7 @@ use fendermint_rpc::{message::GasParams, tx::{BoundClient, TxClient, TxCommit}, 
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use num_traits::Zero;
 use std::collections::HashMap;
 
 /// Default gas parameters for bucket transactions

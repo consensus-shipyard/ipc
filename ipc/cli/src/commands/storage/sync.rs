@@ -4,6 +4,7 @@
 //! Sync command for synchronizing directories with storage
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use clap::Args;
 use std::path::PathBuf;
 
@@ -39,6 +40,7 @@ pub struct SyncArgs {
 
 pub struct SyncStorage;
 
+#[async_trait]
 impl CommandLineHandler for SyncStorage {
     type Arguments = SyncArgs;
 

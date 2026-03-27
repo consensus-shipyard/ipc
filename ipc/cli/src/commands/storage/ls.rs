@@ -4,6 +4,7 @@
 //! List command for storage operations
 
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use clap::Args;
 use std::path::PathBuf;
 
@@ -42,6 +43,7 @@ pub struct ListArgs {
 
 pub struct ListStorage;
 
+#[async_trait]
 impl CommandLineHandler for ListStorage {
     type Arguments = ListArgs;
 
@@ -133,7 +135,7 @@ fn print_json(
 
 fn print_table(
     result: &fendermint_actor_bucket::ListObjectsReturn,
-    prefix: &Option<String>,
+    _prefix: &Option<String>,
     long: bool,
 ) -> Result<()> {
     if result.objects.is_empty() && result.common_prefixes.is_empty() {

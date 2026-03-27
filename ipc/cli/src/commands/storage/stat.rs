@@ -4,6 +4,7 @@
 //! Stat command for displaying object metadata from storage
 
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use clap::Args;
 use std::path::PathBuf;
 
@@ -30,6 +31,7 @@ pub struct StatArgs {
 
 pub struct StatStorage;
 
+#[async_trait]
 impl CommandLineHandler for StatStorage {
     type Arguments = StatArgs;
 

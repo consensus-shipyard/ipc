@@ -2161,19 +2161,43 @@ build_ipc_locally() {
     local binary_dir=""
     local cargo_build_cmd="cargo build --release"
     local os_name
+    local wasm_env_prefix=""
     os_name=$(uname -s)
 
     if [ "$os_name" = "Darwin" ]; then
+        # On macOS, use Homebrew LLVM for wasm C compilation (blst in actors build).
+        # Apple clang often cannot target wasm32-unknown-unknown in this pipeline.
+        local llvm_clang=""
+        local llvm_ar=""
+        if [ -x "/opt/homebrew/opt/llvm/bin/clang" ] && [ -x "/opt/homebrew/opt/llvm/bin/llvm-ar" ]; then
+            llvm_clang="/opt/homebrew/opt/llvm/bin/clang"
+            llvm_ar="/opt/homebrew/opt/llvm/bin/llvm-ar"
+        elif command -v brew &>/dev/null; then
+            local llvm_prefix
+            llvm_prefix=$(brew --prefix llvm 2>/dev/null || true)
+            if [ -n "$llvm_prefix" ] && [ -x "$llvm_prefix/bin/clang" ] && [ -x "$llvm_prefix/bin/llvm-ar" ]; then
+                llvm_clang="$llvm_prefix/bin/clang"
+                llvm_ar="$llvm_prefix/bin/llvm-ar"
+            fi
+        fi
+        if [ -n "$llvm_clang" ] && [ -n "$llvm_ar" ]; then
+            wasm_env_prefix="CC_wasm32_unknown_unknown=$llvm_clang AR_wasm32_unknown_unknown=$llvm_ar "
+            log_info "Using LLVM wasm toolchain for local build: $llvm_clang"
+        else
+            log_warn "LLVM wasm toolchain not found; local storage-enabled builds may fail on macOS"
+            log_warn "Install with: brew install llvm"
+        fi
+
         # Cross-compile for Linux (validators are typically x86_64 Linux)
         target_triple="x86_64-unknown-linux-gnu"
         binary_dir="$local_repo/target/$target_triple/release"
-        cargo_build_cmd="cargo zigbuild --release --target $target_triple"
+        cargo_build_cmd="${wasm_env_prefix}cargo zigbuild --release --target $target_triple"
 
         # Prefer cargo-zigbuild (no Docker needed); fall back to cross
         if command -v cargo-zigbuild &>/dev/null && command -v zig &>/dev/null; then
             log_info "Cross-compiling for $target_triple using cargo-zigbuild (macOS -> Linux)..."
             rustup target add "$target_triple" 2>/dev/null || true
-            if ! (cd "$local_repo" && cargo zigbuild --release --target "$target_triple" 2>&1); then
+            if ! (cd "$local_repo" && eval "${wasm_env_prefix}cargo zigbuild --release --target \"$target_triple\"" 2>&1); then
                 log_error "cargo-zigbuild failed"
                 return 1
             fi

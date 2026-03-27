@@ -4,6 +4,7 @@
 //! Cat command for displaying file contents from storage
 
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use clap::Args;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -28,6 +29,7 @@ pub struct CatArgs {
 
 pub struct CatStorage;
 
+#[async_trait]
 impl CommandLineHandler for CatStorage {
     type Arguments = CatArgs;
 
