@@ -1,0 +1,48 @@
+# Makefile.bridge — IPC Cross-Chain Bridge targets
+# Include in the root Makefile with: include Makefile.bridge
+#
+# Usage:
+#   make deploy-all      — deploy all bridge contracts to testnets
+#   make smoke-test      — run end-to-end smoke test
+#   make bridge-clean    — remove generated deployment artifacts
+#   make bridge-help     — show this help
+
+BRIDGE_SCRIPTS := scripts/bridge
+BRIDGE_ENV     := .env
+
+.PHONY: deploy-all smoke-test bridge-clean bridge-help
+
+## deploy-all: Deploy BridgeLock (Calibration) + BridgeMint (Sepolia) and wire them together.
+deploy-all: $(BRIDGE_ENV)
+	@bash $(BRIDGE_SCRIPTS)/deploy-all.sh
+
+## smoke-test: Run end-to-end smoke test (requires deploy-all to have run first).
+smoke-test: $(BRIDGE_ENV) contracts/deployments/deployments.json
+	@bash $(BRIDGE_SCRIPTS)/smoke-test.sh
+
+## bridge-status: Print current deployment addresses.
+bridge-status:
+	@if [ -f contracts/deployments/deployments.json ]; then \
+	  echo "=== Bridge Deployment Status ==="; \
+	  cat contracts/deployments/deployments.json | python3 -m json.tool; \
+	else \
+	  echo "No deployments.json found. Run 'make deploy-all' first."; \
+	fi
+
+## bridge-clean: Remove deployment artifacts (does NOT affect on-chain contracts).
+bridge-clean:
+	rm -f contracts/deployments/deployments.json
+	rm -f contracts/deployments/bridge-lock-*.json
+	rm -f contracts/deployments/bridge-mint-*.json
+	rm -f contracts/deployments/test-token-*.json
+
+## bridge-help: Show bridge Makefile targets.
+bridge-help:
+	@echo "IPC Bridge Makefile targets:"
+	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## /  make /'
+
+$(BRIDGE_ENV):
+	@echo "ERROR: .env not found. Run: cp .env.example .env && vim .env" && exit 1
+
+contracts/deployments/deployments.json:
+	@echo "ERROR: No deployment found. Run 'make deploy-all' first." && exit 1

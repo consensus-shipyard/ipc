@@ -41,6 +41,7 @@ members = [
   "fendermint/actors-builtin-car",
   "fendermint/actors/api",
   "fendermint/actors/chainmetadata",
+  "fendermint/actors/bridge-relay",
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
   "fendermint/actors/init",
