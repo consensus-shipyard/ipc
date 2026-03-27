@@ -16,7 +16,7 @@
     ],
     "scripts": {
         "prepack": "sh -c 'cp ../LICENSE-* .'",
-        "preinstall": "git submodule update --init --recursive",
+        "preinstall": "git submodule update --init --recursive || true",
         "postpack": "sh -c 'rm -f LICENSE-*'"
     },
     "repository": {

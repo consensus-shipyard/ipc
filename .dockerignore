@@ -1,3 +1,35 @@
-target
-contracts/cache
-contracts/node-modules
+# Rust build artifacts
+target/
+*/target/
+
+# Node.js dependencies
+node_modules/
+*/node_modules/
+contracts/node_modules/
+ipc-ui/frontend/node_modules/
+demos/*/node_modules/
+
+# Contract build artifacts
+contracts/cache/
+# contracts/out/  # Needed by Docker build
+# contracts/lib/  # Needed by Forge for remappings
+contracts/broadcast/
+
+# Git directory
+.git/
+
+# Build directories
+build/
+*/build/
+
+# Cache directories
+.cache/
+*/cache/
+
+# Temporary files
+*.tmp
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
