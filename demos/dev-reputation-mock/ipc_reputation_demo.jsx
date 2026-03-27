@@ -336,8 +336,6 @@ function Pipeline({ next }) {
 
   // Derive which layer is currently active and which are completed
   const curLayer = step >= 0 && step < STEPS.length ? STEPS[step].layer : -1;
-  const completedLayers = new Set();
-  STEPS.forEach((s, i) => { if (done.has(i)) completedLayers.add(s.layer); });
   // A layer is only "completed" if ALL its steps are done
   const layerComplete = new Set();
   [0,1,2].forEach(lid => {
@@ -369,7 +367,7 @@ function Pipeline({ next }) {
 
   const curS  = step >= 0 && step < STEPS.length ? STEPS[step] : null;
   const curPR = curS && curS.pr !== undefined ? DEV.prs[curS.pr] : null;
-  const activeLayer = running || allDone ? curLayer : -1;
+  const activeLayer = running ? curLayer : -1;
 
   return (
     <div>
