@@ -4,7 +4,20 @@ description: Test networks are available for deployment of IPC subnets.
 
 # Networks
 
-### Filecoin Calibration Network
+## IPC Chain Testnet
+
+The IPC Chain Testnet (also known as "IPC Cal") is a public testnet specifically designed for testing IPC features and subnet deployments. This network provides a dedicated environment for developers to experiment with IPC functionality.
+
+The params to connect to IPC Chain Testnet are:
+
+* **Network Name**: IPC Cal
+* **RPC URL**: `http://node-1.test.ipc.space:8545`
+* **Chain ID**: `385401`
+* **Currency Symbol**: `tFIL`
+
+For a step-by-step guide on connecting to this network with MetaMask, see [Connecting to IPC Chain Testnet](../user-guides/connect-to-testnet.md).
+
+## Filecoin Calibration Network
 
 The [Filecoin Calibration network](https://docs.filecoin.io/networks/calibration) is the most realistic testnet simulation of the Filecoin mainnet. As the largest decentralized storage network, applications that require data storage and retrieval can leverage Filecoin's storage capabilities by connecting an IPC subnet to the Calibration net as the parent network.
 
