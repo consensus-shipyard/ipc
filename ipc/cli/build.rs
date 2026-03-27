@@ -30,41 +30,41 @@ struct Asset {
 
 const OWNER: &str = "cometbft";
 const REPO: &str = "cometbft";
-const VERSION: &str = "v0.37.15";
+const VERSION: &str = "v0.38.17";
 
-// SHA-256 sums for v0.37.15 assets
+// SHA-256 sums for v0.38.17 assets
 const CHECKSUMS: &[(&str, &str)] = &[
     (
-        "cometbft_0.37.15_darwin_amd64.tar.gz",
-        "693958a935325eb21269ccf89c39e9feb88e5be663cfb9510deae5e41af5acb7",
+        "cometbft_0.38.17_darwin_amd64.tar.gz",
+        "5a69c2c0f26a65a3b3b17ba62da0615a552ea897449e63d0d5ec62997b901eae",
     ),
     (
-        "cometbft_0.37.15_darwin_arm64.tar.gz",
-        "933b97c4ea40eba0d41f71654a276774535cbc54400e4b361d73545246d60b23",
+        "cometbft_0.38.17_darwin_arm64.tar.gz",
+        "0809221df1ed6b1471b266a8bbdc673331c7ac45f26c20af91bb383e3e6457a5",
     ),
     (
-        "cometbft_0.37.15_linux_amd64.tar.gz",
-        "617846c4d146323564d2c2759592d30b9357b3c8e126e9e066ac95d16e146d4d",
+        "cometbft_0.38.17_linux_amd64.tar.gz",
+        "ca4d7ca0df296e092462edc92a3f07a4cd1e6c0366516e382a0726b522806f38",
     ),
     (
-        "cometbft_0.37.15_linux_arm64.tar.gz",
-        "b25aab414c64183aa401752cba4b03609cf035f5b587376eeac840895c1e36c1",
+        "cometbft_0.38.17_linux_arm64.tar.gz",
+        "5a6a4bf655a84d9463932ff93ac373ea68327c14c26d65a497a3907c45c65144",
     ),
     (
-        "cometbft_0.37.15_linux_armv6.tar.gz",
-        "63b98b93a7708dc6a0b1798b8b186d575a2787da158d67bc787aac3de00e0da8",
+        "cometbft_0.38.17_linux_armv6.tar.gz",
+        "95fae10f5fc5c0ff8176d9497f684c2a0a27c15fc0f96bb3e131489db14d0c1a",
     ),
     (
-        "cometbft_0.37.15_windows_amd64.tar.gz",
-        "e42cf4e1d84b056630248dcaecb1bddea43b668e121ee4ea19587494a3367187",
+        "cometbft_0.38.17_windows_amd64.tar.gz",
+        "3523d602f355ef73380d91db335f86daa4d6e0848f54a09cdbc918defb38281c",
     ),
     (
-        "cometbft_0.37.15_windows_arm64.tar.gz",
-        "880fb704519b7005a5f395f10b0dcc4fbc7dd4936acacd8b1a373ae76e775572",
+        "cometbft_0.38.17_windows_arm64.tar.gz",
+        "1bfe9a6e2bceccee679a9917363bbb3b167c1387be821f3f4c661d226a38b749",
     ),
     (
-        "cometbft_0.37.15_windows_armv6.tar.gz",
-        "5041df72a5ec2ceb3d0f3dbec7272c507c2f92e0d22cfb1e04b26370e32f6de4",
+        "cometbft_0.38.17_windows_armv6.tar.gz",
+        "cf70cdcabd82e9b7080054d06665d286a026469162715057b7ab458cf693fcb0",
     ),
 ];
 
@@ -103,14 +103,14 @@ fn main() {
     let os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let asset_name = match (os.as_str(), arch.as_str()) {
-        ("macos", "x86_64") => "cometbft_0.37.15_darwin_amd64.tar.gz",
-        ("macos", "aarch64") => "cometbft_0.37.15_darwin_arm64.tar.gz",
-        ("linux", "x86_64") => "cometbft_0.37.15_linux_amd64.tar.gz",
-        ("linux", "aarch64") => "cometbft_0.37.15_linux_arm64.tar.gz",
-        ("linux", "arm") => "cometbft_0.37.15_linux_armv6.tar.gz",
-        ("windows", "x86_64") => "cometbft_0.37.15_windows_amd64.tar.gz",
-        ("windows", "aarch64") => "cometbft_0.37.15_windows_arm64.tar.gz",
-        ("windows", "arm") => "cometbft_0.37.15_windows_armv6.tar.gz",
+        ("macos", "x86_64") => "cometbft_0.38.17_darwin_amd64.tar.gz",
+        ("macos", "aarch64") => "cometbft_0.38.17_darwin_arm64.tar.gz",
+        ("linux", "x86_64") => "cometbft_0.38.17_linux_amd64.tar.gz",
+        ("linux", "aarch64") => "cometbft_0.38.17_linux_arm64.tar.gz",
+        ("linux", "arm") => "cometbft_0.38.17_linux_armv6.tar.gz",
+        ("windows", "x86_64") => "cometbft_0.38.17_windows_amd64.tar.gz",
+        ("windows", "aarch64") => "cometbft_0.38.17_windows_arm64.tar.gz",
+        ("windows", "arm") => "cometbft_0.38.17_windows_armv6.tar.gz",
         _ => {
             eprintln!("Unsupported target: {}-{}", os, arch);
             exit(1)

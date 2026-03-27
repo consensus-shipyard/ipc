@@ -4,11 +4,15 @@
 pub mod constants;
 mod executions;
 mod externs;
+pub mod f3_topdown;
 pub mod interpreter;
+pub mod legacy_topdown;
 pub mod observe;
 pub mod state;
 pub mod store;
 pub mod topdown;
+pub use f3_topdown::F3TopDownHandler;
+pub use legacy_topdown::LegacyTopDownHandler;
 pub mod upgrades;
 pub use interpreter::FvmMessagesInterpreter;
 
@@ -17,6 +21,7 @@ pub mod bundle;
 
 pub mod activity;
 pub mod end_block_hook;
+pub mod event_extraction;
 pub(crate) mod gas;
 pub(crate) mod gas_estimation;
 

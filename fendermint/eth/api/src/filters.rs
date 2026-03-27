@@ -246,7 +246,7 @@ where
                     block: Some(block), ..
                 },
             ) => {
-                let b: B = to_block(block).await?;
+                let b: B = to_block(*block).await?;
                 blocks.push(b);
             }
             (

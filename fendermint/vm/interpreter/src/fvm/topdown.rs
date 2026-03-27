@@ -1,138 +1,368 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use async_stm::atomically;
-use fendermint_tracing::emit;
-use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_message::ipc::ParentFinality;
-use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
-use fendermint_vm_topdown::voting::ValidatorKey;
-use fendermint_vm_topdown::voting::VoteTally;
-use fendermint_vm_topdown::{
-    BlockHeight, CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider,
-    ParentViewProvider, Toggle,
-};
-use fvm_shared::clock::ChainEpoch;
-use std::sync::Arc;
+use fendermint_vm_topdown::{BlockHeight, IPCParentFinality};
 
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::FvmExecState;
 use anyhow::{bail, Context};
 use fvm_ipld_blockstore::Blockstore;
+use std::sync::{Arc, OnceLock};
 
 use crate::fvm::end_block_hook::PowerUpdates;
+use crate::fvm::f3_topdown::{F3TopDownError, F3TopDownHandler};
+use crate::fvm::legacy_topdown::LegacyTopDownHandler;
+use crate::fvm::observe::{F3CacheWaitRecovered, F3CacheWaitStuck};
 use crate::fvm::state::ipc::tokens_to_mint;
 use crate::types::AppliedMessage;
 use ipc_api::cross::IpcEnvelope;
+use ipc_observability::emit;
 
-type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
+#[derive(Clone, Debug)]
+pub struct F3ExecutionCacheRetryConfig {
+    pub backoff_initial: std::time::Duration,
+    pub backoff_max: std::time::Duration,
+    /// After this much waiting, emit an error-severity event/log to surface that block execution
+    /// is blocked on a missing local proof-cache entry. Execution will still keep retrying.
+    pub critical_after: std::time::Duration,
+    pub error_after: std::time::Duration,
+}
+
+impl Default for F3ExecutionCacheRetryConfig {
+    fn default() -> Self {
+        Self {
+            backoff_initial: std::time::Duration::from_millis(200),
+            backoff_max: std::time::Duration::from_secs(5),
+            critical_after: std::time::Duration::from_secs(10 * 60),
+            error_after: std::time::Duration::from_secs(2 * 60),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum TopDownFinalityHandler {
+    Disabled,
+    Legacy(LegacyTopDownHandler),
+    F3(F3TopDownHandler),
+}
+
+struct TopDownManagerInner<DB>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    legacy: Option<LegacyTopDownHandler>,
+    f3: OnceLock<F3Runtime>,
+    // Gateway caller for IPC gateway interactions
+    gateway_caller: GatewayCaller<DB>,
+}
+
+#[derive(Clone)]
+struct F3Runtime {
+    handler: F3TopDownHandler,
+    retry: F3ExecutionCacheRetryConfig,
+}
 
 #[derive(Clone)]
 pub struct TopDownManager<DB>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    provider: TopDownFinalityProvider,
-    votes: VoteTally,
-    // Gateway caller for IPC gateway interactions
-    gateway_caller: GatewayCaller<DB>,
+    inner: Arc<TopDownManagerInner<DB>>,
 }
 
 impl<DB> TopDownManager<DB>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    pub fn new(provider: TopDownFinalityProvider, votes: VoteTally) -> Self {
-        Self {
-            provider,
-            votes,
-            gateway_caller: GatewayCaller::default(),
+    fn is_cache_miss(err: &anyhow::Error) -> bool {
+        err.chain().any(|cause| {
+            matches!(
+                cause.downcast_ref::<F3TopDownError>(),
+                Some(F3TopDownError::CacheMiss { .. })
+            )
+        })
+    }
+
+    /// Extract top-down effects, retrying on local proof-cache misses up to a bounded timeout.
+    ///
+    /// This is used during block execution (catch-up): a node might not have had the local cache
+    /// entry during attestation (so it didn't vote), but it still needs to be able to apply the
+    /// committed block once the proof-service catches up.
+    async fn extract_top_down_effects_retry_cache_miss(
+        retry: &F3ExecutionCacheRetryConfig,
+        f3: &F3TopDownHandler,
+        msg: &fendermint_vm_message::ipc::ParentFinalityWithCert,
+    ) -> anyhow::Result<crate::fvm::f3_topdown::ExtractedTopDownEffects> {
+        use tokio::time::sleep;
+
+        // Tuning:
+        // - critical_after controls when we start emitting an error-severity signal.
+        // - error_after controls how often we repeat that signal once we're in the critical state.
+        let mut backoff = retry.backoff_initial;
+        let max_backoff = retry.backoff_max;
+        let critical_after = retry.critical_after;
+        let error_after = retry.error_after;
+        let mut next_error_log_at = critical_after;
+        let mut waited = std::time::Duration::ZERO;
+        let mut saw_cache_miss = false;
+        let mut entered_critical = false;
+
+        loop {
+            match f3.extract_top_down_effects(msg) {
+                Ok(v) => {
+                    if saw_cache_miss {
+                        emit(F3CacheWaitRecovered {
+                            epoch: msg.height as u64,
+                            waited_secs: waited.as_secs_f64(),
+                        });
+                    }
+                    return Ok(v);
+                }
+                Err(e) if Self::is_cache_miss(&e) => {
+                    saw_cache_miss = true;
+                    // Don't abort execution on cache wait: keep retrying forever.
+                    // Once we cross `critical_after`, switch into a "critical" state where we emit
+                    // an error-severity signal periodically.
+                    if waited >= critical_after && !entered_critical {
+                        entered_critical = true;
+                        tracing::error!(
+                            height = msg.height,
+                            waited = ?waited,
+                            critical_after = ?critical_after,
+                            "still missing local proof cache entry after critical_after; continuing to wait"
+                        );
+                    } else if waited >= next_error_log_at {
+                        if entered_critical {
+                            tracing::error!(
+                                height = msg.height,
+                                waited = ?waited,
+                                "still missing local proof cache entry; node cannot execute parent-finality-with-cert yet"
+                            );
+                            emit(F3CacheWaitStuck {
+                                epoch: msg.height as u64,
+                                waited_secs: waited.as_secs_f64(),
+                            });
+                            next_error_log_at += error_after;
+                        }
+                    } else {
+                        tracing::warn!(
+                            height = msg.height,
+                            waited = ?waited,
+                            retry_in = ?backoff,
+                            "missing local proof cache entry; waiting for proof-service to fill cache"
+                        );
+                    }
+                    sleep(backoff).await;
+                    waited += backoff;
+                    backoff = std::cmp::min(backoff * 2, max_backoff);
+                }
+                Err(e) => return Err(e),
+            }
         }
     }
 
-    pub async fn is_finality_valid(&self, finality: ParentFinality) -> bool {
-        let prop = IPCParentFinality {
-            height: finality.height as u64,
-            block_hash: finality.block_hash,
+    pub fn new(finality: TopDownFinalityHandler) -> Self {
+        let (legacy, f3) = match finality {
+            TopDownFinalityHandler::Disabled => (None, None),
+            TopDownFinalityHandler::Legacy(h) => (Some(h), None),
+            TopDownFinalityHandler::F3(h) => (
+                None,
+                Some(F3Runtime {
+                    handler: h,
+                    retry: Default::default(),
+                }),
+            ),
         };
-        atomically(|| self.provider.check_proposal(&prop)).await
+        let f3_cell = OnceLock::new();
+        if let Some(runtime) = f3 {
+            let _ = f3_cell.set(runtime);
+        }
+        Self {
+            inner: Arc::new(TopDownManagerInner {
+                legacy,
+                f3: f3_cell,
+                gateway_caller: GatewayCaller::default(),
+            }),
+        }
     }
 
-    /// Prepares a top-down execution message based on the current parent's finality proposal and quorum.
+    pub fn disabled() -> Self {
+        Self::new(TopDownFinalityHandler::Disabled)
+    }
+
+    pub fn legacy(handler: LegacyTopDownHandler) -> Self {
+        Self::new(TopDownFinalityHandler::Legacy(handler))
+    }
+
+    pub fn f3(handler: F3TopDownHandler) -> Self {
+        Self::new(TopDownFinalityHandler::F3(handler))
+    }
+
+    pub fn f3_with_retry_config(
+        handler: F3TopDownHandler,
+        retry: F3ExecutionCacheRetryConfig,
+    ) -> Self {
+        let f3_cell = OnceLock::new();
+        let _ = f3_cell.set(F3Runtime { handler, retry });
+        Self {
+            inner: Arc::new(TopDownManagerInner {
+                legacy: None,
+                f3: f3_cell,
+                gateway_caller: GatewayCaller::default(),
+            }),
+        }
+    }
+
+    /// Activate F3 exactly once at runtime.
     ///
-    /// This function first pauses incoming votes to prevent interference during processing. It then atomically retrieves
-    /// both the next parent's proposal and the quorum of votes. If either the parent's proposal or the quorum is missing,
-    /// the function returns `None`. When both are available, it selects the finality with the lower block height and wraps
-    /// it into a `ChainMessage` for top-down execution.
-    pub async fn chain_message_from_finality_or_quorum(&self) -> Option<ChainMessage> {
-        // Prepare top down proposals.
-        // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
-        atomically(|| self.votes.pause_votes_until_find_quorum()).await;
+    /// Intended for first-boot lifecycle where the node starts before committed state is queryable.
+    pub fn activate_f3_once(
+        &self,
+        handler: F3TopDownHandler,
+        retry: F3ExecutionCacheRetryConfig,
+    ) -> anyhow::Result<()> {
+        if self.inner.legacy.is_some() {
+            bail!("cannot activate F3: legacy topdown is configured");
+        }
+        self.inner
+            .f3
+            .set(F3Runtime { handler, retry })
+            .map_err(|_| anyhow::anyhow!("cannot activate F3: already active"))?;
+        Ok(())
+    }
 
-        // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
-        // The final proposal can be at most as high as the quorum, but can be less if we have already,
-        // hit some limits such as how many blocks we can propose in a single step.
-        let (parent, quorum) = atomically(|| {
-            let parent = self.provider.next_proposal()?;
+    pub async fn attest_legacy(&self, finality: ParentFinality) -> bool {
+        match &self.inner.legacy {
+            Some(h) => h.attest(finality).await,
+            None => false,
+        }
+    }
 
-            let quorum = self
-                .votes
-                .find_quorum()?
-                .map(|(height, block_hash)| IPCParentFinality { height, block_hash });
+    /// Get the chain message for parent finality proposal.
+    ///
+    /// This method encapsulates the decision of which finality mechanism to use:
+    /// - If configured for legacy: use legacy voting-based finality
+    /// - If configured for F3: use F3 proof-based finality (no fallback)
+    ///
+    /// The caller doesn't need to know which mechanism is being used.
+    pub async fn chain_message_for_proposal(&self) -> Option<ChainMessage> {
+        if let Some(f3) = self.inner.f3.get() {
+            let proof_msg = f3.handler.chain_message_from_proof_cache();
+            if proof_msg.is_some() {
+                tracing::info!("Including F3 proof-based parent-finality message in proposal");
+            } else {
+                tracing::info!("F3 enabled but no proposal parent-finality message available");
+            }
+            return proof_msg;
+        }
+        if let Some(h) = &self.inner.legacy {
+            tracing::debug!("Using legacy top-down proposal path");
+            return h.chain_message_for_proposal().await;
+        }
+        tracing::debug!("Top-down disabled; proposal includes only mempool messages");
+        None
+    }
 
-            Ok((parent, quorum))
-        })
-        .await;
-
-        // If there is no parent proposal, exit early.
-        let parent = parent?;
-
-        // Require a quorum; if it's missing, log and exit.
-        let quorum = if let Some(quorum) = quorum {
-            quorum
-        } else {
-            emit!(
-                DEBUG,
-                ParentFinalityMissingQuorum {
-                    block_height: parent.height,
-                    block_hash: &hex::encode(&parent.block_hash),
-                }
-            );
-            return None;
-        };
-
-        // Choose the lower height between the parent's proposal and the quorum.
-        let finality = if parent.height <= quorum.height {
-            parent
-        } else {
-            quorum
-        };
-
-        Some(ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
-            height: finality.height as ChainEpoch,
-            block_hash: finality.block_hash,
-        })))
+    /// Attest a parent-finality-with-cert message during the attestation phase.
+    ///
+    /// Delegates to F3 handler if F3 is configured, otherwise returns error.
+    pub async fn attest_parent_finality_with_cert<BS>(
+        &self,
+        state: &mut FvmExecState<BS>,
+        msg: &fendermint_vm_message::ipc::ParentFinalityWithCert,
+    ) -> anyhow::Result<()>
+    where
+        BS: Blockstore + Clone + 'static + Send + Sync,
+    {
+        if let Some(f3) = self.inner.f3.get() {
+            return f3.handler.attest(state, msg).await;
+        }
+        Err(anyhow::anyhow!(
+            "F3 not configured - cannot attest parent-finality-with-cert message"
+        ))
     }
 
     pub async fn update_voting_power_table(&self, power_updates: &PowerUpdates) {
-        let power_updates_mapped: Vec<_> = power_updates
-            .0
-            .iter()
-            .map(|v| (ValidatorKey::from(v.public_key.0), v.power.0))
-            .collect();
+        if let Some(h) = &self.inner.legacy {
+            h.update_voting_power_table(power_updates).await
+        }
+    }
 
-        atomically(|| self.votes.update_power_table(power_updates_mapped.clone())).await
+    /// Execute parent-finality-with-cert message.
+    /// Delegates F3-specific logic to F3 module, handles common top-down execution.
+    pub async fn execute_parent_finality_with_cert(
+        &self,
+        state: &mut FvmExecState<DB>,
+        msg: fendermint_vm_message::ipc::ParentFinalityWithCert,
+    ) -> anyhow::Result<AppliedMessage> {
+        let Some(f3) = self.inner.f3.get() else {
+            bail!("F3 not configured - cannot execute without F3 handler");
+        };
+
+        // Execute F3-specific logic (certificate validation, proof extraction, state updates).
+        //
+        // This path may be hit during catch-up for a node that did not have the local proof cache
+        // entry during attestation. In that case, wait for the cache to be filled by the proof-service.
+        let extracted =
+            Self::extract_top_down_effects_retry_cache_miss(&f3.retry, &f3.handler, &msg).await?;
+
+        // Commit parent finality to gateway.
+        //
+        // The gateway expects a fixed `bytes32 blockHash`, so for Filecoin we commit the FEVM
+        // (Ethereum-view) block hash corresponding to this epoch, derived deterministically from
+        // the cached tipset key bytes for this epoch (see `F3TopDownHandler`).
+        let finality = IPCParentFinality::new(msg.height, extracted.parent_eth_block_hash.to_vec());
+        let (prev_height, _prev_finality) = self
+            .commit_finality(state, finality.clone(), 0)
+            .await
+            .context("failed to commit finality")?;
+
+        tracing::debug!(
+            previous_height = prev_height,
+            current_height = finality.height,
+            "committed parent finality"
+        );
+
+        // Store validator changes in gateway
+        self.inner
+            .gateway_caller
+            .store_validator_changes(state, extracted.validator_changes)
+            .context("failed to store validator changes")?;
+
+        // Execute topdown messages
+        let ret = self
+            .execute_topdown_msgs(state, extracted.topdown_msgs)
+            .await
+            .context("failed to execute top down messages")?;
+
+        // Finalize F3 execution only after all effects were applied successfully.
+        f3.handler
+            .finalize_after_execution(state, msg.height, extracted.instance_id)
+            .context("failed to finalize F3 execution")?;
+
+        tracing::info!(
+            height = msg.height,
+            "parent finality with cert executed successfully"
+        );
+
+        Ok(ret)
     }
 
     // TODO Karel - separate this huge function and clean up
-    pub async fn execute_topdown_msg(
+    pub async fn execute_legacy(
         &self,
         state: &mut FvmExecState<DB>,
         finality: ParentFinality,
     ) -> anyhow::Result<AppliedMessage> {
-        if !self.provider.is_enabled() {
+        if self.inner.f3.get().is_some() {
+            bail!("cannot execute legacy top-down: F3 enabled");
+        }
+        let Some(legacy) = &self.inner.legacy else {
+            bail!("cannot execute IPC top-down message: parent provider disabled");
+        };
+        if !legacy.is_enabled() {
             bail!("cannot execute IPC top-down message: parent provider disabled");
         }
 
@@ -144,7 +374,7 @@ where
         );
 
         let (prev_height, prev_finality) = self
-            .commit_finality(state, finality.clone())
+            .commit_finality(state, finality.clone(), legacy.genesis_epoch()?)
             .await
             .context("failed to commit finality")?;
 
@@ -170,8 +400,7 @@ where
         let (execution_fr, execution_to) = (prev_height + 1, finality.height);
 
         // error happens if we cannot get the validator set from ipc agent after retries
-        let validator_changes = self
-            .provider
+        let validator_changes = legacy
             .validator_changes_from(execution_fr, execution_to)
             .await
             .context("failed to fetch validator changes")?;
@@ -183,13 +412,13 @@ where
             "chain interpreter received total validator changes"
         );
 
-        self.gateway_caller
+        self.inner
+            .gateway_caller
             .store_validator_changes(state, validator_changes)
             .context("failed to store validator changes")?;
 
         // error happens if we cannot get the cross messages from ipc agent after retries
-        let msgs = self
-            .provider
+        let msgs = legacy
             .top_down_msgs_from(execution_fr, execution_to)
             .await
             .context("failed to fetch top down messages")?;
@@ -214,19 +443,10 @@ where
             .map(|id| hex::encode(id.serialize_compressed()));
         let proposer_ref = proposer.as_deref();
 
-        atomically(|| {
-            self.provider.set_new_finality(finality.clone())?;
-
-            self.votes.set_finalized(
-                finality.height,
-                finality.block_hash.clone(),
-                proposer_ref,
-                Some(local_block_height),
-            )?;
-
-            Ok(())
-        })
-        .await;
+        legacy
+            .on_finality_executed(finality.clone(), proposer_ref, local_block_height)
+            .await
+            .context("failed to record new finality")?;
 
         tracing::debug!(
             finality = finality.to_string(),
@@ -242,14 +462,16 @@ where
         &self,
         state: &mut FvmExecState<DB>,
         finality: IPCParentFinality,
+        genesis_epoch: BlockHeight,
     ) -> anyhow::Result<(BlockHeight, Option<IPCParentFinality>)> {
         let (prev_height, prev_finality) = if let Some(prev_finality) = self
+            .inner
             .gateway_caller
             .commit_parent_finality(state, finality)?
         {
             (prev_finality.height, Some(prev_finality))
         } else {
-            (self.provider.genesis_epoch()?, None)
+            (genesis_epoch, None)
         };
 
         tracing::debug!(
@@ -270,7 +492,8 @@ where
         tracing::debug!(token = minted_tokens.to_string(), "tokens to mint in child");
 
         if !minted_tokens.is_zero() {
-            self.gateway_caller
+            self.inner
+                .gateway_caller
                 .mint_to_gateway(state, minted_tokens.clone())
                 .context("failed to mint to gateway")?;
 
@@ -279,6 +502,8 @@ where
             });
         }
 
-        self.gateway_caller.apply_cross_messages(state, messages)
+        self.inner
+            .gateway_caller
+            .apply_cross_messages(state, messages)
     }
 }

@@ -109,6 +109,44 @@ pub(crate) async fn create_subnet(
         .clone()
         .unwrap_or(ZERO_ADDRESS.to_string());
     let validator_rewarder = require_fil_addr_from_str(&raw_addr)?;
+
+    // Fetch F3 instance ID if parent is Filecoin (for deterministic genesis)
+    //
+    // When --parent-filecoin-rpc is provided, we fetch the current F3 instance ID
+    // and store it in the subnet actor. This ensures all nodes generate identical
+    // genesis files by fetching F3 data for the SAME instance, not "latest".
+    //
+    // Without this, nodes running genesis at different times would fetch different
+    // F3 instances, resulting in different genesis files and consensus failure.
+    let genesis_f3_instance_id = if let Some(ref parent_filecoin_rpc) =
+        arguments.parent_filecoin_rpc
+    {
+        match fetch_current_f3_instance(
+            parent_filecoin_rpc,
+            arguments.parent_filecoin_auth_token.as_ref(),
+        )
+        .await
+        {
+            Ok(instance_id) => {
+                log::info!(
+                    "Captured F3 instance ID {} for deterministic genesis",
+                    instance_id
+                );
+                Some(instance_id)
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to fetch F3 instance ID: {}. Subnet will be created without F3 data.",
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        log::debug!("Parent Filecoin RPC not provided - parent is likely another subnet (no F3)");
+        None
+    };
+
     let addr = provider
         .create_subnet(
             from,
@@ -127,10 +165,50 @@ pub(crate) async fn create_subnet(
             validator_rewarder,
             arguments.genesis_subnet_ipc_contracts_owner,
             arguments.chain_id,
+            genesis_f3_instance_id,
         )
         .await?;
 
     Ok(addr)
+}
+
+/// Fetches the current F3 instance ID from Filecoin parent chain
+///
+/// This captures the F3 instance ID at subnet creation time and stores it in the
+/// subnet actor. All nodes will later fetch this SAME instance ID when generating
+/// genesis, ensuring deterministic genesis files across all nodes.
+///
+/// # Arguments
+/// * `parent_filecoin_rpc` - Filecoin RPC endpoint (mainnet or calibration)
+/// * `auth_token` - Optional auth token for the RPC endpoint
+///
+/// # Returns
+/// The current F3 instance ID (extracted from the latest certificate)
+async fn fetch_current_f3_instance(
+    parent_filecoin_rpc: &url::Url,
+    auth_token: Option<&String>,
+) -> anyhow::Result<u64> {
+    use ipc_provider::jsonrpc::JsonRpcClientImpl;
+    use ipc_provider::lotus::client::LotusJsonRPCClient;
+    use ipc_provider::lotus::LotusClient;
+
+    let jsonrpc_client =
+        JsonRpcClientImpl::new(parent_filecoin_rpc.clone(), auth_token.map(|s| s.as_str()));
+
+    let lotus_client = LotusJsonRPCClient::new(jsonrpc_client, SubnetID::default());
+
+    // Fetch the latest F3 certificate which contains the current instance ID
+    let cert = lotus_client.f3_get_certificate().await?;
+
+    match cert {
+        Some(c) => {
+            // Extract instance ID from the certificate (gpbft_instance field)
+            Ok(c.gpbft_instance)
+        }
+        None => Err(anyhow::anyhow!(
+            "No F3 certificate available on parent chain"
+        )),
+    }
 }
 
 /// Shared subnet‐create config for both CLI flags and YAML.
@@ -224,6 +302,18 @@ pub(crate) struct SubnetCreateConfig {
         help = "The chain id for the subnet, make sure it's unique across existing known chain ids"
     )]
     pub chain_id: u64,
+
+    /// Parent Filecoin RPC endpoint (optional - only when parent is Filecoin)
+    /// If provided, CLI will fetch F3 instance ID for deterministic genesis
+    #[arg(
+        long,
+        help = "Parent Filecoin RPC endpoint (for F3 instance ID capture)"
+    )]
+    pub parent_filecoin_rpc: Option<url::Url>,
+
+    /// Auth token for parent Filecoin RPC (optional)
+    #[arg(long, help = "Auth token for parent Filecoin RPC")]
+    pub parent_filecoin_auth_token: Option<String>,
 }
 
 #[derive(Debug, Args)]

@@ -152,9 +152,10 @@ fn create_metadata_command(path: impl Into<PathBuf>) -> MetadataCommand {
     metadata_command
 }
 
-/// Find the `Cargo.lock` relative to the `OUT_DIR` environment variable.
+/// Find the `Cargo.lock` by walking parent directories from known anchors.
 ///
-/// If the `Cargo.lock` cannot be found, we emit a warning and return `None`.
+/// We first try `OUT_DIR`, then fall back to `CARGO_MANIFEST_DIR`.
+/// The fallback is needed when `CARGO_TARGET_DIR` points outside the workspace.
 fn find_cargo_lock(out_dir: &Path) -> Option<PathBuf> {
     fn find_impl(mut path: PathBuf) -> Option<PathBuf> {
         loop {
@@ -170,6 +171,12 @@ fn find_cargo_lock(out_dir: &Path) -> Option<PathBuf> {
 
     if let Some(path) = find_impl(out_dir.to_path_buf()) {
         return Some(path);
+    }
+
+    if let Some(manifest_dir) = std::env::var_os("CARGO_MANIFEST_DIR") {
+        if let Some(path) = find_impl(PathBuf::from(manifest_dir)) {
+            return Some(path);
+        }
     }
 
     None
@@ -393,11 +400,44 @@ fn main() -> Result<()> {
     );
 
     let actors = parse_dependencies_of_umbrella_crate(&actors_manifest_path)?;
-    let actors = Vec::from_iter(actors.iter().map(|(name, crate_path)| Actor {
-        package_name: name.as_str().to_owned(),
-        wasm_blob_path: wasm_blob_dir.join(name.as_str()).with_extension("wasm"),
-        crate_path: crate_path.clone(),
-    }));
+    let ipc_storage_enabled = std::env::var("CARGO_FEATURE_IPC_STORAGE").is_ok();
+
+    echo!(
+        "actors-custom-car",
+        purple,
+        "IPC_STORAGE feature enabled: {}",
+        ipc_storage_enabled
+    );
+
+    // IPC storage related actors that should only be built when ipc-storage feature is enabled
+    let ipc_storage_actors = [
+        "fendermint_actor_init",
+        "fendermint_actor_adm",
+        "fendermint_actor_adm_types",
+        "fendermint_actor_blobs",
+        "fendermint_actor_blob_reader",
+        "fendermint_actor_bucket",
+        "fendermint_actor_machine",
+        "fendermint_actor_ipc_storage_config",
+        "fendermint_actor_timehub",
+    ];
+
+    let actors = Vec::from_iter(
+        actors
+            .iter()
+            .filter(|(name, _)| {
+                if ipc_storage_enabled {
+                    true
+                } else {
+                    !ipc_storage_actors.contains(&name.as_str())
+                }
+            })
+            .map(|(name, crate_path)| Actor {
+                package_name: name.as_str().to_owned(),
+                wasm_blob_path: wasm_blob_dir.join(name.as_str()).with_extension("wasm"),
+                crate_path: crate_path.clone(),
+            }),
+    );
 
     print_cargo_rerun_if_dependency_instructions(&actors_manifest_path, &out_dir)?;
 

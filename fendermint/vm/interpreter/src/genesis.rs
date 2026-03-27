@@ -21,6 +21,8 @@ use fendermint_vm_actor_interface::{
     account, activity, burntfunds, chainmetadata, cron, eam, f3_light_client, gas_market, init,
     ipc, reward, system, EMPTY_ARR,
 };
+#[cfg(feature = "ipc-storage")]
+use fendermint_vm_actor_interface::{adm, blob_reader, blobs, ipc_storage_config};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
 use fvm::engine::MultiEngine;
@@ -302,14 +304,22 @@ impl<'a> GenesisBuilder<'a> {
             .context("failed to create system actor")?;
 
         // Init actor
+        // Add Blobs actor ID to eth_builtin_ids so its delegated address is registered
+        #[allow(unused_mut)]
+        let mut eth_builtin_ids: BTreeSet<_> =
+            ipc_entrypoints.values().map(|c| c.actor_id).collect();
+
+        #[cfg(feature = "ipc-storage")]
+        {
+            eth_builtin_ids.insert(blobs::BLOBS_ACTOR_ID);
+            eth_builtin_ids.insert(adm::ADM_ACTOR_ID);
+        }
+
         let (init_state, addr_to_id) = init::State::new(
             state.store(),
             genesis.chain_name.clone(),
             &genesis.accounts,
-            &ipc_entrypoints
-                .values()
-                .map(|c| c.actor_id)
-                .collect::<BTreeSet<_>>(),
+            &eth_builtin_ids,
             all_ipc_contracts.len() as u64,
         )
         .context("failed to create init state")?;
@@ -376,6 +386,38 @@ impl<'a> GenesisBuilder<'a> {
             )
             .context("failed to create reward actor")?;
 
+        // ADM Address Manager (ADM) actor
+        #[cfg(feature = "ipc-storage")]
+        {
+            use std::str::FromStr;
+            let mut machine_codes = std::collections::HashMap::new();
+            for machine_name in &["bucket", "timehub"] {
+                if let Some(cid) = state.custom_actor_manifest.code_by_name(machine_name) {
+                    let kind = fendermint_actor_adm::Kind::from_str(machine_name)
+                        .expect("failed to parse adm machine name");
+                    tracing::info!(machine_name, cid = cid.to_string(), "registered machine");
+                    machine_codes.insert(kind, *cid);
+                }
+            }
+            let adm_state = fendermint_actor_adm::State::new(
+                state.store(),
+                machine_codes,
+                fendermint_actor_adm::PermissionModeParams::Unrestricted,
+            )?;
+            let eth_addr = init::builtin_actor_eth_addr(adm::ADM_ACTOR_ID);
+            let f4_addr = fvm_shared::address::Address::from(eth_addr);
+            tracing::info!("!!!!!!!!  SETUP adm ACTOR !!!!!!!!: {eth_addr}, {eth_addr:?}");
+            state
+                .create_custom_actor(
+                    fendermint_vm_actor_interface::adm::ADM_ACTOR_NAME,
+                    adm::ADM_ACTOR_ID,
+                    &adm_state,
+                    TokenAmount::zero(),
+                    Some(f4_addr),
+                )
+                .context("failed to create adm actor")?;
+        }
+
         // STAGE 1b: Then we initialize the in-repo custom actors.
 
         // Initialize the chain metadata actor which handles saving metadata about the chain
@@ -394,6 +436,53 @@ impl<'a> GenesisBuilder<'a> {
             )
             .context("failed to create chainmetadata actor")?;
 
+        // Initialize the ipc-storage actors (ipc_storage_config, blobs, blob_reader)
+        #[cfg(feature = "ipc-storage")]
+        {
+            // Initialize the ipc_storage config actor.
+            let ipc_storage_config_state = fendermint_actor_ipc_storage_config::State {
+                admin: None,
+                config: fendermint_actor_ipc_storage_config_shared::IPCStorageConfig::default(),
+            };
+            state
+                .create_custom_actor(
+                    fendermint_actor_ipc_storage_config::ACTOR_NAME,
+                    ipc_storage_config::IPC_STORAGE_CONFIG_ACTOR_ID,
+                    &ipc_storage_config_state,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create ipc_storage config actor")?;
+
+            // Initialize the blob actor with delegated address for Ethereum/Solidity access.
+            let blobs_state = fendermint_actor_blobs::State::new(&state.store())?;
+            let blobs_eth_addr = init::builtin_actor_eth_addr(blobs::BLOBS_ACTOR_ID);
+            let blobs_f4_addr = fvm_shared::address::Address::from(blobs_eth_addr);
+            state
+                .create_custom_actor(
+                    fendermint_actor_blobs::BLOBS_ACTOR_NAME,
+                    blobs::BLOBS_ACTOR_ID,
+                    &blobs_state,
+                    TokenAmount::zero(),
+                    Some(blobs_f4_addr),
+                )
+                .context("failed to create blobs actor")?;
+            tracing::info!(
+                "!!!!!!!!  SETUP BLOB ACTOR !!!!!!!!: {blobs_eth_addr}, {blobs_eth_addr:?}"
+            );
+
+            // Initialize the blob reader actor.
+            state
+                .create_custom_actor(
+                    fendermint_actor_blob_reader::BLOB_READER_ACTOR_NAME,
+                    blob_reader::BLOB_READER_ACTOR_ID,
+                    &fendermint_actor_blob_reader::State::new(&state.store())?,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create blob reader actor")?;
+        }
+
         let eam_state = fendermint_actor_eam::State::new(
             state.store(),
             PermissionModeParams::from(genesis.eam_permission_mode),
@@ -408,6 +497,19 @@ impl<'a> GenesisBuilder<'a> {
                 None,
             )
             .context("failed to replace built in eam actor")?;
+
+        // Replace Init actor with our custom version that allows ADM to spawn actors
+        #[cfg(feature = "ipc-storage")]
+        state
+            .replace_builtin_actor(
+                init::INIT_ACTOR_NAME,
+                init::INIT_ACTOR_ID,
+                fendermint_actor_init::IPC_INIT_ACTOR_NAME,
+                &init_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to replace built in init actor")?;
 
         // Currently hardcoded for now, once genesis V2 is implemented, should be taken
         // from genesis parameters.
@@ -444,16 +546,12 @@ impl<'a> GenesisBuilder<'a> {
 
         // F3 Light Client actor - manages F3 light client state for proof-based parent finality
         if let Some(f3_params) = &genesis.f3 {
-            // For subnets with F3 parameters, initialize with the provided F3 data
-            let constructor_params = fendermint_actor_f3_light_client::types::ConstructorParams {
-                instance_id: f3_params.instance_id,
-                power_table: f3_params.power_table.clone(),
-                finalized_epochs: f3_params.finalized_epochs.clone(),
-            };
+            // We treat the configured F3 `instance_id` as already committed at genesis.
+            // The proof-service starts fetching/validating from `instance_id + 1`.
             let f3_state = fendermint_actor_f3_light_client::state::State::new(
-                constructor_params.instance_id,
-                constructor_params.power_table,
-                constructor_params.finalized_epochs,
+                state.store(),
+                f3_params.instance_id,
+                f3_params.power_table.clone(),
             )?;
 
             state
@@ -520,6 +618,27 @@ impl<'a> GenesisBuilder<'a> {
             state,
             config,
         )?;
+
+        // If we have F3 enabled, seed the gateway's parent finality cursor at genesis.
+        // This anchors the epoch cursor in on-chain contract state for late joiners.
+        if let Some(f3) = genesis.f3.as_ref() {
+            let exec_state = state
+                .exec_state()
+                .ok_or_else(|| anyhow::anyhow!("exec state not initialized in genesis builder"))?;
+
+            let gateway = crate::fvm::state::ipc::GatewayCaller::<
+                crate::fvm::store::memory::MemoryBlockstore,
+            >::default();
+
+            let base_finality = fendermint_vm_topdown::IPCParentFinality::new(
+                f3.base_epoch,
+                f3.base_epoch_eth_block_hash.to_vec(),
+            );
+
+            gateway
+                .commit_parent_finality(exec_state, base_finality)
+                .context("failed to seed gateway parent finality at genesis")?;
+        }
 
         Ok(out)
     }
@@ -791,6 +910,14 @@ pub async fn create_test_genesis_state(
 #[cfg(test)]
 mod tests {
     use crate::genesis::GenesisAppState;
+    use fendermint_crypto::SecretKey;
+    use fendermint_vm_genesis::ipc::{F3Params, GatewayParams, IpcParams};
+    use fendermint_vm_genesis::{Collateral, Genesis, PermissionMode, Validator, ValidatorKey};
+    use fendermint_vm_topdown::IPCParentFinality;
+    use fvm_shared::econ::TokenAmount;
+    use fvm_shared::version::NetworkVersion;
+    use ipc_api::subnet_id::SubnetID;
+    use rand::thread_rng;
 
     #[test]
     fn test_compression() {
@@ -804,5 +931,66 @@ mod tests {
         let recovered = GenesisAppState::decode_and_decompress(&s).unwrap();
 
         assert_eq!(recovered, bytes);
+    }
+
+    #[tokio::test]
+    async fn test_genesis_seeds_gateway_parent_finality_when_f3_enabled() -> anyhow::Result<()> {
+        use crate::fvm::bundle::contracts_path;
+        use crate::fvm::state::ipc::GatewayCaller;
+
+        // Minimal genesis with IPC + F3 enabled.
+        let mut rng = thread_rng();
+        let pk = SecretKey::random(&mut rng).public_key();
+
+        let base_epoch = 123_i64;
+        let base_epoch_eth_block_hash = [0xABu8; 32];
+
+        let genesis = Genesis {
+            chain_name: "test".to_string(),
+            chain_id: 1234,
+            timestamp: fendermint_vm_core::Timestamp(0),
+            network_version: NetworkVersion::V21,
+            base_fee: TokenAmount::from_atto(0),
+            power_scale: 0,
+            validators: vec![Validator {
+                public_key: ValidatorKey::new(pk),
+                power: Collateral(TokenAmount::from_atto(1)),
+            }],
+            accounts: vec![],
+            eam_permission_mode: PermissionMode::Unrestricted,
+            ipc: Some(IpcParams {
+                gateway: GatewayParams::new(SubnetID::new(1234u64, vec![])),
+            }),
+            ipc_contracts_owner: ethers::types::Address::repeat_byte(0x11),
+            f3: Some(F3Params {
+                instance_id: 10,
+                base_epoch,
+                base_epoch_eth_block_hash,
+                power_table: vec![],
+            }),
+        };
+
+        let (state, _out) = crate::genesis::create_test_genesis_state(
+            actors_builtin_car::CAR,
+            actors_custom_car::CAR,
+            contracts_path(),
+            genesis,
+        )
+        .await?;
+
+        let mut exec_state = state
+            .into_exec_state()
+            .map_err(|_| anyhow::anyhow!("failed to convert genesis state into exec state"))?;
+
+        let gateway = GatewayCaller::default();
+        let got = gateway.get_latest_parent_finality(&mut exec_state)?;
+
+        let want = IPCParentFinality::new(base_epoch, base_epoch_eth_block_hash.to_vec());
+        assert_eq!(
+            got, want,
+            "gateway latest parent finality should be seeded from genesis.f3"
+        );
+
+        Ok(())
     }
 }

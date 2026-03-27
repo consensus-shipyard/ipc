@@ -1,0 +1,536 @@
+#!/bin/bash
+# Live monitoring dashboard for IPC subnet
+
+# Dashboard state variables
+declare -A ERROR_COUNTS
+declare -A ERROR_SAMPLES
+declare -A METRICS
+declare -a RECENT_EVENTS
+
+# Initialize error categories
+ERROR_CATEGORIES=(
+    "checkpoint"
+    "finality"
+    "network"
+    "consensus"
+    "rpc"
+    "other"
+)
+
+# ANSI escape codes for dashboard
+CLEAR_SCREEN="\033[2J"
+CURSOR_HOME="\033[H"
+CURSOR_HIDE="\033[?25l"
+CURSOR_SHOW="\033[?25h"
+BOLD="\033[1m"
+RESET="\033[0m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+RED="\033[31m"
+CYAN="\033[36m"
+BLUE="\033[34m"
+
+# Initialize dashboard (with defaults so we can draw immediately)
+initialize_dashboard() {
+    # Hide cursor for cleaner display
+    echo -ne "${CURSOR_HIDE}"
+
+    # Initialize error counts
+    for category in "${ERROR_CATEGORIES[@]}"; do
+        ERROR_COUNTS[$category]=0
+        ERROR_SAMPLES[$category]=""
+    done
+
+    # Initialize metrics (defaults allow immediate draw before first fetch)
+    METRICS[start_time]=$(date +%s)
+    METRICS[last_height]=0
+    METRICS[last_check]=0
+    METRICS[height]=0
+    METRICS[block_time]=""
+    METRICS[peers]=0
+    METRICS[mempool_size]=0
+    METRICS[mempool_bytes]=0
+    METRICS[mempool_max]=5000
+    METRICS[blocks_per_min]=0
+    METRICS[parent_height]=0
+    METRICS[parent_chain_height]=0
+    METRICS[finality_lag]=0
+    METRICS[finality_time]=""
+    METRICS[checkpoint_sigs]=0
+
+    # Initialize recent events queue
+    RECENT_EVENTS=()
+
+    # Trap cleanup on exit
+    trap cleanup_dashboard EXIT INT TERM
+}
+
+# Cleanup on exit
+cleanup_dashboard() {
+    echo -ne "${CURSOR_SHOW}"
+    clear
+}
+
+# Add event to recent events (max 5)
+add_event() {
+    local icon="$1"
+    local message="$2"
+    local timestamp=$(date +%H:%M:%S)
+
+    RECENT_EVENTS=("$timestamp  $icon $message" "${RECENT_EVENTS[@]}")
+
+    # Keep only last 5 events
+    if [ ${#RECENT_EVENTS[@]} -gt 5 ]; then
+        RECENT_EVENTS=("${RECENT_EVENTS[@]:0:5}")
+    fi
+}
+
+# Categorize error message
+categorize_error() {
+    local error_msg="$1"
+    local category="other"
+    local sample=""
+
+    if echo "$error_msg" | grep -qi "checkpoint\|bottomup"; then
+        category="checkpoint"
+        sample=$(echo "$error_msg" | grep -oE "(mempool|broadcast|signature)" | head -1)
+    elif echo "$error_msg" | grep -qi "finality\|parent.*finality"; then
+        category="finality"
+        sample=$(echo "$error_msg" | grep -oE "(sync|vote|proposal)" | head -1)
+    elif echo "$error_msg" | grep -qi "network\|p2p\|peer\|libp2p"; then
+        category="network"
+        sample=$(echo "$error_msg" | grep -oE "(peer|connection|gossip)" | head -1)
+    elif echo "$error_msg" | grep -qi "consensus\|round\|proposal\|prevote"; then
+        category="consensus"
+        sample=$(echo "$error_msg" | grep -oE "(round|timeout|proposal)" | head -1)
+    elif echo "$error_msg" | grep -qi "rpc\|http\|timeout"; then
+        category="rpc"
+        sample=$(echo "$error_msg" | grep -oE "(timeout|connection)" | head -1)
+    fi
+
+    ERROR_COUNTS[$category]=$((${ERROR_COUNTS[$category]} + 1))
+    if [ -z "${ERROR_SAMPLES[$category]}" ]; then
+        ERROR_SAMPLES[$category]="$sample"
+    fi
+}
+
+# Fetch current metrics from validator
+fetch_metrics() {
+    local validator_idx="$1"
+    local name="${VALIDATORS[$validator_idx]}"
+
+    # Get node home path (local or remote)
+    local node_home
+    if is_local_mode; then
+        local node_home_base=$(get_config_value "paths.node_home_base")
+        node_home="${node_home_base/#\~/$HOME}/$name"
+    else
+        node_home=$(get_config_value "paths.node_home")
+    fi
+
+    # Fetch block height and info (curl has its own timeout via --max-time)
+    local status=$(exec_on_host "$validator_idx" \
+        "curl -s --max-time 3 http://localhost:26657/status 2>/dev/null" 2>/dev/null || echo '{"result":{"sync_info":{}}}')
+
+    METRICS[height]=$(echo "$status" | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null || echo "0")
+    METRICS[block_time]=$(echo "$status" | jq -r '.result.sync_info.latest_block_time // ""' 2>/dev/null || echo "")
+    METRICS[catching_up]=$(echo "$status" | jq -r '.result.sync_info.catching_up // true' 2>/dev/null || echo "true")
+
+    # Fetch network info (curl has its own timeout via --max-time)
+    local net_info=$(exec_on_host "$validator_idx" \
+        "curl -s --max-time 3 http://localhost:26657/net_info 2>/dev/null" 2>/dev/null || echo '{"result":{}}')
+    METRICS[peers]=$(echo "$net_info" | jq -r '.result.n_peers // 0' 2>/dev/null || echo "0")
+
+    # Fetch mempool status (curl has its own timeout via --max-time)
+    local mempool=$(exec_on_host "$validator_idx" \
+        "curl -s --max-time 3 http://localhost:26657/num_unconfirmed_txs 2>/dev/null" 2>/dev/null || echo '{"result":{}}')
+    METRICS[mempool_size]=$(echo "$mempool" | jq -r '.result.n_txs // 0' 2>/dev/null || echo "0")
+    METRICS[mempool_bytes]=$(echo "$mempool" | jq -r '.result.total_bytes // 0' 2>/dev/null || echo "0")
+
+    # Fetch mempool max size from CometBFT config (only fetch once if not already set)
+    if [ -z "${METRICS[mempool_max]:-}" ]; then
+        local mempool_max=$(exec_on_host "$validator_idx" \
+            "grep -E '^size = [0-9]+' $node_home/cometbft/config/config.toml 2>/dev/null | head -1 | grep -oE '[0-9]+'" 2>/dev/null || echo "5000")
+        METRICS[mempool_max]=${mempool_max:-5000}
+    fi
+
+    # Calculate block production rate
+    local current_time=$(date +%s)
+    local time_diff=$((current_time - METRICS[last_check]))
+
+    if [ $time_diff -ge 15 ] && [ ${METRICS[last_height]:-0} -gt 0 ]; then
+        local height_diff=$((METRICS[height] - METRICS[last_height]))
+        METRICS[blocks_per_min]=$((height_diff * 60 / time_diff))
+        METRICS[last_height]=${METRICS[height]}
+        METRICS[last_check]=$current_time
+    elif [ ${METRICS[last_height]:-0} -eq 0 ]; then
+        METRICS[last_height]=${METRICS[height]}
+        METRICS[last_check]=$current_time
+        METRICS[blocks_per_min]=0
+    fi
+
+    # Fetch parent finality from logs (recent)
+    # Note: For local/Anvil deployments, parent finality tracking works via null finality provider (no F3 required)
+    local finality=$(exec_on_host "$validator_idx" \
+        "grep ParentFinalityCommitted $node_home/logs/*.log $node_home/node.log 2>/dev/null | tail -1" 2>/dev/null || echo "")
+
+    if [ -n "$finality" ]; then
+        METRICS[parent_height]=$(echo "$finality" | grep -oE 'block_height=[0-9]+' | grep -oE '[0-9]+' | head -1 || echo "0")
+        METRICS[finality_time]=$(echo "$finality" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' || echo "")
+    fi
+
+    # Fetch parent chain height (with timeout)
+    local parent_rpc=$(get_config_value "subnet.parent_rpc")
+    local parent_height_hex=$(timeout 5 curl -s --max-time 3 -X POST -H "Content-Type: application/json" \
+        --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+        "$parent_rpc" 2>/dev/null | jq -r '.result // "0x0"' 2>/dev/null || echo "0x0")
+    METRICS[parent_chain_height]=$((16#${parent_height_hex#0x})) 2>/dev/null || METRICS[parent_chain_height]=0
+
+    # Calculate finality lag
+    if [ "${METRICS[parent_height]:-0}" -gt 0 ] && [ "${METRICS[parent_chain_height]:-0}" -gt 0 ]; then
+        METRICS[finality_lag]=$((METRICS[parent_chain_height] - METRICS[parent_height]))
+    else
+        METRICS[finality_lag]=0
+    fi
+
+    # Scan recent logs for errors (support both logs/*.log and node.log)
+    local errors=$(exec_on_host "$validator_idx" \
+        "tail -500 $node_home/logs/*.log $node_home/node.log 2>/dev/null | grep -E 'ERROR|WARN' 2>/dev/null | tail -100" 2>/dev/null || echo "")
+
+    # Process errors
+    while IFS= read -r error_line; do
+        if [ -n "$error_line" ]; then
+            categorize_error "$error_line"
+        fi
+    done <<< "$errors"
+
+    # Count checkpoint signatures
+    local signatures=$(exec_on_host "$validator_idx" \
+        "tail -100 $node_home/logs/*.log $node_home/node.log 2>/dev/null | grep -c 'broadcasted signature' 2>/dev/null" 2>/dev/null || echo "0")
+    METRICS[checkpoint_sigs]=$(echo "$signatures" | tr -d ' \n')
+}
+
+# Format number with commas
+format_number() {
+    printf "%'d" "$1" 2>/dev/null || echo "$1"
+}
+
+# Format ISO timestamp to relative time (e.g. "2m ago") or short time
+# CometBFT returns UTC timestamps like 2026-03-05T14:07:03.461765Z
+format_timestamp() {
+    local ts="$1"
+    [ -z "$ts" ] && echo "--" && return
+    if [[ "$ts" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2} ]]; then
+        local input="${ts:0:19}"
+        [[ "$ts" =~ Z$ ]] && input="${input}Z"
+        local epoch
+        epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$input" +%s 2>/dev/null)
+        [ -z "$epoch" ] && epoch=$(date -d "${ts:0:19}" +%s 2>/dev/null)
+        if [ -n "$epoch" ] && [ "$epoch" -gt 0 ] 2>/dev/null; then
+            local now=$(date +%s)
+            local diff=$((now - epoch))
+            if [ $diff -lt 0 ]; then
+                echo "${ts:11:8}"
+            elif [ $diff -lt 60 ]; then
+                echo "${diff}s ago"
+            elif [ $diff -lt 3600 ]; then
+                echo "$((diff / 60))m ago"
+            else
+                echo "${ts:11:8}"
+            fi
+        else
+            echo "${ts:11:8}"
+        fi
+    else
+        echo "${ts:0:8}"
+    fi
+}
+
+# Format bytes to human readable
+format_bytes() {
+    local bytes=$1
+    if [ $bytes -lt 1024 ]; then
+        echo "${bytes}B"
+    elif [ $bytes -lt 1048576 ]; then
+        echo "$((bytes / 1024))KB"
+    else
+        echo "$((bytes / 1048576))MB"
+    fi
+}
+
+# Get status indicator
+get_status_indicator() {
+    local value=$1
+    local threshold_good=$2
+    local threshold_warn=$3
+    local higher_is_better=${4:-true}
+
+    if [ "$higher_is_better" = "true" ]; then
+        if [ $value -ge $threshold_good ]; then
+            echo -e "${GREEN}✓${RESET}"
+        elif [ $value -ge $threshold_warn ]; then
+            echo -e "${YELLOW}⚠${RESET}"
+        else
+            echo -e "${RED}✗${RESET}"
+        fi
+    else
+        if [ $value -le $threshold_good ]; then
+            echo -e "${GREEN}✓${RESET}"
+        elif [ $value -le $threshold_warn ]; then
+            echo -e "${YELLOW}⚠${RESET}"
+        else
+            echo -e "${RED}✗${RESET}"
+        fi
+    fi
+}
+
+# Calculate uptime
+get_uptime() {
+    local start_time=${METRICS[start_time]}
+    local current_time=$(date +%s)
+    local uptime_seconds=$((current_time - start_time))
+
+    local hours=$((uptime_seconds / 3600))
+    local minutes=$(((uptime_seconds % 3600) / 60))
+
+    echo "${hours}h ${minutes}m"
+}
+
+# Draw the dashboard
+draw_dashboard() {
+    local name="$1"
+    local subnet_id=$(get_config_value "subnet.id")
+    local subnet_short="${subnet_id:0:20}..."
+
+    # Clear screen and move cursor to home
+    echo -ne "${CLEAR_SCREEN}${CURSOR_HOME}"
+
+    # Header
+    echo -e "${BOLD}${CYAN}╔═══════════════════════════════════════════════════════════════════════╗${RESET}"
+    printf "${BOLD}${CYAN}║${RESET}           ${BOLD}IPC SUBNET LIVE MONITOR${RESET} - %-27s ${BOLD}${CYAN}║${RESET}\n" "$name"
+    printf "${BOLD}${CYAN}║${RESET}  Subnet: %-24s Refresh: 3s    Uptime: %-6s ${BOLD}${CYAN}║${RESET}\n" "$subnet_short" "$(get_uptime)"
+    echo -e "${BOLD}${CYAN}╚═══════════════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+
+    # Block Production
+    local height=$(format_number ${METRICS[height]:-0})
+    local blocks_per_min=${METRICS[blocks_per_min]:-0}
+    local expected_peers=$((${#VALIDATORS[@]} - 1))
+    local peers=${METRICS[peers]:-0}
+    # Status: when blocks_per_min not yet calculated, use height>0 and peers as proxy
+    local block_status
+    if [ $blocks_per_min -gt 0 ]; then
+        block_status=$(get_status_indicator $blocks_per_min 30 10 true)
+    elif [ ${METRICS[height]:-0} -gt 0 ] && [ $peers -ge $expected_peers ]; then
+        block_status=$(echo -e "${GREEN}✓${RESET}")
+    else
+        block_status=$(get_status_indicator $blocks_per_min 30 10 true)
+    fi
+    local avg_block_time="--"
+    local rate_display="--"
+    if [ $blocks_per_min -gt 0 ]; then
+        avg_block_time=$(printf "%.1fs" $(echo "scale=1; 60/$blocks_per_min" | bc 2>/dev/null || echo "0"))
+        rate_display="${blocks_per_min}/min"
+    fi
+    local last_block=$(format_timestamp "${METRICS[block_time]:-}")
+
+    echo -e "${BOLD}┌─ BLOCK PRODUCTION ────────────────────────────────────────────────────┐${RESET}"
+    printf "│ Height: %-6s  (+%-3d in 1m)  Avg Block Time: %-6s  Rate: %-8s │\n" "$height" "$blocks_per_min" "$avg_block_time" "$rate_display"
+    printf "│ Status: %b PRODUCING             Last Block: %-24s │\n" "$block_status" "$last_block"
+    echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
+    echo ""
+
+    # Parent Finality
+    local parent_height_val=${METRICS[parent_height]:-0}
+    local subnet_finality
+    if [ "$parent_height_val" -eq 0 ]; then
+        subnet_finality="N/A"
+    else
+        subnet_finality=$(format_number $parent_height_val)
+    fi
+    local parent_chain=$(format_number ${METRICS[parent_chain_height]:-0})
+    local lag=${METRICS[finality_lag]:-0}
+    local finality_status=$(get_status_indicator $lag 30 100 false)
+    local last_commit=$(format_timestamp "${METRICS[finality_time]:-}")
+
+    # Check if F3 is disabled (Anvil/local development) or topdown disabled (bootstrap)
+    local finality_note=""
+    if is_local_mode; then
+        finality_note=" ${YELLOW}(Null Finality - F3 disabled)${RESET}"
+    elif [ "$parent_height_val" -eq 0 ]; then
+        finality_note=" ${YELLOW}(Topdown disabled - bootstrap subnet)${RESET}"
+    fi
+
+    echo -e "${BOLD}┌─ PARENT FINALITY ─────────────────────────────────────────────────────┐${RESET}"
+    printf "│ Subnet: %-8s  Parent Chain: %-8s  Lag: %-4d blocks           │\n" "$subnet_finality" "$parent_chain" "$lag"
+    printf "│ Status: %b SYNCING               Last Commit: %-24s │\n" "$finality_status" "$last_commit"
+    if [ -n "$finality_note" ]; then
+        printf "│ %b%-69s │\n" "$finality_note" ""
+    fi
+    echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
+    echo ""
+
+    # Network Health
+    local peers=${METRICS[peers]:-0}
+    # Calculate expected peers as validator_count - 1 (excludes self)
+    local expected_peers=$((${#VALIDATORS[@]} - 1))
+    local peer_status=$(get_status_indicator $peers $expected_peers 1 true)
+
+    # Libp2p peers: CometBFT net_info doesn't expose; show same as Comet for now (validator mesh)
+    local libp2p_display="${peers}"
+    echo -e "${BOLD}┌─ NETWORK HEALTH ──────────────────────────────────────────────────────┐${RESET}"
+    printf "│ CometBFT Peers: %d/%d %b    Libp2p Peers: %-3s    RPC: ${GREEN}✓${RESET} RESPONSIVE     │\n" "$peers" "$expected_peers" "$peer_status" "$libp2p_display"
+    echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
+    echo ""
+
+    # Mempool Status
+    local mempool_size=${METRICS[mempool_size]:-0}
+    local mempool_bytes=${METRICS[mempool_bytes]:-0}
+    local mempool_max=${METRICS[mempool_max]:-5000}
+    local mempool_pct=0
+    if [ $mempool_max -gt 0 ]; then
+        mempool_pct=$((mempool_size * 100 / mempool_max))
+    fi
+    local mempool_status=$(get_status_indicator $mempool_pct 80 50 false)
+    local mempool_bytes_fmt=$(format_bytes $mempool_bytes)
+    local mempool_size_fmt=$(format_number $mempool_size)
+    local mempool_max_fmt=$(format_number $mempool_max)
+
+    # Dynamic status text based on mempool state
+    local mempool_state="HEALTHY"
+    if [ $mempool_size -eq 0 ]; then
+        mempool_state="EMPTY"
+    elif [ $mempool_pct -ge 80 ]; then
+        mempool_state="${RED}CRITICAL${RESET}"
+    elif [ $mempool_pct -ge 50 ]; then
+        mempool_state="${YELLOW}WARNING${RESET}"
+    elif [ $mempool_size -gt 100 ]; then
+        mempool_state="${YELLOW}ACTIVE${RESET}"
+    else
+        mempool_state="${GREEN}HEALTHY${RESET}"
+    fi
+
+    echo -e "${BOLD}┌─ MEMPOOL STATUS ──────────────────────────────────────────────────────┐${RESET}"
+    printf "│ Pending Transactions: %-8s (%-3d%% full)    Status: %b           │\n" "$mempool_size_fmt" "$mempool_pct" "$mempool_status"
+    printf "│ Max Capacity: %-8s    Size: %-6s    State: %-18s │\n" "$mempool_max_fmt" "$mempool_bytes_fmt" "$mempool_state"
+    echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
+    echo ""
+
+    # Checkpoint Activity
+    local checkpoint_sigs=${METRICS[checkpoint_sigs]:-0}
+    local checkpoint_last=$(format_timestamp "${METRICS[finality_time]:-}")
+
+    echo -e "${BOLD}┌─ CHECKPOINT ACTIVITY (Last 5 min) ────────────────────────────────────┐${RESET}"
+    printf "│ Signatures: %-3d broadcast          Last: %-24s │\n" "$checkpoint_sigs" "$checkpoint_last"
+    echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
+    echo ""
+
+    # Error Summary
+    local total_errors=0
+    for category in "${ERROR_CATEGORIES[@]}"; do
+        total_errors=$((total_errors + ${ERROR_COUNTS[$category]}))
+    done
+
+    local error_rate=0
+    if [ $total_errors -gt 0 ]; then
+        error_rate=$(echo "scale=1; $total_errors / 5" | bc 2>/dev/null || echo "0")
+    fi
+
+    echo -e "${BOLD}┌─ ERROR SUMMARY (Last 5 min) ──────────────────────────────────────────┐${RESET}"
+
+    for category in "${ERROR_CATEGORIES[@]}"; do
+        local count=${ERROR_COUNTS[$category]:-0}
+        local sample=${ERROR_SAMPLES[$category]:-}
+        local icon="●"
+        local color="${GREEN}"
+
+        if [ $count -gt 0 ]; then
+            icon="⚠"
+            if [ $count -gt 10 ]; then
+                color="${RED}"
+            else
+                color="${YELLOW}"
+            fi
+        fi
+
+        local display_name=$(echo "$category" | awk '{for(i=1;i<=NF;i++)sub(/./,toupper(substr($i,1,1)),$i)}1')
+        case $category in
+            "checkpoint") display_name="Bottom-up Checkpoint" ;;
+            "finality") display_name="Parent Finality" ;;
+            "network") display_name="Network/P2P" ;;
+            "consensus") display_name="Consensus" ;;
+            "rpc") display_name="RPC/API" ;;
+        esac
+
+        # Simplified formatting - just show count
+        printf "│ ${color}%-2s${RESET} %-23s  %-3d                                             │\n" "$icon" "$display_name:" "$count"
+    done
+
+    printf "│ ${BOLD}Total Errors:${RESET} %-3d          Error Rate: %.1f/min                        │\n" "$total_errors" "$error_rate"
+    echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
+    echo ""
+
+    # Recent Events
+    echo -e "${BOLD}┌─ RECENT EVENTS ───────────────────────────────────────────────────────┐${RESET}"
+    if [ ${#RECENT_EVENTS[@]} -eq 0 ]; then
+        echo "│ No recent events                                                      │"
+    else
+        for event in "${RECENT_EVENTS[@]}"; do
+            printf "│ %-69s │\n" "$event"
+        done
+    fi
+    echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
+    echo ""
+
+    # Footer
+    echo -e "${CYAN}Press 'q' to quit, 'r' to reset counters${RESET}"
+}
+
+# Main dashboard loop
+run_dashboard() {
+    local validator_idx="${1:-0}"
+    local refresh_interval="${2:-3}"
+
+    load_config
+
+    local name="${VALIDATORS[$validator_idx]}"
+
+    log_info "Starting live dashboard for $name (refresh: ${refresh_interval}s)"
+    echo ""
+
+    initialize_dashboard
+
+    # Draw immediately with defaults so user sees something (avoids hang before first SSH fetch)
+    draw_dashboard "$name" || true
+
+    # Main loop
+    while true; do
+        # Fetch latest metrics (with error handling)
+        fetch_metrics "$validator_idx" || true
+
+        # Draw dashboard (with error handling)
+        draw_dashboard "$name" || true
+
+        # Check for user input (non-blocking)
+        read -t "$refresh_interval" -n 1 key 2>/dev/null || true
+
+        case "$key" in
+            q|Q)
+                break
+                ;;
+            r|R)
+                # Reset error counters
+                for category in "${ERROR_CATEGORIES[@]}"; do
+                    ERROR_COUNTS[$category]=0
+                    ERROR_SAMPLES[$category]=""
+                done
+                RECENT_EVENTS=()
+                add_event "✓" "Counters reset"
+                ;;
+        esac
+    done
+
+    cleanup_dashboard
+    log_info "Dashboard stopped"
+}
+

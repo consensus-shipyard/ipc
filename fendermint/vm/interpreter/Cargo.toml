@@ -10,7 +10,7 @@ license.workspace = true
 
 [dependencies]
 actors-custom-api = { path = "../../actors/api" }
-fendermint_vm_actor_interface = { path = "../actor_interface" }
+fendermint_vm_actor_interface = { path = "../actor_interface", default-features = false }
 fendermint_vm_core = { path = "../core" }
 fendermint_vm_event = { path = "../event" }
 fendermint_vm_encoding = { path = "../encoding" }
@@ -18,6 +18,8 @@ fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_message = { path = "../message" }
 fendermint_vm_resolver = { path = "../resolver" }
 fendermint_vm_topdown = { path = "../topdown" }
+fendermint_vm_topdown_proof_service = { path = "../topdown/proof-service" }
+fendermint_vm_evm_event_utils = { path = "../evm-event-utils" }
 fendermint_crypto = { path = "../../crypto" }
 fendermint_eth_hardhat = { path = "../../eth/hardhat" }
 fendermint_eth_deployer = { path = "../../eth/deployer" }
@@ -29,9 +31,19 @@ fendermint_actor_activity_tracker = { path = "../../actors/activity-tracker" }
 fendermint_actor_f3_light_client = { path = "../../actors/f3-light-client" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
 fendermint_actor_eam = { path = "../../actors/eam" }
+fendermint_actor_init = { path = "../../actors/init", optional = true }
+fendermint_actor_adm = { path = "../../actors/adm", optional = true }
+fendermint_actor_blobs = { path = "../../actors/blobs", optional = true }
+fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared", optional = true }
+fendermint_actor_blob_reader = { path = "../../actors/blob_reader", optional = true }
+fendermint_actor_ipc_storage_config = { path = "../../actors/ipc_storage_config", optional = true }
+fendermint_actor_ipc_storage_config_shared = { path = "../../actors/ipc_storage_config/shared", optional = true }
+fil_actor_adm = { workspace = true, optional = true }
 fil_actor_evm = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }
+iroh = { workspace = true, optional = true }
+iroh-blobs = { workspace = true, optional = true }
 fil_actor_eam = { workspace = true }
 ipc-api = { path = "../../../ipc/api" }
 ipc-observability = { path = "../../../ipc/observability" }
@@ -39,9 +51,11 @@ ipc-observability = { path = "../../../ipc/observability" }
 async-trait = { workspace = true }
 async-stm = { workspace = true }
 anyhow = { workspace = true }
+arc-swap = "1.6"
 base64 = { workspace = true }
 ethers = { workspace = true }
 hex = { workspace = true }
+num-bigint = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -75,11 +89,13 @@ quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
 merkle-tree-rs = { path = "../../../ext/merkle-tree-rs" }
+proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", rev = "45ed1e8c3f99c6055169be1b6812eeff2657f553" }
 
 [dev-dependencies]
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 tempfile = { workspace = true }
+actors-builtin-car = { path = "../../actors-builtin-car" }
 
 fendermint_vm_interpreter = { path = ".", features = ["arb"] }
 fendermint_vm_message = { path = "../message", features = ["arb"] }
@@ -92,6 +108,19 @@ hex = { workspace = true }
 [features]
 default = []
 bundle = []
+ipc-storage = [
+    "fendermint_actor_init",
+    "fendermint_actor_adm",
+    "fendermint_actor_blobs",
+    "fendermint_actor_blobs_shared",
+    "fendermint_actor_blob_reader",
+    "fendermint_actor_ipc_storage_config",
+    "fendermint_actor_ipc_storage_config_shared",
+    "fil_actor_adm",
+    "iroh",
+    "iroh-blobs",
+    "fendermint_vm_actor_interface/ipc-storage",
+]
 arb = [
     "arbitrary",
     "quickcheck",

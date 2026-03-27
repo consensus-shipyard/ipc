@@ -8,7 +8,9 @@
 
 use crate::types::{LightClientState, PowerEntry};
 use fil_actors_runtime::runtime::Runtime;
-use fil_actors_runtime::ActorError;
+use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
+use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use serde::{Deserialize, Serialize};
 
 /// State of the F3 light client actor.
@@ -22,34 +24,72 @@ pub struct State {
     pub light_client_state: LightClientState,
 }
 
+/// Stored HAMT value for power table entries.
+///
+/// The key of the HAMT is the validator ID, so storing `id` in the value would be redundant.
+#[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PowerEntryValue {
+    pub public_key: Vec<u8>,
+    pub power_be: Vec<u8>,
+}
+
+pub(crate) type PowerTable<BS> = Map2<BS, u64, PowerEntryValue>;
+
 impl State {
     /// Create a new F3 light client state
-    pub fn new(
-        instance_id: u64,
+    pub fn new<BS: Blockstore>(
+        store: &BS,
+        processed_instance_id: u64,
         power_table: Vec<PowerEntry>,
-        finalized_epochs: Vec<fvm_shared::clock::ChainEpoch>,
     ) -> Result<State, ActorError> {
+        let power_table_root = {
+            let mut m = PowerTable::empty(store, DEFAULT_HAMT_CONFIG, "f3_power_table");
+            for pe in power_table {
+                let id = pe.id;
+                m.set(
+                    &id,
+                    PowerEntryValue {
+                        public_key: pe.public_key,
+                        power_be: pe.power_be,
+                    },
+                )?;
+            }
+            m.flush()?
+        };
+
         let state = State {
             light_client_state: LightClientState {
-                instance_id,
-                finalized_epochs,
-                power_table,
+                processed_instance_id,
+                power_table_root,
             },
         };
         Ok(state)
     }
 
     /// Update light client state
-    ///
-    /// This method should only be called from consensus code path which
-    /// contains the lightclient verifier. No additional validation is
-    /// performed here as it's expected to be done by the verifier.
     pub fn update_state(
         &mut self,
-        _rt: &impl Runtime,
-        new_state: LightClientState,
+        rt: &impl Runtime,
+        processed_instance_id: u64,
+        power_table: Vec<PowerEntry>,
     ) -> Result<(), ActorError> {
-        self.light_client_state = new_state;
+        let power_table_root = {
+            let mut m = PowerTable::empty(rt.store(), DEFAULT_HAMT_CONFIG, "f3_power_table");
+            for pe in power_table {
+                let id = pe.id;
+                m.set(
+                    &id,
+                    PowerEntryValue {
+                        public_key: pe.public_key,
+                        power_be: pe.power_be,
+                    },
+                )?;
+            }
+            m.flush()?
+        };
+
+        self.light_client_state.processed_instance_id = processed_instance_id;
+        self.light_client_state.power_table_root = power_table_root;
         Ok(())
     }
 }

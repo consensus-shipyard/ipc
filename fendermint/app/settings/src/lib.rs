@@ -27,6 +27,8 @@ use self::resolver::ResolverSettings;
 use ipc_observability::config::TracingSettings;
 use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 
+use fendermint_vm_topdown_proof_service::ProofServiceConfig;
+
 pub mod eth;
 pub mod fvm;
 pub mod resolver;
@@ -226,6 +228,76 @@ pub struct TopDownSettings {
     /// The parent gateway address
     #[serde(deserialize_with = "deserialize_eth_address_from_str")]
     pub parent_gateway: Address,
+    /// F3 configuration (optional - for proof-based finality)
+    /// If Some, F3 proof-based finality is enabled; if None, use legacy voting-based finality
+    #[serde(default)]
+    pub f3: Option<F3>,
+}
+
+/// F3 proof-based finality configuration
+/// When present, F3 proof-based finality is enabled
+#[serde_as]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct F3 {
+    /// F3 proof service configuration (mandatory when F3 is configured)
+    pub proof_service: ProofServiceConfig,
+
+    /// Retry policy for executing `ParentFinalityWithCert` when the local proof cache is missing.
+    ///
+    /// This affects catch-up: if a node did not have the cache entry during attestation (so it
+    /// didn't vote), it may still need to execute a committed block later once the proof-service
+    /// fills the cache.
+    #[serde(default)]
+    pub execution_cache_retry: F3ExecutionCacheRetrySettings,
+}
+
+#[serde_as]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct F3ExecutionCacheRetrySettings {
+    /// Initial backoff between retries.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub backoff_initial: Duration,
+    /// Maximum backoff between retries.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub backoff_max: Duration,
+    /// After this much waiting for a local cache entry during block execution, emit an
+    /// error-severity signal (but keep retrying).
+    #[serde_as(as = "DurationSeconds<u64>")]
+    #[serde(alias = "max_wait")]
+    pub critical_after: Duration,
+    /// Emit an `error!` log after this much waiting (and then periodically thereafter).
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub error_after: Duration,
+}
+
+impl Default for F3ExecutionCacheRetrySettings {
+    fn default() -> Self {
+        Self {
+            backoff_initial: Duration::from_millis(200),
+            backoff_max: Duration::from_secs(5),
+            critical_after: Duration::from_secs(10 * 60),
+            error_after: Duration::from_secs(2 * 60),
+        }
+    }
+}
+
+/// Settings for bottom-up checkpointing (posting subnet state to parent chain).
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct BottomUpSettings {
+    /// Whether bottom-up checkpointing is enabled. If false, no checkpoints will be created
+    /// and no signatures will be broadcast.
+    #[serde(default = "default_bottomup_enabled")]
+    pub enabled: bool,
+}
+
+fn default_bottomup_enabled() -> bool {
+    true
+}
+
+impl Default for BottomUpSettings {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 #[serde_as]
@@ -242,6 +314,9 @@ pub struct IpcSettings {
     /// The config for top down checkpoint. It's None if subnet id is root or not activating
     /// any top down checkpoint related operations
     pub topdown: Option<TopDownSettings>,
+    /// The config for bottom up checkpoint. If None or disabled, no bottom-up checkpointing
+    /// will be performed (no checkpoint creation or signature broadcasting).
+    pub bottomup: Option<BottomUpSettings>,
 }
 
 impl Default for IpcSettings {
@@ -251,6 +326,7 @@ impl Default for IpcSettings {
             vote_interval: Duration::from_secs(1),
             vote_timeout: Duration::from_secs(60),
             topdown: None,
+            bottomup: None,
         }
     }
 }
@@ -267,6 +343,13 @@ impl IpcSettings {
         };
 
         Ok(ret)
+    }
+
+    /// Check if bottom-up checkpointing is enabled.
+    /// Returns true by default if bottomup config is not specified, matching the intended
+    /// default behavior where bottom-up checkpointing is enabled by default.
+    pub fn bottomup_enabled(&self) -> bool {
+        self.bottomup.as_ref().is_none_or(|config| config.enabled)
     }
 }
 

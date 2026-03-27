@@ -1,0 +1,26 @@
+# Kibana Configuration for IPC Log Visualization
+
+server.name: ipc-kibana
+server.host: "0.0.0.0"
+server.port: 5601
+
+# Elasticsearch connection
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+elasticsearch.username: "elastic"
+elasticsearch.password: "${ELASTICSEARCH_PASSWORD}"
+
+# Security
+xpack.security.enabled: true
+xpack.encryptedSavedObjects.encryptionKey: "${KIBANA_ENCRYPTION_KEY}"
+
+# Monitoring
+monitoring.ui.container.elasticsearch.enabled: true
+xpack.monitoring.enabled: true
+
+# Session timeout (24 hours)
+xpack.security.session.idleTimeout: "24h"
+xpack.security.session.lifespan: "30d"
+
+# Enable logging
+logging.root.level: info
+

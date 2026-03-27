@@ -47,6 +47,7 @@ struct PowerChangeRequest {
 /// @notice The collection of staking changes.
 struct PowerChangeLog {
     /// @notice The next configuration number to assign to new changes.
+    // Keep in sync with the storage slot offset in the proof-service: fendermint/vm/topdown/proof-service/src/assembler.rs:NEXT_CONFIG_NUMBER_STORAGE_SLOT
     uint64 nextConfigurationNumber;
     /// @notice The starting configuration number stored.
     uint64 startConfigurationNumber;

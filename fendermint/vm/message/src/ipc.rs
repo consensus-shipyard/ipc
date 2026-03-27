@@ -8,9 +8,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum IpcMessage {
-    /// A top-down checkpoint parent finality proposal. This proposal should contain the latest parent
-    /// state that to be checked and voted by validators.
+    /// A top-down checkpoint parent finality proposal (legacy voting-based)
     TopDownExec(ParentFinality),
+    /// Parent finality proposal carrying a certificate.
+    ///
+    /// This is intentionally "WithCert" to allow future extensions where certificates and
+    /// integrity proof bundles are delivered as separate messages.
+    ParentFinalityWithCert(ParentFinalityWithCert),
 }
 
 /// A proposal of the parent view that validators will be voting on.
@@ -20,6 +24,23 @@ pub struct ParentFinality {
     pub height: ChainEpoch,
     /// The block hash of the parent, expressed as bytes
     pub block_hash: Vec<u8>,
+}
+
+/// Parent finality proposal with a certificate (v2).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ParentFinalityWithCert {
+    /// The chain epoch this finality is for (height)
+    pub height: ChainEpoch,
+    /// The certificate that certifies finality (type-specific, proof is fetched from local cache)
+    pub certificate: Certificate,
+}
+
+/// Certificate types (extensible for future certificate types)
+/// Each variant contains the certificate data. Proofs are fetched from local cache when needed.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Certificate {
+    /// Filecoin F3 certificate (proof bundle is fetched from local cache using instance ID)
+    FilecoinF3(fendermint_vm_topdown_proof_service::types::SerializableF3Certificate),
 }
 
 #[cfg(feature = "arb")]
