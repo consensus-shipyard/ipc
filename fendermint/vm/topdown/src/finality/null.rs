@@ -8,7 +8,7 @@ use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, Sequential
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
-use std::cmp::min;
+use std::cmp::max;
 
 use fendermint_tracing::emit;
 use fendermint_vm_event::ParentFinalityCommitted;
@@ -94,13 +94,6 @@ impl FinalityWithNull {
         let proposal = IPCParentFinality { height, block_hash };
         tracing::debug!(proposal = proposal.to_string(), "new proposal");
         Ok(Some(proposal))
-    }
-
-    pub fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {
-        if !self.check_height(proposal)? {
-            return Ok(false);
-        }
-        self.check_block_hash(proposal)
     }
 
     pub fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()> {
@@ -191,42 +184,66 @@ impl FinalityWithNull {
             unreachable!("last committed finality will be available at this point");
         };
 
-        let max_proposal_height = last_committed_height + self.config.max_proposal_range();
-        let candidate_height = min(max_proposal_height, latest_height);
-        tracing::debug!(max_proposal_height, candidate_height, "propose heights");
-
-        let first_non_null_height = if let Some(h) = self.first_non_null_block(candidate_height)? {
+        // Propose only the next non-null block after the last committed height.
+        // This avoids moving-target quorum where proposal candidates keep advancing.
+        let next_non_null_height = if let Some(h) =
+            self.next_non_null_block_after(last_committed_height, latest_height)?
+        {
             h
         } else {
-            tracing::debug!(height = candidate_height, "no non-null block found before");
+            tracing::debug!(
+                last_committed_height,
+                latest_height,
+                "no next non-null block found after last committed"
+            );
             return Ok(None);
         };
 
-        tracing::debug!(first_non_null_height, candidate_height);
-        // an extra layer of delay
-        let maybe_proposal_height =
-            self.first_non_null_block(first_non_null_height - self.config.proposal_delay())?;
-        tracing::debug!(
-            delayed_height = maybe_proposal_height,
-            delay = self.config.proposal_delay()
-        );
-        if let Some(proposal_height) = maybe_proposal_height {
-            // this is possible due to delayed execution as the proposed height's data cannot be
-            // executed because they have yet to be executed.
-            return if last_committed_height == proposal_height {
-                tracing::debug!(
-                    last_committed_height,
-                    proposal_height,
-                    "no new blocks from cache, not proposing"
-                );
-                Ok(None)
-            } else {
-                tracing::debug!(proposal_height, "new proposal height");
-                Ok(Some(proposal_height))
-            };
+        // Require additional headroom before proposing this next block.
+        let delay = self.config.proposal_delay();
+        let min_observed_height = next_non_null_height.saturating_add(delay);
+        if latest_height < min_observed_height {
+            tracing::debug!(
+                next_non_null_height,
+                latest_height,
+                delay,
+                min_observed_height,
+                "not enough delayed parent view to propose next non-null block"
+            );
+            return Ok(None);
         }
 
-        tracing::debug!(last_committed_height, "no non-null block after delay");
+        tracing::debug!(
+            proposal_height = next_non_null_height,
+            delay,
+            latest_height,
+            "new proposal height (single-next policy)"
+        );
+        Ok(Some(next_non_null_height))
+    }
+
+    fn next_non_null_block_after(
+        &self,
+        lower_exclusive: BlockHeight,
+        upper_inclusive: BlockHeight,
+    ) -> Stm<Option<BlockHeight>> {
+        let cache = self.cached_data.read()?;
+        let lower = if let Some(lb) = cache.lower_bound() {
+            max(lb, lower_exclusive.saturating_add(1))
+        } else {
+            return Ok(None);
+        };
+
+        if lower > upper_inclusive {
+            return Ok(None);
+        }
+
+        for h in lower..=upper_inclusive {
+            if let Some(Some(_)) = cache.get_value(h) {
+                return Ok(Some(h));
+            }
+        }
+
         Ok(None)
     }
 
@@ -307,58 +324,6 @@ impl FinalityWithNull {
         Ok(())
     }
 
-    fn check_height(&self, proposal: &IPCParentFinality) -> Stm<bool> {
-        let binding = self.last_committed_finality.read()?;
-        // last committed finality is not ready yet, we don't vote, just reject
-        let last_committed_finality = if let Some(f) = binding.as_ref() {
-            f
-        } else {
-            return Ok(false);
-        };
-
-        // the incoming proposal has height already committed, reject
-        if last_committed_finality.height >= proposal.height {
-            tracing::debug!(
-                last_committed = last_committed_finality.height,
-                proposed = proposal.height,
-                "proposed height already committed",
-            );
-            return Ok(false);
-        }
-
-        if let Some(latest_height) = self.latest_height_in_cache()? {
-            let r = latest_height >= proposal.height;
-            tracing::debug!(
-                is_true = r,
-                latest_height,
-                proposal = proposal.height.to_string(),
-                "incoming proposal height seen?"
-            );
-            // requires the incoming height cannot be more advanced than our trusted parent node
-            Ok(r)
-        } else {
-            // latest height is not found, meaning we dont have any prefetched cache, we just be
-            // strict and vote no simply because we don't know.
-            tracing::debug!(
-                proposal = proposal.height.to_string(),
-                "reject proposal, no data in cache"
-            );
-            Ok(false)
-        }
-    }
-
-    fn check_block_hash(&self, proposal: &IPCParentFinality) -> Stm<bool> {
-        Ok(
-            if let Some(block_hash) = self.block_hash_at_height(proposal.height)? {
-                let r = block_hash == proposal.block_hash;
-                tracing::debug!(proposal = proposal.to_string(), is_same = r, "same hash?");
-                r
-            } else {
-                tracing::debug!(proposal = proposal.to_string(), "reject, hash not found");
-                false
-            },
-        )
-    }
 }
 
 #[cfg(test)]
@@ -398,7 +363,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_happy_path() {
-        // max_proposal_range is 6. proposal_delay is 2
+        // Under single-next policy with proposal_delay=2 we propose the next non-null (101)
+        // once we've observed at least two more parent heights.
         let parent_blocks = vec![
             (100, Some((vec![0; 32], vec![], vec![]))), // last committed block
             (101, Some((vec![1; 32], vec![], vec![]))), // cache start
@@ -412,8 +378,8 @@ mod tests {
         let provider = new_provider(parent_blocks).await;
 
         let f = IPCParentFinality {
-            height: 104,
-            block_hash: vec![4; 32],
+            height: 101,
+            block_hash: vec![1; 32],
         };
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
@@ -436,7 +402,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_not_enough_view() {
-        // max_proposal_range is 6. proposal_delay is 2
+        // Under single-next policy, this still proposes the first non-null after commitment
+        // (101), because enough delayed view is available.
         let parent_blocks = vec![
             (100, Some((vec![0; 32], vec![], vec![]))), // last committed block
             (101, Some((vec![1; 32], vec![], vec![]))),
@@ -451,8 +418,8 @@ mod tests {
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
             Some(IPCParentFinality {
-                height: 103,
-                block_hash: vec![3; 32]
+                height: 101,
+                block_hash: vec![1; 32]
             })
         );
     }
@@ -501,7 +468,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_partially_null_blocks_ii() {
-        // max_proposal_range is 10. proposal_delay is 2
+        // Under single-next policy this proposes 103 (the first non-null after committed 102),
+        // once enough delayed parent view is present.
         let parent_blocks = vec![
             (102, Some((vec![2; 32], vec![], vec![]))), // last committed block
             (103, Some((vec![3; 32], vec![], vec![]))),
@@ -520,8 +488,8 @@ mod tests {
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
             Some(IPCParentFinality {
-                height: 107,
-                block_hash: vec![7; 32]
+                height: 103,
+                block_hash: vec![3; 32]
             })
         );
     }
@@ -548,8 +516,8 @@ mod tests {
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
             Some(IPCParentFinality {
-                height: 107,
-                block_hash: vec![7; 32]
+                height: 103,
+                block_hash: vec![3; 32]
             })
         );
     }

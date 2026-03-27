@@ -157,8 +157,6 @@ pub trait ParentViewProvider {
 pub trait ParentFinalityProvider: ParentViewProvider {
     /// Latest proposal for parent finality
     fn next_proposal(&self) -> Stm<Option<IPCParentFinality>>;
-    /// Check if the target proposal is valid
-    fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool>;
     /// Called when finality is committed
     fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()>;
 }

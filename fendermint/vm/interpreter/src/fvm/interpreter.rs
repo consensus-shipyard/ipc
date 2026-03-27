@@ -5,11 +5,13 @@ use anyhow::{Context, Result};
 use cid::Cid;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::ipc::IpcMessage;
+use fendermint_vm_message::ipc::ParentFinality;
 use fendermint_vm_message::query::{FvmQuery, StateParams};
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{self};
 use fvm_shared::{address::Address, error::ExitCode};
+use fendermint_vm_topdown::IPCParentFinality;
 use std::sync::Arc;
 
 use crate::errors::*;
@@ -254,6 +256,7 @@ where
         state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
+        topdown_override: Option<Option<IPCParentFinality>>,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError> {
         let input_tx_count = msgs.len();
         tracing::info!(
@@ -295,9 +298,18 @@ where
             "prepare_messages_for_block selected messages by gas limit"
         );
 
-        // Get parent finality message - TopDownManager decides internally whether to use F3 or legacy
+        // Get parent finality message.
+        // When override is supplied, it comes from deterministic consensus data (local_last_commit).
         tracing::info!("prepare_messages_for_block entering topdown proposal lookup");
-        let top_down_msg = self.top_down_manager.chain_message_for_proposal().await;
+        let top_down_msg = match topdown_override {
+            Some(maybe_finality) => maybe_finality.map(|finality| {
+                ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
+                    height: finality.height as fvm_shared::clock::ChainEpoch,
+                    block_hash: finality.block_hash,
+                }))
+            }),
+            None => self.top_down_manager.chain_message_for_proposal().await,
+        };
         let topdown_included = top_down_msg.is_some();
         let top_down_iter = top_down_msg.into_iter();
         tracing::info!(
@@ -437,6 +449,10 @@ where
         }
 
         Ok(AttestMessagesResponse::Accept)
+    }
+
+    async fn parent_vote_extension_candidate(&self) -> Option<IPCParentFinality> {
+        self.top_down_manager.vote_extension_candidate().await
     }
 
     async fn begin_block(
