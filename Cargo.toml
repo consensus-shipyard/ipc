@@ -328,7 +328,7 @@ yamux = { git = "https://github.com/paritytech/yamux", tag = "yamux-v0.13.4" }
 # Pin digest to 0.11.0-rc.2 for compatibility with blake2 from huitseeker/hashes (used by rust-f3)
 digest = { git = "https://github.com/RustCrypto/traits", tag = "digest-v0.11.0-rc.2" }
 
-[profile.wasm]
+[profile.wasm-actor]
 inherits = "release"
 panic = "abort"
 overflow-checks = false
