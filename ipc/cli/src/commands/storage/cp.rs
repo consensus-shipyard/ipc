@@ -18,6 +18,8 @@ use async_trait::async_trait;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::SignedMessageFactory;
 use fendermint_rpc::QueryClient;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 
 use crate::commands::storage::{bucket, client::GatewayClient, config::StorageConfig, path};
@@ -124,7 +126,7 @@ async fn upload_file(
         dirs::home_dir()
             .unwrap()
             .join(".ipc")
-            .join("storage_default.yaml")
+            .join("storage.yaml")
     });
 
     let mut config = if config_path.exists() {
@@ -155,13 +157,13 @@ async fn upload_file(
         upload_response.hash, upload_response.original_len, upload_response.num_chunks
     );
 
-    // Convert hash to B256 (with length validation)
-    let blob_hash = bucket::hex_to_b256(&upload_response.hash)
+    // Convert hash to B256 (auto-detects hex or base32)
+    let blob_hash = bucket::hash_to_b256(&upload_response.hash)
         .context("Invalid blob hash from gateway")?;
 
-    // Get node info for source ID (with length validation)
+    // Get node info for source ID (auto-detects hex or base32)
     let node_info = gateway_client.get_node_info().await?;
-    let source = bucket::hex_to_b256(&node_info.node_id)
+    let source = bucket::hash_to_b256(&node_info.node_id)
         .context("Invalid node ID from gateway")?;
 
     // Register object on-chain
@@ -183,10 +185,12 @@ async fn upload_file(
         &config.secret_key_file
     )?;
 
-    // Get account sequence (nonce)
-    let addr = fvm_shared::address::Address::new_secp256k1(
-        &secret_key.public_key().serialize(),
-    )?;
+    // Use delegated (f410) address as sender
+    let pub_key = secret_key.public_key();
+    let eth_addr = EthAddress::new_secp256k1(&pub_key.serialize())
+        .context("failed to derive delegated address")?;
+    let addr = Address::new_delegated(10, &eth_addr.0)
+        .context("failed to construct f410 address")?;
     let state = fm_client
         .actor_state(&addr, fendermint_vm_message::query::FvmQueryHeight::default())
         .await
@@ -210,7 +214,7 @@ async fn upload_file(
         upload_response.parity_shards as u16,
     )
     .await
-    .context("Failed to register object on-chain")?;
+    .map_err(|e| anyhow::anyhow!("Failed to register object on-chain: {:?}", e))?;
 
     println!("✓ Successfully uploaded and registered: {}", storage_path.key);
 
@@ -288,7 +292,7 @@ async fn download_file(
         dirs::home_dir()
             .unwrap()
             .join(".ipc")
-            .join("storage_default.yaml")
+            .join("storage.yaml")
     });
 
     let mut config = if config_path.exists() {
@@ -340,7 +344,7 @@ async fn download_directory(
         dirs::home_dir()
             .unwrap()
             .join(".ipc")
-            .join("storage_default.yaml")
+            .join("storage.yaml")
     });
 
     let mut config = if config_path.exists() {

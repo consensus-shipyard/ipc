@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use crate::commands::node::config::NodeInitConfig;
 use crate::commands::storage::config::{StorageConfig, StorageRunMode};
 use crate::CommandLineHandler;
 use anyhow::{Context, Result};
@@ -21,14 +20,11 @@ impl CommandLineHandler for InitStorage {
     type Arguments = InitStorageArgs;
 
     async fn handle(global: &crate::GlobalArguments, args: &Self::Arguments) -> Result<()> {
-        let node_cfg = NodeInitConfig::load(&args.node_config).with_context(|| {
-            format!(
-                "failed to read node config from {}",
-                args.node_config.display()
-            )
-        })?;
+        let node_home = args
+            .home
+            .clone()
+            .unwrap_or_else(|| default_storage_home());
 
-        let node_home = node_cfg.home.clone();
         let storage_dir = node_home.join("storage");
 
         tokio::fs::create_dir_all(&storage_dir)
@@ -40,13 +36,10 @@ impl CommandLineHandler for InitStorage {
                 )
             })?;
 
-        let default_out = {
-            let safe_id = sanitize_subnet_id(&node_cfg.subnet);
-            global
-                .config_dir()
-                .join(format!("storage_{}.yaml", safe_id))
-        };
-        let out = args.out.clone().unwrap_or(default_out);
+        let out = args
+            .out
+            .clone()
+            .unwrap_or_else(|| global.config_dir().join("storage.yaml"));
 
         let root = workspace_root();
         let secret_key_file = args
@@ -72,7 +65,6 @@ impl CommandLineHandler for InitStorage {
             .context("failed to construct operator f410 address")?;
         let storage_cfg = StorageConfig {
             node_home: node_home.clone(),
-            node_config: args.node_config.clone(),
             storage_node_bin: root.join("target/release/node"),
             storage_gateway_bin: root.join("target/release/gateway"),
             network: "testnet".to_string(),
@@ -113,12 +105,6 @@ impl CommandLineHandler for InitStorage {
         log::info!(
             "Recommendation: cross-fund the delegated operator address above before `storage run --register-operator`."
         );
-        log::info!("Example:");
-        log::info!(
-            "  ipc-cli cross-msg fund --subnet \"{}\" --from <PARENT_FUNDING_ADDR> --to {} 1",
-            node_cfg.subnet,
-            operator_f410
-        );
         log::info!(
             "Run storage services with `ipc-cli storage run --config {}`",
             out.display()
@@ -128,24 +114,26 @@ impl CommandLineHandler for InitStorage {
 }
 
 #[derive(Debug, Args)]
-#[command(name = "init", about = "Generate storage-node config from node config")]
+#[command(name = "init", about = "Generate default storage config")]
 pub struct InitStorageArgs {
-    #[arg(long, help = "Path to node init YAML config (node_*.yaml)")]
-    pub node_config: PathBuf,
+    #[arg(
+        long,
+        help = "Storage home directory for keys and data (defaults to ~/.ipc-storage)"
+    )]
+    pub home: Option<PathBuf>,
     #[arg(long, help = "Output path for generated storage YAML config")]
     pub out: Option<PathBuf>,
     #[arg(
         long,
-        help = "Path to operator secp256k1 secret key file (base64). Defaults to <node-home>/storage/operator.sk"
+        help = "Path to operator secp256k1 secret key file (base64). Defaults to <home>/storage/operator.sk"
     )]
     pub secret_key_file: Option<PathBuf>,
 }
 
-fn sanitize_subnet_id(subnet_id: &str) -> String {
-    subnet_id
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect()
+fn default_storage_home() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".ipc-storage")
 }
 
 fn workspace_root() -> PathBuf {

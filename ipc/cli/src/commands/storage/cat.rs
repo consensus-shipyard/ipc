@@ -46,7 +46,7 @@ impl CommandLineHandler for CatStorage {
             dirs::home_dir()
                 .unwrap()
                 .join(".ipc")
-                .join("storage_default.yaml")
+                .join("storage.yaml")
         });
 
         let mut config = if config_path.exists() {

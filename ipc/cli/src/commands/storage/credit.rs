@@ -10,7 +10,7 @@ use num_traits::Zero;
 use std::path::PathBuf;
 
 use fendermint_actor_blobs_shared::{
-    accounts::account::Account,
+    accounts::Account,
     credit::BuyCreditParams,
     method::Method as BlobsMethod,
     BLOBS_ACTOR_ADDR,
@@ -21,6 +21,7 @@ use fendermint_rpc::tx::{TxClient, TxCommit};
 use fendermint_rpc::QueryClient;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_ipld_encoding::RawBytes;
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
@@ -87,7 +88,7 @@ impl CommandLineHandler for BuyCredit {
             dirs::home_dir()
                 .unwrap()
                 .join(".ipc")
-                .join("storage_default.yaml")
+                .join("storage.yaml")
         });
 
         let config = if config_path.exists() {
@@ -106,7 +107,18 @@ impl CommandLineHandler for BuyCredit {
             .context("Failed to query chain ID")?;
 
         let secret_key = SignedMessageFactory::read_secret_key(&config.secret_key_file)?;
-        let addr = Address::new_secp256k1(&secret_key.public_key().serialize())?;
+        let pub_key = secret_key.public_key();
+        let addr = Address::new_secp256k1(&pub_key.serialize())?;
+
+        // Determine recipient — blobs actor requires a delegated (f410) address
+        let recipient = if let Some(ref to_str) = args.to {
+            crate::require_fil_addr_from_str(to_str)?
+        } else {
+            let eth_addr = EthAddress::new_secp256k1(&pub_key.serialize())
+                .context("failed to derive delegated address from operator key")?;
+            Address::new_delegated(10, &eth_addr.0)
+                .context("failed to construct f410 address")?
+        };
 
         let state = fm_client
             .actor_state(&addr, FvmQueryHeight::default())
@@ -117,13 +129,6 @@ impl CommandLineHandler for BuyCredit {
         let mf = SignedMessageFactory::new(secret_key, addr, sequence, ChainID::from(chain_id));
         let mut bound_client = fm_client.bind(mf);
 
-        // Determine recipient
-        let recipient = if let Some(ref to_str) = args.to {
-            crate::require_fil_addr_from_str(to_str)?
-        } else {
-            addr
-        };
-
         let params = BuyCreditParams(recipient);
         let params_bytes =
             RawBytes::serialize(params).context("Failed to serialize BuyCreditParams")?;
@@ -133,8 +138,8 @@ impl CommandLineHandler for BuyCredit {
 
         let gas_params = GasParams {
             gas_limit: 10_000_000_000,
-            gas_fee_cap: TokenAmount::from_atto(100),
-            gas_premium: TokenAmount::from_atto(100),
+            gas_fee_cap: TokenAmount::from_atto(10_000),
+            gas_premium: TokenAmount::from_atto(10_000),
         };
 
         println!("Buying credit for {} with {} FIL...", recipient, args.amount);
@@ -158,9 +163,13 @@ impl CommandLineHandler for BuyCredit {
         }
 
         if res.response.deliver_tx.code.is_err() {
+            let log = &res.response.deliver_tx.log;
+            let info = &res.response.deliver_tx.info;
             return Err(anyhow!(
-                "BuyCredit deliver_tx failed: {}",
-                res.response.deliver_tx.log
+                "BuyCredit deliver_tx failed (code {:?}): log={} info={}",
+                res.response.deliver_tx.code,
+                if log.is_empty() { "<empty>" } else { log },
+                if info.is_empty() { "<empty>" } else { info },
             ));
         }
 
@@ -200,7 +209,7 @@ impl CommandLineHandler for CreditInfo {
             dirs::home_dir()
                 .unwrap()
                 .join(".ipc")
-                .join("storage_default.yaml")
+                .join("storage.yaml")
         });
 
         let config = if config_path.exists() {

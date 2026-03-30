@@ -12,12 +12,13 @@ use std::path::PathBuf;
 
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::{GasParams, SignedMessageFactory};
-use fendermint_rpc::tx::{BoundClient, TxClient, TxCommit};
+use fendermint_rpc::tx::{TxClient, TxCommit};
 use fendermint_rpc::QueryClient;
 use fendermint_vm_actor_interface::adm::{
     self, CreateExternalParams, CreateExternalReturn, Kind, ListMetadataParams,
     Method as AdmMethod,
 };
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
@@ -81,7 +82,7 @@ impl CommandLineHandler for CreateBucket {
             dirs::home_dir()
                 .unwrap()
                 .join(".ipc")
-                .join("storage_default.yaml")
+                .join("storage.yaml")
         });
 
         let config = if config_path.exists() {
@@ -101,7 +102,18 @@ impl CommandLineHandler for CreateBucket {
 
         let secret_key =
             SignedMessageFactory::read_secret_key(&config.secret_key_file)?;
-        let addr = Address::new_secp256k1(&secret_key.public_key().serialize())?;
+        let pub_key = secret_key.public_key();
+        let addr = Address::new_secp256k1(&pub_key.serialize())?;
+
+        // Parse owner address — ADM requires delegated (f410) address
+        let owner = if let Some(ref owner_str) = args.owner {
+            crate::require_fil_addr_from_str(owner_str)?
+        } else {
+            let eth_addr = EthAddress::new_secp256k1(&pub_key.serialize())
+                .context("failed to derive delegated address")?;
+            Address::new_delegated(10, &eth_addr.0)
+                .context("failed to construct f410 address")?
+        };
 
         let state = fm_client
             .actor_state(&addr, FvmQueryHeight::default())
@@ -111,13 +123,6 @@ impl CommandLineHandler for CreateBucket {
 
         let mf = SignedMessageFactory::new(secret_key, addr, sequence, ChainID::from(chain_id));
         let mut bound_client = fm_client.bind(mf);
-
-        // Parse owner address
-        let owner = if let Some(ref owner_str) = args.owner {
-            crate::require_fil_addr_from_str(owner_str)?
-        } else {
-            addr
-        };
 
         // Parse metadata
         let metadata = parse_metadata(&args.metadata)?;
@@ -133,8 +138,8 @@ impl CommandLineHandler for CreateBucket {
 
         let gas_params = GasParams {
             gas_limit: 10_000_000_000,
-            gas_fee_cap: TokenAmount::from_atto(100),
-            gas_premium: TokenAmount::from_atto(100),
+            gas_fee_cap: TokenAmount::from_atto(10_000),
+            gas_premium: TokenAmount::from_atto(10_000),
         };
 
         println!("Creating bucket...");
@@ -158,9 +163,13 @@ impl CommandLineHandler for CreateBucket {
         }
 
         if res.response.deliver_tx.code.is_err() {
+            let log = &res.response.deliver_tx.log;
+            let info = &res.response.deliver_tx.info;
             return Err(anyhow!(
-                "CreateExternal deliver_tx failed: {}",
-                res.response.deliver_tx.log
+                "CreateExternal deliver_tx failed (code {:?}): log={} info={}",
+                res.response.deliver_tx.code,
+                if log.is_empty() { "<empty>" } else { log },
+                if info.is_empty() { "<empty>" } else { info },
             ));
         }
 
@@ -170,12 +179,16 @@ impl CommandLineHandler for CreateBucket {
         let result: CreateExternalReturn = fvm_ipld_encoding::from_slice(&return_data)
             .context("Failed to decode CreateExternalReturn")?;
 
+        let bucket_id_addr = Address::new_id(result.actor_id);
+        let evm_addr = fendermint_vm_actor_interface::eam::EthAddress::from_id(result.actor_id);
+
         println!("Bucket created successfully!");
-        println!("  Actor ID: {}", result.actor_id);
+        println!("  Actor ID:    {}", bucket_id_addr);
+        println!("  EVM address: 0x{}", hex::encode(evm_addr.0));
         if let Some(ref robust) = result.robust_address {
-            println!("  Address:  {}", robust);
+            println!("  Robust addr: {}", robust);
         }
-        println!("  Owner:    {}", owner);
+        println!("  Owner:       {}", owner);
 
         Ok(())
     }
@@ -211,7 +224,7 @@ impl CommandLineHandler for ListBuckets {
             dirs::home_dir()
                 .unwrap()
                 .join(".ipc")
-                .join("storage_default.yaml")
+                .join("storage.yaml")
         });
 
         let config = if config_path.exists() {

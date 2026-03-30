@@ -22,8 +22,8 @@ use std::collections::HashMap;
 fn default_gas_params() -> GasParams {
     GasParams {
         gas_limit: 10_000_000_000,
-        gas_fee_cap: TokenAmount::from_atto(100),
-        gas_premium: TokenAmount::from_atto(100),
+        gas_fee_cap: TokenAmount::from_atto(10_000),
+        gas_premium: TokenAmount::from_atto(10_000),
     }
 }
 
@@ -73,16 +73,24 @@ where
     .context("Failed to send AddObject transaction")?;
 
     if res.response.check_tx.code.is_err() {
+        let log = &res.response.check_tx.log;
+        let info = &res.response.check_tx.info;
         return Err(anyhow!(
-            "AddObject check_tx failed: {}",
-            res.response.check_tx.log
+            "AddObject check_tx failed (code {:?}): log={} info={}",
+            res.response.check_tx.code,
+            if log.is_empty() { "<empty>" } else { log },
+            if info.is_empty() { "<empty>" } else { info },
         ));
     }
 
     if res.response.deliver_tx.code.is_err() {
+        let log = &res.response.deliver_tx.log;
+        let info = &res.response.deliver_tx.info;
         return Err(anyhow!(
-            "AddObject deliver_tx failed: {}",
-            res.response.deliver_tx.log
+            "AddObject deliver_tx failed (code {:?}): log={} info={}",
+            res.response.deliver_tx.code,
+            if log.is_empty() { "<empty>" } else { log },
+            if info.is_empty() { "<empty>" } else { info },
         ));
     }
 
@@ -240,47 +248,58 @@ pub fn hex_to_b256(hex_str: &str) -> Result<B256> {
     Ok(B256(array))
 }
 
-/// Update object metadata
-pub async fn update_object_metadata<C>(
-    client: &mut C,
-    bucket_address: Address,
-    key: String,
-    metadata: HashMap<String, Option<String>>,
-) -> Result<()>
-where
-    C: BoundClient + TxClient<TxCommit> + Send + Sync,
-{
-    let params = UpdateObjectMetadataParams {
-        key: key.into_bytes(),
-        metadata,
-    };
-    let params_bytes =
-        RawBytes::serialize(params).context("Failed to serialize UpdateObjectMetadataParams")?;
-
-    let res = TxClient::<TxCommit>::transaction(
-        client,
-        bucket_address,
-        BucketMethod::UpdateObjectMetadata as u64,
-        params_bytes,
-        TokenAmount::zero(),
-        default_gas_params(),
-    )
-    .await
-    .context("Failed to send UpdateObjectMetadata transaction")?;
-
-    if res.response.check_tx.code.is_err() {
+/// Convert a hash string to B256, auto-detecting hex or base32 encoding.
+///
+/// Supports:
+/// - Hex with "0x" prefix
+/// - Hex (64 hex chars)
+/// - Base32 lower-case no-padding (iroh/blake3 format, 52 chars)
+pub fn hash_to_b256(s: &str) -> Result<B256> {
+    if s.starts_with("0x") || (s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())) {
+        return hex_to_b256(s);
+    }
+    // Try base32 (lower-case no-padding, as used by iroh)
+    let bytes = base32_decode_nopad(s).context("Failed to decode as base32")?;
+    if bytes.len() < 32 {
         return Err(anyhow!(
-            "UpdateObjectMetadata check_tx failed: {}",
-            res.response.check_tx.log
+            "Expected at least 32 bytes, got {} from base32 string",
+            bytes.len()
         ));
     }
+    let mut array = [0u8; 32];
+    array.copy_from_slice(&bytes[..32]);
+    Ok(B256(array))
+}
 
-    if res.response.deliver_tx.code.is_err() {
-        return Err(anyhow!(
-            "UpdateObjectMetadata deliver_tx failed: {}",
-            res.response.deliver_tx.log
-        ));
+/// Decode RFC 4648 base32 (case-insensitive, no padding required).
+fn base32_decode_nopad(input: &str) -> Result<Vec<u8>> {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+    fn val(c: u8) -> Result<u8> {
+        let c = c.to_ascii_uppercase();
+        ALPHABET
+            .iter()
+            .position(|&a| a == c)
+            .map(|p| p as u8)
+            .ok_or_else(|| anyhow!("invalid base32 character: {}", c as char))
     }
 
-    Ok(())
+    let input = input.as_bytes();
+    let mut buf = Vec::with_capacity(input.len() * 5 / 8);
+    let mut bits: u32 = 0;
+    let mut n_bits: u32 = 0;
+
+    for &c in input {
+        if c == b'=' {
+            break;
+        }
+        bits = (bits << 5) | val(c)? as u32;
+        n_bits += 5;
+        if n_bits >= 8 {
+            n_bits -= 8;
+            buf.push((bits >> n_bits) as u8);
+            bits &= (1 << n_bits) - 1;
+        }
+    }
+    Ok(buf)
 }

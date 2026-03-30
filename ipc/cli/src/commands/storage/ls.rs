@@ -56,7 +56,7 @@ impl CommandLineHandler for ListStorage {
             dirs::home_dir()
                 .unwrap()
                 .join(".ipc")
-                .join("storage_default.yaml")
+                .join("storage.yaml")
         });
 
         let config = if config_path.exists() {

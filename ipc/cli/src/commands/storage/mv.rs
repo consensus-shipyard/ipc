@@ -11,6 +11,8 @@ use async_trait::async_trait;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::SignedMessageFactory;
 use fendermint_rpc::QueryClient;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 
 use crate::commands::storage::{bucket, client::GatewayClient, config::StorageConfig, path};
@@ -56,7 +58,7 @@ impl CommandLineHandler for MoveStorage {
             dirs::home_dir()
                 .unwrap()
                 .join(".ipc")
-                .join("storage_default.yaml")
+                .join("storage.yaml")
         });
 
         let mut config = if config_path.exists() {
@@ -96,9 +98,11 @@ impl CommandLineHandler for MoveStorage {
             &config.secret_key_file
         )?;
 
-        let addr = fvm_shared::address::Address::new_secp256k1(
-            &secret_key.public_key().serialize(),
-        )?;
+        let pub_key = secret_key.public_key();
+        let eth_addr = EthAddress::new_secp256k1(&pub_key.serialize())
+            .context("failed to derive delegated address")?;
+        let addr = Address::new_delegated(10, &eth_addr.0)
+            .context("failed to construct f410 address")?;
         let state = fm_client
             .actor_state(&addr, fendermint_vm_message::query::FvmQueryHeight::default())
             .await

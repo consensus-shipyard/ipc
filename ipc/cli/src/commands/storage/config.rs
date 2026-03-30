@@ -19,10 +19,8 @@ pub enum StorageRunMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct StorageConfig {
-    /// IPC node home, usually "~/.node-ipc".
+    /// Storage home directory for keys, iroh data, etc.
     pub node_home: PathBuf,
-    /// Source node-init config used to derive defaults.
-    pub node_config: PathBuf,
     /// Path to ipc-storage node binary (ipc-decentralized-storage `node`).
     pub storage_node_bin: PathBuf,
     /// Path to ipc-storage gateway binary.
