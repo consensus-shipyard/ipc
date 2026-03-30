@@ -4,6 +4,10 @@ version = "0.1.0"
 edition.workspace = true
 license-file.workspace = true
 
+[features]
+default = []
+ipc-storage = ["fendermint_app/ipc-storage"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
@@ -40,7 +44,7 @@ num-derive = "0.3.3"
 num-bigint = { workspace = true }
 num-traits = { workspace = true }
 openssl = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, features = ["multipart"] }
 serde = { workspace = true }
 serde_bytes = "0.11.9"
 serde_json = { workspace = true }
@@ -68,7 +72,7 @@ uuid = { version = "1.0", features = ["v4"] }
 mime_guess = "2.0"
 include_dir = "0.7"
 fendermint_eth_api = { path = "../../fendermint/eth/api" }
-fendermint_rpc = { path = "../../fendermint/rpc" }
+fendermint_rpc = { path = "../../fendermint/rpc", features = ["ipc-storage"] }
 tendermint-rpc = { workspace = true }
 
 ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
@@ -82,8 +86,15 @@ fendermint_eth_hardhat = { path = "../../fendermint/eth/hardhat" }
 fendermint_eth_deployer = { path = "../../fendermint/eth/deployer" }
 fendermint_app_settings = { path = "../../fendermint/app/settings" }
 fendermint_vm_actor_interface = { path = "../../fendermint/vm/actor_interface" }
+fendermint_vm_message = { path = "../../fendermint/vm/message" }
+fendermint_actor_blobs_shared = { path = "../../fendermint/actors/blobs/shared" }
+fendermint_actor_bucket = { path = "../../fendermint/actors/bucket" }
 fendermint_app = { path = "../../fendermint/app" }
 fendermint_crypto = { path = "../../fendermint/crypto" }
 ipc_ipld_resolver = { path = "../../ipld/resolver" }
 contracts-artifacts = { path = "../../contracts-artifacts" }
 ipc_actors_abis = { path = "../../contract-bindings" }
+walkdir = "2.4"
+dirs = "5.0"
+blake3 = "1.5"
+iroh-blobs = { workspace = true }

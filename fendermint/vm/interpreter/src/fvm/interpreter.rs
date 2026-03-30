@@ -277,12 +277,12 @@ where
             "prepare_messages_for_block decoded mempool messages"
         );
 
-        let signed_msgs =
-            select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
-        tracing::info!(
-            selected_by_base_fee = signed_msgs.len(),
-            "prepare_messages_for_block selected messages above base fee"
-        );
+        // let signed_msgs =
+        //     select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
+        // tracing::info!(
+        //     selected_by_base_fee = signed_msgs.len(),
+        //     "prepare_messages_for_block selected messages above base fee"
+        // );
 
         let total_gas_limit = state.block_gas_tracker().available();
         let signed_msg_count = signed_msgs.len();

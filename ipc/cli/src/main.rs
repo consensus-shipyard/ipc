@@ -42,34 +42,15 @@ fn print_user_friendly_error(error: &anyhow::Error) {
 }
 
 fn extract_meaningful_error(error: &anyhow::Error) -> String {
-    // Get the root cause of the error chain
-    let mut root_cause = error.to_string();
-
-    // Get the first source error if available
-    if let Some(source) = error.source() {
-        root_cause = source.to_string();
+    // Show the full error chain so no details are lost
+    let mut parts = Vec::new();
+    parts.push(error.to_string());
+    let mut source = error.source();
+    while let Some(s) = source {
+        parts.push(s.to_string());
+        source = s.source();
     }
-
-    // Clean up common error patterns
-    let cleaned = root_cause
-        .replace("error processing command Some(", "")
-        .replace("main process failed: ", "")
-        .trim()
-        .to_string();
-
-    // Special handling for contract revert errors
-    if cleaned.contains("Contract call reverted with data:") {
-        // Provide a generic but helpful message
-        return "Contract operation failed. The transaction was reverted by the smart contract."
-            .to_string();
-    }
-
-    // If the cleaned message is significantly shorter, use it
-    if cleaned.len() < root_cause.len() * 2 / 3 {
-        cleaned
-    } else {
-        root_cause
-    }
+    parts.join(": ")
 }
 
 fn is_contract_related_error(error_msg: &str) -> bool {
