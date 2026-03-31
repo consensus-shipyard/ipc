@@ -17,6 +17,10 @@ use std::path::{Path, PathBuf};
 
 use fendermint_actor_blobs_shared::bytes::B256;
 use fendermint_rpc::client::FendermintClient;
+use fendermint_rpc::QueryClient;
+use fendermint_vm_actor_interface::eam::EthAddress as FvmEthAddress;
+use fendermint_vm_message::query::FvmQueryHeight;
+use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 
 use crate::commands::storage::{bucket, client::GatewayClient, config::StorageConfig, path};
@@ -72,11 +76,9 @@ impl CommandLineHandler for CopyStorage {
                 // Storage -> Storage (copy between buckets)
                 copy_between_buckets(global, args).await
             }
-            (false, false) => {
-                Err(anyhow!(
-                    "At least one path must be a storage path (ipc://...)"
-                ))
-            }
+            (false, false) => Err(anyhow!(
+                "At least one path must be a storage path (ipc://...)"
+            )),
         }
     }
 }
@@ -95,9 +97,7 @@ async fn upload_to_storage(_global: &GlobalArguments, args: &CopyArgs) -> Result
     // Handle recursive directory upload
     if local_path.is_dir() {
         if !args.recursive {
-            return Err(anyhow!(
-                "Cannot copy directory without -r/--recursive flag"
-            ));
+            return Err(anyhow!("Cannot copy directory without -r/--recursive flag"));
         }
         return upload_directory(local_path, &storage_path, args).await;
     }
@@ -112,7 +112,11 @@ async fn upload_file(
     storage_path: &path::StoragePath,
     args: &CopyArgs,
 ) -> Result<()> {
-    println!("Uploading {} -> {}", local_path.display(), storage_path.to_uri());
+    println!(
+        "Uploading {} -> {}",
+        local_path.display(),
+        storage_path.to_uri()
+    );
 
     // Read file data
     let data = fs::read(local_path)
@@ -155,7 +159,10 @@ async fn upload_file(
     );
 
     // Convert hash to B256
-    let blob_hash_hex = upload_response.hash.strip_prefix("0x").unwrap_or(&upload_response.hash);
+    let blob_hash_hex = upload_response
+        .hash
+        .strip_prefix("0x")
+        .unwrap_or(&upload_response.hash);
     let blob_hash_bytes = hex::decode(blob_hash_hex)?;
     let mut hash_array = [0u8; 32];
     hash_array.copy_from_slice(&blob_hash_bytes[..32]);
@@ -172,18 +179,39 @@ async fn upload_file(
     println!("Registering object on-chain...");
 
     // Create FendermintClient for on-chain operations
-    let fm_client = FendermintClient::new_http(
-        config.tendermint_rpc_url.parse()?,
-        None,
-    )?;
+    let fm_client = FendermintClient::new_http(config.tendermint_rpc_url.parse()?, None)?;
 
     // Create bound client with secret key
-    let secret_key = fendermint_rpc::message::SignedMessageFactory::read_secret_key(
-        &config.secret_key_file
-    )?;
+    let secret_key =
+        fendermint_rpc::message::SignedMessageFactory::read_secret_key(&config.secret_key_file)?;
 
-    let message_factory =
-        fendermint_rpc::message::SignedMessageFactory::new_secp256k1(secret_key, 0, ChainID::from(0));
+    let pk = secret_key.public_key();
+    let from_f1 = Address::new_secp256k1(&pk.serialize()).context("failed to create f1 address")?;
+    let from_eth = FvmEthAddress::new_secp256k1(&pk.serialize())
+        .context("failed to derive delegated address from secret key")?;
+    let from_f410 =
+        Address::new_delegated(10, &from_eth.0).context("failed to create f410 address")?;
+    let sequence = get_sequence_opt(&fm_client, &from_f410)
+        .await
+        .context("failed to get delegated account sequence")?
+        .ok_or_else(|| {
+            anyhow!(
+                "delegated sender {} not found on-chain; cross-fund this delegated address and retry (native f1 {} is intentionally not used)",
+                from_f410, from_f1
+            )
+        })?;
+    let chain_id = fm_client
+        .state_params(FvmQueryHeight::default())
+        .await
+        .context("failed to get state params")?
+        .value
+        .chain_id;
+    let message_factory = fendermint_rpc::message::SignedMessageFactory::new(
+        secret_key,
+        from_f410,
+        sequence,
+        ChainID::from(chain_id),
+    );
     let mut bound_client = fm_client.bind(message_factory);
 
     // Add object to bucket
@@ -202,9 +230,24 @@ async fn upload_file(
     .await
     .context("Failed to register object on-chain")?;
 
-    println!("✓ Successfully uploaded and registered: {}", storage_path.key);
+    println!(
+        "✓ Successfully uploaded and registered: {}",
+        storage_path.key
+    );
 
     Ok(())
+}
+
+/// Get the next sequence number (nonce) of an account if it exists.
+async fn get_sequence_opt(client: &impl QueryClient, addr: &Address) -> Result<Option<u64>> {
+    let state = client
+        .actor_state(addr, FvmQueryHeight::default())
+        .await
+        .context("failed to get actor state")?;
+    match state.value {
+        Some((_id, state)) => Ok(Some(state.sequence)),
+        None => Ok(None),
+    }
 }
 
 /// Upload a directory recursively
@@ -229,7 +272,11 @@ async fn upload_directory(
             let storage_key = if storage_base.key.is_empty() {
                 rel_path_str
             } else {
-                format!("{}/{}", storage_base.key.trim_end_matches('/'), rel_path_str)
+                format!(
+                    "{}/{}",
+                    storage_base.key.trim_end_matches('/'),
+                    rel_path_str
+                )
             };
 
             let file_storage_path = path::StoragePath {
@@ -271,7 +318,11 @@ async fn download_file(
     local_path: &Path,
     args: &CopyArgs,
 ) -> Result<()> {
-    println!("Downloading {} -> {}", storage_path.to_uri(), local_path.display());
+    println!(
+        "Downloading {} -> {}",
+        storage_path.to_uri(),
+        local_path.display()
+    );
 
     // Get/load config
     let config_path = args.config.clone().unwrap_or_else(|| {
@@ -323,7 +374,10 @@ async fn download_directory(
     _local_dir: &Path,
     _args: &CopyArgs,
 ) -> Result<()> {
-    println!("Downloading directory {} recursively...", storage_base.to_uri());
+    println!(
+        "Downloading directory {} recursively...",
+        storage_base.to_uri()
+    );
 
     // TODO: Implement by listing objects with prefix and downloading each
     // This requires implementing the ls command first to reuse list_objects functionality

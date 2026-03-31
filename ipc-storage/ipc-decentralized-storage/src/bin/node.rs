@@ -31,7 +31,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
 use ipc_decentralized_storage::node::{launch, NodeConfig};
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 use tendermint_rpc::Url;
@@ -193,6 +193,10 @@ struct RunExecutorArgs {
     /// Polling interval in seconds
     #[arg(long, default_value = "5")]
     poll_interval_secs: u64,
+
+    /// Directory containing executable binaries referenced by jobs via local://
+    #[arg(long, default_value = "./executor-bin", env = "EXECUTOR_BIN_DIR")]
+    binary_dir: PathBuf,
 }
 
 #[tokio::main]
@@ -508,7 +512,7 @@ fn abi_int256_from_i32(value: i32) -> EthU256 {
     if value >= 0 {
         EthU256::from(value as u32)
     } else {
-        EthU256::MAX - EthU256::from((-value) as u32) + EthU256::from(1u8)
+        EthU256::MAX - EthU256::from(value.unsigned_abs()) + EthU256::from(1u8)
     }
 }
 
@@ -735,6 +739,18 @@ async fn run_executor(args: RunExecutorArgs) -> Result<()> {
 
     let mf = SignedMessageFactory::new(sk, from_f410, sequence, ChainID::from(chain_id));
     let mut tx_client = client.bind(mf);
+    let binary_dir = std::fs::canonicalize(&args.binary_dir).with_context(|| {
+        format!(
+            "failed to canonicalize executor binary directory: {}",
+            args.binary_dir.display()
+        )
+    })?;
+    if !binary_dir.is_dir() {
+        anyhow::bail!(
+            "executor binary directory is not a directory: {}",
+            binary_dir.display()
+        );
+    }
 
     let poll_interval = Duration::from_secs(args.poll_interval_secs);
     loop {
@@ -745,7 +761,10 @@ async fn run_executor(args: RunExecutorArgs) -> Result<()> {
         }
 
         let job = pending_jobs[0].clone();
-        info!("Found candidate job {} with binary_ref={}", job.id, job.binary_ref);
+        info!(
+            "Found candidate job {} with binary_ref={}",
+            job.id, job.binary_ref
+        );
 
         let latest = get_job(&tx_client, job.id).await?;
         let Some(latest) = latest else {
@@ -776,7 +795,8 @@ async fn run_executor(args: RunExecutorArgs) -> Result<()> {
         )
         .await
         .context("failed to send ClaimJob transaction via InvokeContract facade")?;
-        if claim_res.response.check_tx.code.is_err() || claim_res.response.deliver_tx.code.is_err() {
+        if claim_res.response.check_tx.code.is_err() || claim_res.response.deliver_tx.code.is_err()
+        {
             info!(
                 "ClaimJob rejected for {}: check={:?} deliver={:?} log={} info={}",
                 job.id,
@@ -790,18 +810,26 @@ async fn run_executor(args: RunExecutorArgs) -> Result<()> {
         }
         info!("ClaimJob accepted for {}", job.id);
 
-        let run_result = run_job_binary(&job.binary_ref, &job.args).await;
+        let run_result = run_job_binary(&binary_dir, &job.binary_ref, &job.args).await;
         match run_result {
             Ok((exit_code, stdout, stderr)) if exit_code == 0 => {
                 let output_commitment = fendermint_actor_blobs_shared::bytes::B256(
                     *blake3::hash([stdout.as_bytes(), stderr.as_bytes()].concat().as_slice())
                         .as_bytes(),
                 );
-                let output_refs = vec![format!("inline://stdout/{}", hex::encode(output_commitment.0))];
+                let output_refs = vec![format!(
+                    "inline://stdout/{}",
+                    hex::encode(output_commitment.0)
+                )];
                 let complete_res = TxClient::<TxCommit>::fevm_invoke(
                     &mut tx_client,
                     BLOBS_ACTOR_ADDR,
-                    encode_complete_job_calldata(job.id, output_refs, output_commitment.0, exit_code),
+                    encode_complete_job_calldata(
+                        job.id,
+                        output_refs,
+                        output_commitment.0,
+                        exit_code,
+                    ),
                     TokenAmount::zero(),
                     gas_params.clone(),
                 )
@@ -922,7 +950,8 @@ async fn list_pending_jobs(client: &impl QueryClient) -> Result<Vec<ExecutionJob
 }
 
 async fn get_job(client: &impl QueryClient, id: u64) -> Result<Option<ExecutionJob>> {
-    let params = RawBytes::serialize(GetJobParams { id }).context("failed to serialize GetJob params")?;
+    let params =
+        RawBytes::serialize(GetJobParams { id }).context("failed to serialize GetJob params")?;
 
     let msg = Message {
         version: Default::default(),
@@ -951,14 +980,42 @@ async fn get_job(client: &impl QueryClient, id: u64) -> Result<Option<ExecutionJ
     Ok(job)
 }
 
-async fn run_job_binary(binary_ref: &str, args: &[String]) -> Result<(i32, String, String)> {
-    // MVP runner supports local paths directly or `local://` URIs.
-    let binary = binary_ref
+async fn run_job_binary(
+    binary_dir: &Path,
+    binary_ref: &str,
+    args: &[String],
+) -> Result<(i32, String, String)> {
+    let binary_rel = binary_ref
         .strip_prefix("local://")
-        .unwrap_or(binary_ref)
-        .to_string();
+        .ok_or_else(|| anyhow::anyhow!("unsupported binary_ref scheme, expected local://"))?;
+    let binary_rel = Path::new(binary_rel);
+    if binary_rel.as_os_str().is_empty() || binary_rel.is_absolute() {
+        anyhow::bail!("invalid local binary_ref path: {}", binary_ref);
+    }
+    if binary_rel
+        .components()
+        .any(|c| !matches!(c, Component::Normal(_)))
+    {
+        anyhow::bail!(
+            "binary_ref must be a normalized relative path: {}",
+            binary_ref
+        );
+    }
 
-    let output = TokioCommand::new(binary)
+    let binary = binary_dir.join(binary_rel);
+    let binary = std::fs::canonicalize(&binary)
+        .with_context(|| format!("failed to resolve executable path: {}", binary.display()))?;
+    if !binary.starts_with(binary_dir) {
+        anyhow::bail!(
+            "binary_ref resolved outside allowed directory: {}",
+            binary.display()
+        );
+    }
+    if !binary.is_file() {
+        anyhow::bail!("executable is not a file: {}", binary.display());
+    }
+
+    let output = TokioCommand::new(&binary)
         .args(args)
         .output()
         .await
