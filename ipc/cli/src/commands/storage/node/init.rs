@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::commands::node::config::NodeInitConfig;
-use crate::commands::storage::config::{StorageConfig, StorageRunMode};
+use crate::commands::storage::config::{
+    default_storage_provider_config_path, StorageConfig, StorageRunMode,
+};
 use crate::CommandLineHandler;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -20,7 +22,7 @@ pub(crate) struct InitStorage;
 impl CommandLineHandler for InitStorage {
     type Arguments = InitStorageArgs;
 
-    async fn handle(global: &crate::GlobalArguments, args: &Self::Arguments) -> Result<()> {
+    async fn handle(_global: &crate::GlobalArguments, args: &Self::Arguments) -> Result<()> {
         let node_cfg = NodeInitConfig::load(&args.node_config).with_context(|| {
             format!(
                 "failed to read node config from {}",
@@ -40,13 +42,10 @@ impl CommandLineHandler for InitStorage {
                 )
             })?;
 
-        let default_out = {
-            let safe_id = sanitize_subnet_id(&node_cfg.subnet);
-            global
-                .config_dir()
-                .join(format!("storage_{}.yaml", safe_id))
-        };
-        let out = args.out.clone().unwrap_or(default_out);
+        let out = args
+            .out
+            .clone()
+            .unwrap_or_else(default_storage_provider_config_path);
 
         let root = workspace_root();
         let secret_key_file = args
@@ -138,13 +137,6 @@ pub struct InitStorageArgs {
         help = "Path to operator secp256k1 secret key file (base64). Defaults to <node-home>/storage/operator.sk"
     )]
     pub secret_key_file: Option<PathBuf>,
-}
-
-fn sanitize_subnet_id(subnet_id: &str) -> String {
-    subnet_id
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect()
 }
 
 fn workspace_root() -> PathBuf {

@@ -101,6 +101,11 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    tracing::info!(
+        "gateway v{} (build 2026-04-01-fevm-facade)",
+        env!("CARGO_PKG_VERSION"),
+    );
+
     let args = Args::parse();
 
     // Set the network for address display (f for mainnet, t for testnet)
@@ -228,15 +233,27 @@ async fn main() -> Result<()> {
 
     tracing::info!("Chain ID: {}", chain_id);
 
+    // Prefer delegated f410 sender: FinalizeBlob now goes through the EVM facade
+    // (InvokeContract with ABI-encoded calldata) so it works with both f1 and f410.
     let (from_addr, sequence) = if let Some(sequence) = get_sequence_opt(&client, &from_f410)
         .await
         .context("failed to get delegated account sequence")?
     {
         tracing::info!("Using delegated sender (f410) for gateway transactions");
         (from_f410, sequence)
+    } else if let Some(sequence) = get_sequence_opt(&client, &from_f1)
+        .await
+        .context("failed to get native account sequence")?
+    {
+        tracing::info!(
+            "Delegated f410 sender {} is not on-chain; falling back to native f1 sender",
+            from_f410
+        );
+        (from_f1, sequence)
     } else {
         anyhow::bail!(
-            "delegated sender {} not found on-chain; cross-fund this delegated address and retry (native f1 {} is intentionally not used)",
+            "neither delegated sender {} nor native sender {} found on-chain; \
+             fund the delegated (f410) address for gateway transaction signing",
             from_f410, from_f1
         );
     };

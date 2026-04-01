@@ -4,8 +4,8 @@
 
 use fendermint_actor_blobs_shared::{
     blobs::{
-        AddBlobParams, Blob, BlobStatus, DeleteBlobParams, GetBlobParams, OverwriteBlobParams,
-        TrimBlobExpiriesParams,
+        AddBlobParams, Blob, BlobStatus, DeleteBlobParams, FinalizeBlobParams, GetBlobParams,
+        OverwriteBlobParams, SubscriptionId, TrimBlobExpiriesParams,
     },
     bytes::B256,
     execution::{
@@ -120,6 +120,8 @@ pub fn parse_input(input: &ipc_storage_actor_sdk::evm::InputData) -> Result<Call
 pub const REGISTER_NODE_OPERATOR_SELECTOR: [u8; 4] = [0x71, 0x3b, 0x10, 0xcf];
 pub const GET_OPERATOR_INFO_SELECTOR: [u8; 4] = [0x27, 0xd9, 0xab, 0x5d];
 pub const GET_ACTIVE_OPERATORS_SELECTOR: [u8; 4] = [0x64, 0xbd, 0xc6, 0x7e];
+/// keccak256("finalizeBlob(bytes32,address,bytes32,uint64,string,uint8,bytes,uint128)")
+pub const FINALIZE_BLOB_SELECTOR: [u8; 4] = [0xf6, 0x94, 0x17, 0x21];
 
 pub struct RegisterNodeOperatorInvokeCall {
     pub bls_pubkey: Vec<u8>,
@@ -181,6 +183,10 @@ pub fn is_complete_job_call(input: &ipc_storage_actor_sdk::evm::InputData) -> bo
 
 pub fn is_fail_job_call(input: &ipc_storage_actor_sdk::evm::InputData) -> bool {
     input.selector() == FAIL_JOB_SELECTOR
+}
+
+pub fn is_finalize_blob_call(input: &ipc_storage_actor_sdk::evm::InputData) -> bool {
+    input.selector() == FINALIZE_BLOB_SELECTOR
 }
 
 pub fn parse_register_node_operator_input(
@@ -306,6 +312,54 @@ pub fn parse_fail_job_input(
         job_id,
         error,
         exit_code,
+    })
+}
+
+/// Parses ABI-encoded calldata for `finalizeBlob(bytes32,address,bytes32,uint64,string,uint8,bytes,uint128)`.
+pub fn parse_finalize_blob_input(
+    input: &ipc_storage_actor_sdk::evm::InputData,
+    rt: &impl Runtime,
+) -> Result<FinalizeBlobParams, ActorError> {
+    let calldata = input.calldata();
+    // 8 head slots: source(32) + subscriber(32) + blobHash(32) + size(32)
+    //              + string_offset(32) + status(32) + bytes_offset(32) + signerBitmap(32)
+    if calldata.len() < 32 * 8 {
+        return Err(actor_error!(
+            illegal_argument,
+            "invalid finalizeBlob call: input too short"
+        ));
+    }
+
+    let source = decode_b256_word(calldata, 0)?;
+    let subscriber_h160 = decode_address_word(calldata, 32)?;
+    let subscriber: Address = subscriber_h160.into();
+    let subscriber = rt
+        .resolve_address(&subscriber)
+        .map(Address::new_id)
+        .unwrap_or(subscriber);
+    let hash = decode_b256_word(calldata, 64)?;
+    let size = decode_u64_word(calldata, 96)?;
+    let subscription_id_str = decode_dynamic_string(calldata, decode_offset(calldata, 128)?)?;
+    let subscription_id: SubscriptionId = subscription_id_str.try_into().map_err(|e| {
+        actor_error!(
+            illegal_argument,
+            format!("invalid finalizeBlob call: bad subscription id: {}", e)
+        )
+    })?;
+    let status_u8 = decode_u8_word(calldata, 160)?;
+    let status = solidity_enum_to_blob_status(status_u8)?;
+    let aggregated_signature = decode_dynamic_bytes(calldata, decode_offset(calldata, 192)?)?;
+    let signer_bitmap = decode_u128_word(calldata, 224)?;
+
+    Ok(FinalizeBlobParams {
+        source,
+        subscriber,
+        hash,
+        size,
+        id: subscription_id,
+        status,
+        aggregated_signature,
+        signer_bitmap,
     })
 }
 
@@ -505,6 +559,69 @@ fn decode_b256_word(calldata: &[u8], at: usize) -> Result<B256, ActorError> {
     let mut out = [0u8; 32];
     out.copy_from_slice(&calldata[at..end]);
     Ok(B256(out))
+}
+
+fn decode_address_word(calldata: &[u8], at: usize) -> Result<H160, ActorError> {
+    let end = at + 32;
+    if end > calldata.len() {
+        return Err(actor_error!(
+            illegal_argument,
+            "invalid call: malformed address word"
+        ));
+    }
+    let word = &calldata[at..end];
+    if word[..12].iter().any(|b| *b != 0) {
+        return Err(actor_error!(
+            illegal_argument,
+            "invalid call: malformed address"
+        ));
+    }
+    Ok(H160::from_slice(&word[12..32]))
+}
+
+fn decode_u8_word(calldata: &[u8], at: usize) -> Result<u8, ActorError> {
+    let end = at + 32;
+    if end > calldata.len() {
+        return Err(actor_error!(illegal_argument, "invalid call: malformed word"));
+    }
+    let word = &calldata[at..end];
+    if word[..31].iter().any(|b| *b != 0) {
+        return Err(actor_error!(
+            illegal_argument,
+            "invalid call: uint8 value too large"
+        ));
+    }
+    Ok(word[31])
+}
+
+fn decode_u128_word(calldata: &[u8], at: usize) -> Result<u128, ActorError> {
+    let end = at + 32;
+    if end > calldata.len() {
+        return Err(actor_error!(illegal_argument, "invalid call: malformed word"));
+    }
+    let word = &calldata[at..end];
+    if word[..16].iter().any(|b| *b != 0) {
+        return Err(actor_error!(
+            illegal_argument,
+            "invalid call: uint128 value too large"
+        ));
+    }
+    let mut n = [0u8; 16];
+    n.copy_from_slice(&word[16..32]);
+    Ok(u128::from_be_bytes(n))
+}
+
+fn solidity_enum_to_blob_status(value: u8) -> Result<BlobStatus, ActorError> {
+    match value {
+        0 => Ok(BlobStatus::Added),
+        1 => Ok(BlobStatus::Pending),
+        2 => Ok(BlobStatus::Resolved),
+        3 => Ok(BlobStatus::Failed),
+        _ => Err(actor_error!(
+            illegal_argument,
+            format!("invalid BlobStatus enum value: {}", value)
+        )),
+    }
 }
 
 fn abi_word_from_usize(value: usize) -> [u8; 32] {

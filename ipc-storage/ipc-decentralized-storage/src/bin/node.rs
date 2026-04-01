@@ -17,7 +17,7 @@ use fendermint_actor_blobs_shared::method::Method;
 use fendermint_actor_blobs_shared::operators::RegisterNodeOperatorParams;
 use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
 use fendermint_rpc::message::{GasParams, SignedMessageFactory};
-use fendermint_rpc::tx::{TxClient, TxCommit};
+use fendermint_rpc::tx::{BoundClient, TxClient, TxCommit};
 use fendermint_rpc::FendermintClient;
 use fendermint_rpc::QueryClient;
 use fendermint_vm_actor_interface::eam::EthAddress as FvmEthAddress;
@@ -193,6 +193,10 @@ struct RunExecutorArgs {
     /// Polling interval in seconds
     #[arg(long, default_value = "5")]
     poll_interval_secs: u64,
+
+    /// Gateway URL for downloading/uploading ipc:// storage objects
+    #[arg(long, env = "IPC_STORAGE_GATEWAY")]
+    gateway_url: Option<String>,
 }
 
 #[tokio::main]
@@ -382,11 +386,10 @@ async fn register_operator(args: RegisterOperatorArgs) -> Result<()> {
         rpc_url: args.operator_rpc_url.clone(),
     };
 
-    // Gas params
     let gas_params = GasParams {
         gas_limit: 10_000_000,
-        gas_fee_cap: TokenAmount::from_atto(100),
-        gas_premium: TokenAmount::from_atto(100),
+        gas_fee_cap: TokenAmount::from_atto(1_000_000),
+        gas_premium: TokenAmount::from_atto(100_000),
     };
 
     let tx_hash = if let Some(sequence) = get_sequence_opt(&client, &from_f410)
@@ -729,164 +732,444 @@ async fn run_executor(args: RunExecutorArgs) -> Result<()> {
             )
         })?;
 
-    info!("Executor sender address: {}", from_f410);
+    info!("Executor sender: {}", from_f410);
     info!("Executor chain ID: {}", chain_id);
-    info!("Executor account sequence: {}", sequence);
+    info!("Executor sequence: {}", sequence);
 
     let mf = SignedMessageFactory::new(sk, from_f410, sequence, ChainID::from(chain_id));
     let mut tx_client = client.bind(mf);
 
     let poll_interval = Duration::from_secs(args.poll_interval_secs);
+
     loop {
-        let pending_jobs = list_pending_jobs(&tx_client).await?;
-        if pending_jobs.is_empty() {
-            tokio::time::sleep(poll_interval).await;
-            continue;
+        let processed = process_pending_jobs(
+            &mut tx_client,
+            &from_f410,
+            args.gateway_url.as_deref(),
+            &args.rpc_url,
+        )
+        .await;
+
+        match processed {
+            Ok(0) => {
+                tokio::time::sleep(poll_interval).await;
+            }
+            Ok(n) => {
+                info!("Processed {} job(s)", n);
+            }
+            Err(e) => {
+                tracing::error!("Executor tick error: {:#}", e);
+                if let Err(sync_err) = resync_sequence(&mut tx_client, &from_f410).await {
+                    tracing::error!("Failed to resync sequence after error: {:#}", sync_err);
+                }
+                tokio::time::sleep(poll_interval).await;
+            }
         }
+    }
+}
 
-        let job = pending_jobs[0].clone();
-        info!("Found candidate job {} with binary_ref={}", job.id, job.binary_ref);
+const MAX_TX_RETRIES: u32 = 3;
 
-        let latest = get_job(&tx_client, job.id).await?;
+/// Re-query the on-chain nonce and update the local message factory.
+async fn resync_sequence(
+    tx_client: &mut (impl BoundClient + QueryClient),
+    sender: &Address,
+) -> Result<()> {
+    let state = tx_client
+        .actor_state(sender, FvmQueryHeight::default())
+        .await
+        .context("failed to query actor state for sequence resync")?;
+    let sequence = state
+        .value
+        .map(|(_, s)| s.sequence)
+        .ok_or_else(|| anyhow::anyhow!("sender {} not found during sequence resync", sender))?;
+    tx_client.message_factory_mut().set_sequence(sequence);
+    info!("Resynced sequence to {}", sequence);
+    Ok(())
+}
+
+/// Send a transaction to the blobs actor with retry and automatic sequence resync.
+///
+/// Returns `Ok(true)` if the transaction was delivered successfully (deliver_tx ok),
+/// `Ok(false)` if deliver_tx rejected it (nonce was consumed, move on),
+/// `Err` only on unrecoverable failures.
+async fn send_executor_tx(
+    tx_client: &mut (impl BoundClient + QueryClient + TxClient<TxCommit>),
+    sender: &Address,
+    calldata: Bytes,
+    label: &str,
+) -> Result<bool> {
+    let gas_params = GasParams {
+        gas_limit: 10_000_000,
+        gas_fee_cap: TokenAmount::from_atto(1_000_000),
+        gas_premium: TokenAmount::from_atto(100_000),
+    };
+
+    for attempt in 0..MAX_TX_RETRIES {
+        let res = TxClient::<TxCommit>::fevm_invoke(
+            tx_client,
+            BLOBS_ACTOR_ADDR,
+            calldata.clone(),
+            TokenAmount::zero(),
+            gas_params.clone(),
+        )
+        .await;
+
+        match res {
+            Ok(commit_res) => {
+                if commit_res.response.check_tx.code.is_err() {
+                    // check_tx rejection: nonce NOT consumed on-chain but WAS incremented locally.
+                    let log = &commit_res.response.check_tx.log;
+                    tracing::warn!(
+                        "{} check_tx rejected (attempt {}): code={:?} log={}",
+                        label,
+                        attempt + 1,
+                        commit_res.response.check_tx.code,
+                        if log.is_empty() { "<empty>" } else { log.as_str() },
+                    );
+                    resync_sequence(tx_client, sender).await?;
+                    tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
+                    continue;
+                }
+                if commit_res.response.deliver_tx.code.is_err() {
+                    // deliver_tx failure: nonce WAS consumed, sequence is correct. Not retryable.
+                    let log = &commit_res.response.deliver_tx.log;
+                    let info_str = &commit_res.response.deliver_tx.info;
+                    tracing::warn!(
+                        "{} deliver_tx failed: code={:?} log={} info={}",
+                        label,
+                        commit_res.response.deliver_tx.code,
+                        if log.is_empty() { "<empty>" } else { log.as_str() },
+                        if info_str.is_empty() { "<empty>" } else { info_str.as_str() },
+                    );
+                    return Ok(false);
+                }
+                return Ok(true);
+            }
+            Err(e) => {
+                // Network/transport error: sequence state is unknown.
+                tracing::warn!(
+                    "{} network error (attempt {}): {:#}",
+                    label,
+                    attempt + 1,
+                    e
+                );
+                resync_sequence(tx_client, sender).await?;
+                tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
+            }
+        }
+    }
+
+    anyhow::bail!("{} failed after {} retries", label, MAX_TX_RETRIES)
+}
+
+async fn process_pending_jobs(
+    tx_client: &mut (impl BoundClient + QueryClient + TxClient<TxCommit>),
+    sender: &Address,
+    gateway_url: Option<&str>,
+    rpc_url: &str,
+) -> Result<usize> {
+    let pending_jobs = list_pending_jobs(tx_client).await?;
+    if pending_jobs.is_empty() {
+        return Ok(0);
+    }
+
+    let mut processed = 0;
+
+    for job in &pending_jobs {
+        info!(
+            "Found candidate job {} binary_ref={} args={:?}",
+            job.id, job.binary_ref, job.args
+        );
+
+        // Re-check the job is still pending (another executor may have claimed it).
+        let latest = get_job(tx_client, job.id).await?;
         let Some(latest) = latest else {
             info!("Skipping job {}: no longer exists", job.id);
-            tokio::time::sleep(poll_interval).await;
             continue;
         };
         if latest.status != JobStatus::Pending {
             info!(
-                "Skipping job {}: latest status is {:?}, not Pending",
+                "Skipping job {}: status is {:?}",
                 latest.id, latest.status
             );
-            tokio::time::sleep(poll_interval).await;
             continue;
         }
 
-        let gas_params = GasParams {
-            gas_limit: 10_000_000,
-            gas_fee_cap: TokenAmount::from_atto(100),
-            gas_premium: TokenAmount::from_atto(100),
-        };
-        let claim_res = TxClient::<TxCommit>::fevm_invoke(
-            &mut tx_client,
-            BLOBS_ACTOR_ADDR,
+        // --- Claim ---
+        let claimed = send_executor_tx(
+            tx_client,
+            sender,
             encode_claim_job_calldata(job.id),
-            TokenAmount::zero(),
-            gas_params.clone(),
+            &format!("ClaimJob({})", job.id),
         )
-        .await
-        .context("failed to send ClaimJob transaction via InvokeContract facade")?;
-        if claim_res.response.check_tx.code.is_err() || claim_res.response.deliver_tx.code.is_err() {
-            info!(
-                "ClaimJob rejected for {}: check={:?} deliver={:?} log={} info={}",
-                job.id,
-                claim_res.response.check_tx.code,
-                claim_res.response.deliver_tx.code,
-                claim_res.response.deliver_tx.log,
-                claim_res.response.deliver_tx.info
-            );
-            tokio::time::sleep(poll_interval).await;
+        .await?;
+
+        if !claimed {
+            info!("Job {} could not be claimed, skipping", job.id);
             continue;
         }
-        info!("ClaimJob accepted for {}", job.id);
+        info!("Claimed job {}", job.id);
 
-        let run_result = run_job_binary(&job.binary_ref, &job.args).await;
+        // --- Execute ---
+        let run_result = execute_job(job, gateway_url, rpc_url).await;
+
         match run_result {
-            Ok((exit_code, stdout, stderr)) if exit_code == 0 => {
-                let output_commitment = fendermint_actor_blobs_shared::bytes::B256(
-                    *blake3::hash([stdout.as_bytes(), stderr.as_bytes()].concat().as_slice())
-                        .as_bytes(),
-                );
-                let output_refs = vec![format!("inline://stdout/{}", hex::encode(output_commitment.0))];
-                let complete_res = TxClient::<TxCommit>::fevm_invoke(
-                    &mut tx_client,
-                    BLOBS_ACTOR_ADDR,
-                    encode_complete_job_calldata(job.id, output_refs, output_commitment.0, exit_code),
-                    TokenAmount::zero(),
-                    gas_params.clone(),
-                )
-                .await
-                .context("failed to send CompleteJob transaction via InvokeContract facade")?;
-                if complete_res.response.check_tx.code.is_err()
-                    || complete_res.response.deliver_tx.code.is_err()
-                {
-                    info!(
-                        "CompleteJob rejected for {}: check={:?} deliver={:?} log={} info={}",
-                        job.id,
-                        complete_res.response.check_tx.code,
-                        complete_res.response.deliver_tx.code,
-                        complete_res.response.deliver_tx.log,
-                        complete_res.response.deliver_tx.info
-                    );
-                } else {
-                    info!("Job {} completed successfully", job.id);
+            Ok((exit_code, stdout, stderr)) => {
+                // Always print job output.
+                if !stdout.is_empty() {
+                    info!("Job {} stdout:\n{}", job.id, stdout);
                 }
-            }
-            Ok((exit_code, _stdout, stderr)) => {
-                let fail_res = TxClient::<TxCommit>::fevm_invoke(
-                    &mut tx_client,
-                    BLOBS_ACTOR_ADDR,
-                    encode_fail_job_calldata(
-                        job.id,
-                        format!("process exited with code {}: {}", exit_code, stderr),
-                        exit_code,
-                    ),
-                    TokenAmount::zero(),
-                    gas_params.clone(),
-                )
-                .await
-                .context("failed to send FailJob transaction via InvokeContract facade")?;
-                if fail_res.response.check_tx.code.is_err()
-                    || fail_res.response.deliver_tx.code.is_err()
-                {
-                    info!(
-                        "FailJob rejected for {}: check={:?} deliver={:?} log={} info={}",
-                        job.id,
-                        fail_res.response.check_tx.code,
-                        fail_res.response.deliver_tx.code,
-                        fail_res.response.deliver_tx.log,
-                        fail_res.response.deliver_tx.info
-                    );
+                if !stderr.is_empty() {
+                    info!("Job {} stderr:\n{}", job.id, stderr);
+                }
+                info!("Job {} exited with code {}", job.id, exit_code);
+
+                if exit_code == 0 {
+                    let combined = [stdout.as_bytes(), stderr.as_bytes()].concat();
+                    let output_commitment =
+                        fendermint_actor_blobs_shared::bytes::B256(*blake3::hash(&combined).as_bytes());
+                    let output_refs =
+                        vec![format!("inline://stdout/{}", hex::encode(output_commitment.0))];
+
+                    let ok = send_executor_tx(
+                        tx_client,
+                        sender,
+                        encode_complete_job_calldata(
+                            job.id,
+                            output_refs,
+                            output_commitment.0,
+                            exit_code,
+                        ),
+                        &format!("CompleteJob({})", job.id),
+                    )
+                    .await?;
+
+                    if ok {
+                        info!("Job {} completed successfully", job.id);
+                    } else {
+                        tracing::warn!("CompleteJob deliver_tx rejected for job {}", job.id);
+                    }
                 } else {
-                    info!("Job {} failed with non-zero exit", job.id);
+                    let reason =
+                        format!("process exited with code {}: {}", exit_code, truncate(&stderr, 512));
+                    let ok = send_executor_tx(
+                        tx_client,
+                        sender,
+                        encode_fail_job_calldata(job.id, reason, exit_code),
+                        &format!("FailJob({})", job.id),
+                    )
+                    .await?;
+
+                    if ok {
+                        info!("Job {} reported as failed (exit code {})", job.id, exit_code);
+                    }
                 }
             }
             Err(e) => {
-                let fail_res = TxClient::<TxCommit>::fevm_invoke(
-                    &mut tx_client,
-                    BLOBS_ACTOR_ADDR,
-                    encode_fail_job_calldata(job.id, format!("execution error: {}", e), -1),
-                    TokenAmount::zero(),
-                    gas_params.clone(),
+                tracing::error!("Job {} execution error: {:#}", job.id, e);
+                let reason = format!("execution error: {}", truncate(&e.to_string(), 512));
+                let _ = send_executor_tx(
+                    tx_client,
+                    sender,
+                    encode_fail_job_calldata(job.id, reason, -1),
+                    &format!("FailJob({})", job.id),
                 )
-                .await
-                .context("failed to send FailJob transaction via InvokeContract facade")?;
-                if fail_res.response.check_tx.code.is_err()
-                    || fail_res.response.deliver_tx.code.is_err()
-                {
-                    info!(
-                        "FailJob rejected for {}: check={:?} deliver={:?} log={} info={}",
-                        job.id,
-                        fail_res.response.check_tx.code,
-                        fail_res.response.deliver_tx.code,
-                        fail_res.response.deliver_tx.log,
-                        fail_res.response.deliver_tx.info
-                    );
-                } else {
-                    info!("Job {} failed due to execution error", job.id);
-                }
+                .await;
             }
         }
 
-        tokio::time::sleep(poll_interval).await;
+        processed += 1;
+    }
+
+    Ok(processed)
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}...(truncated)", &s[..max])
     }
 }
 
+/// Execute a job: download ipc:// inputs, run binary with env/timeout, upload outputs.
+async fn execute_job(
+    job: &ExecutionJob,
+    gateway_url: Option<&str>,
+    _rpc_url: &str,
+) -> Result<(i32, String, String)> {
+    let work_dir = tempfile::tempdir().context("failed to create temp working directory")?;
+    let input_dir = work_dir.path().join("input");
+    let output_dir = work_dir.path().join("output");
+    std::fs::create_dir_all(&input_dir)?;
+    std::fs::create_dir_all(&output_dir)?;
+
+    let mut env_vars: Vec<(String, String)> = job.env.clone();
+
+    // Download ipc:// input files.
+    let http_client = reqwest::Client::new();
+    for (i, input_ref) in job.input_refs.iter().enumerate() {
+        if input_ref.starts_with("ipc://") {
+            let gw = gateway_url.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Job {} has ipc:// input {} but no --gateway-url configured",
+                    job.id,
+                    input_ref
+                )
+            })?;
+
+            let (bucket, key) = parse_ipc_uri(input_ref)?;
+            let file_name = key.rsplit('/').next().unwrap_or(&key);
+            let local_path = input_dir.join(file_name);
+
+            info!("Downloading input {} -> {}", input_ref, local_path.display());
+            let url = format!(
+                "{}/v1/objects/{}/{}",
+                gw.trim_end_matches('/'),
+                bucket,
+                urlencoding::encode(&key)
+            );
+            let resp = http_client
+                .get(&url)
+                .send()
+                .await
+                .with_context(|| format!("failed to download {}", input_ref))?;
+            if !resp.status().is_success() {
+                anyhow::bail!(
+                    "Gateway returned {} downloading {}",
+                    resp.status(),
+                    input_ref
+                );
+            }
+            let data = resp.bytes().await?;
+            std::fs::write(&local_path, &data)?;
+
+            env_vars.push((format!("IPC_INPUT_{}", i), local_path.to_string_lossy().to_string()));
+        } else {
+            env_vars.push((format!("IPC_INPUT_{}", i), input_ref.clone()));
+        }
+    }
+
+    // Prepare output file paths for any IPC_OUTPUT_N env vars.
+    let mut output_uploads: Vec<(String, PathBuf)> = Vec::new();
+    for (key, value) in &env_vars {
+        if key.starts_with("IPC_OUTPUT_") && key != "IPC_OUTPUT_DIR" && value.starts_with("ipc://") {
+            let idx = key.trim_start_matches("IPC_OUTPUT_");
+            let local_out = output_dir.join(format!("output_{}", idx));
+            output_uploads.push((value.clone(), local_out.clone()));
+        }
+    }
+
+    // Set IPC_OUTPUT_FILE_N vars pointing to writable local paths,
+    // and IPC_OUTPUT_DIR for convenience.
+    for (i, (_, local_path)) in output_uploads.iter().enumerate() {
+        env_vars.push((
+            format!("IPC_OUTPUT_FILE_{}", i),
+            local_path.to_string_lossy().to_string(),
+        ));
+    }
+    env_vars.push(("IPC_OUTPUT_DIR".to_string(), output_dir.to_string_lossy().to_string()));
+
+    // Resolve binary.
+    let binary = job
+        .binary_ref
+        .strip_prefix("local://")
+        .unwrap_or(&job.binary_ref)
+        .to_string();
+
+    let timeout = if job.timeout_secs > 0 {
+        Duration::from_secs(job.timeout_secs)
+    } else {
+        Duration::from_secs(300)
+    };
+
+    info!(
+        "Executing: {} {:?} (timeout {}s)",
+        binary,
+        job.args,
+        timeout.as_secs()
+    );
+
+    let child_fut = TokioCommand::new(&binary)
+        .args(&job.args)
+        .envs(env_vars.iter().map(|(k, v)| (k.as_str(), v.as_str())))
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    let output = tokio::time::timeout(timeout, child_fut)
+        .await
+        .map_err(|_| anyhow::anyhow!("job timed out after {}s", timeout.as_secs()))?
+        .context("failed to spawn/run process")?;
+
+    let code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    // Upload output files to ipc:// destinations if job succeeded.
+    if code == 0 && !output_uploads.is_empty() {
+        if let Some(gw) = gateway_url {
+            for (ipc_uri, local_path) in &output_uploads {
+                if !local_path.exists() {
+                    tracing::warn!(
+                        "Output file {} not created by job, skipping upload to {}",
+                        local_path.display(),
+                        ipc_uri
+                    );
+                    continue;
+                }
+                info!("Uploading output {} -> {}", local_path.display(), ipc_uri);
+                let data = std::fs::read(local_path)
+                    .with_context(|| format!("failed to read output {}", local_path.display()))?;
+
+                let form = reqwest::multipart::Form::new()
+                    .text("size", data.len().to_string())
+                    .part(
+                        "data",
+                        reqwest::multipart::Part::bytes(data)
+                            .file_name("upload")
+                            .mime_str("application/octet-stream")?,
+                    );
+                let url = format!("{}/v1/objects", gw.trim_end_matches('/'));
+                let resp = http_client.post(&url).multipart(form).send().await?;
+                if resp.status().is_success() {
+                    info!("Uploaded output to gateway for {}", ipc_uri);
+                } else {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    tracing::warn!(
+                        "Failed to upload output to {}: {} {}",
+                        ipc_uri,
+                        status,
+                        body
+                    );
+                }
+            }
+        } else {
+            tracing::warn!(
+                "Job produced output files but no --gateway-url configured; skipping upload"
+            );
+        }
+    }
+
+    Ok((code, stdout, stderr))
+}
+
+fn parse_ipc_uri(uri: &str) -> Result<(String, String)> {
+    let path = uri
+        .strip_prefix("ipc://")
+        .ok_or_else(|| anyhow::anyhow!("not an ipc:// URI: {}", uri))?;
+    let (bucket, key) = path.split_once('/').ok_or_else(|| {
+        anyhow::anyhow!("ipc:// URI must include a key: {}", uri)
+    })?;
+    Ok((bucket.to_string(), key.to_string()))
+}
+
 async fn list_pending_jobs(client: &impl QueryClient) -> Result<Vec<ExecutionJob>> {
-    // Query all and apply local filtering to avoid relying on possibly stale enum-filter behavior.
     let params = ListJobsParams {
-        status: None,
-        limit: 10,
+        status: Some(JobStatus::Pending),
+        limit: 50,
     };
     let params = RawBytes::serialize(params).context("failed to serialize ListJobs params")?;
 
@@ -914,6 +1197,7 @@ async fn list_pending_jobs(client: &impl QueryClient) -> Result<Vec<ExecutionJob
         .context("failed to decode ListJobs response data")?;
     let jobs = fvm_ipld_encoding::from_slice::<ListJobsReturn>(&return_data)
         .context("failed to decode ListJobs return type")?;
+    // Double-check client-side in case the actor ignores the status filter.
     Ok(jobs
         .jobs
         .into_iter()
@@ -922,7 +1206,8 @@ async fn list_pending_jobs(client: &impl QueryClient) -> Result<Vec<ExecutionJob
 }
 
 async fn get_job(client: &impl QueryClient, id: u64) -> Result<Option<ExecutionJob>> {
-    let params = RawBytes::serialize(GetJobParams { id }).context("failed to serialize GetJob params")?;
+    let params =
+        RawBytes::serialize(GetJobParams { id }).context("failed to serialize GetJob params")?;
 
     let msg = Message {
         version: Default::default(),
@@ -949,23 +1234,4 @@ async fn get_job(client: &impl QueryClient, id: u64) -> Result<Option<ExecutionJ
     let job = fvm_ipld_encoding::from_slice::<Option<ExecutionJob>>(&return_data)
         .context("failed to decode GetJob return type")?;
     Ok(job)
-}
-
-async fn run_job_binary(binary_ref: &str, args: &[String]) -> Result<(i32, String, String)> {
-    // MVP runner supports local paths directly or `local://` URIs.
-    let binary = binary_ref
-        .strip_prefix("local://")
-        .unwrap_or(binary_ref)
-        .to_string();
-
-    let output = TokioCommand::new(binary)
-        .args(args)
-        .output()
-        .await
-        .context("failed to spawn process")?;
-
-    let code = output.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    Ok((code, stdout, stderr))
 }

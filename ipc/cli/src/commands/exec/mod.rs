@@ -84,11 +84,19 @@ pub(crate) struct SubmitJobArgs {
     secret_key_file: PathBuf,
     #[arg(long)]
     binary_ref: String,
-    #[arg(long = "input-ref")]
+    #[arg(long = "input-ref", help = "Raw input reference (passed as-is to input_refs)")]
     input_refs: Vec<String>,
+    /// ipc:// URI for input file (e.g. ipc://t0123/data.txt). Executor downloads
+    /// the file and sets IPC_INPUT_N env var pointing to the local path.
+    #[arg(long = "input")]
+    inputs: Vec<String>,
+    /// ipc:// URI for output destination (e.g. ipc://t0123/result.txt). Executor
+    /// uploads the file written to IPC_OUTPUT_FILE_N after the job completes.
+    #[arg(long = "output")]
+    outputs: Vec<String>,
     #[arg(long = "arg")]
     args: Vec<String>,
-    #[arg(long = "env")]
+    #[arg(long = "env", help = "Extra env var in KEY=VALUE format")]
     env: Vec<String>,
     #[arg(long, default_value = "300")]
     timeout_secs: u64,
@@ -143,10 +151,20 @@ async fn submit_job(args: &SubmitJobArgs) -> Result<()> {
     let mf = SignedMessageFactory::new(sk, from_f410, sequence, ChainID::from(chain_id));
     let mut tx_client = client.bind(mf);
 
-    let env_pairs = parse_env_pairs(&args.env)?;
+    // Merge --input-ref and --input into input_refs. --input values are ipc:// URIs
+    // that the executor will download before running the binary.
+    let mut all_input_refs = args.input_refs.clone();
+    all_input_refs.extend(args.inputs.iter().cloned());
+
+    // Build env: explicit --env pairs + IPC_OUTPUT_N entries from --output flags.
+    let mut env_pairs = parse_env_pairs(&args.env)?;
+    for (i, output_uri) in args.outputs.iter().enumerate() {
+        env_pairs.push((format!("IPC_OUTPUT_{}", i), output_uri.clone()));
+    }
+
     let calldata = encode_create_job_calldata(
         &args.binary_ref,
-        &args.input_refs,
+        &all_input_refs,
         &args.args,
         &env_pairs,
         args.timeout_secs,
@@ -154,8 +172,8 @@ async fn submit_job(args: &SubmitJobArgs) -> Result<()> {
 
     let gas_params = GasParams {
         gas_limit: 10_000_000,
-        gas_fee_cap: TokenAmount::from_atto(100),
-        gas_premium: TokenAmount::from_atto(100),
+        gas_fee_cap: TokenAmount::from_atto(1_000_000),
+        gas_premium: TokenAmount::from_atto(100_000),
     };
     let res = TxClient::<TxCommit>::fevm_invoke(
         &mut tx_client,
@@ -165,18 +183,41 @@ async fn submit_job(args: &SubmitJobArgs) -> Result<()> {
         gas_params,
     )
     .await
-    .context("failed to send CreateJob transaction via InvokeContract facade")?;
+    .context("failed to send CreateJob transaction")?;
 
-    if res.response.deliver_tx.code.is_err() {
+    if res.response.check_tx.code.is_err() {
+        let log = &res.response.check_tx.log;
         anyhow::bail!(
-            "CreateJob failed: code={:?}, log={}",
+            "CreateJob check_tx rejected: code={:?} log={}",
+            res.response.check_tx.code,
+            if log.is_empty() { "<empty>" } else { log.as_str() },
+        );
+    }
+    if res.response.deliver_tx.code.is_err() {
+        let log = &res.response.deliver_tx.log;
+        let info = &res.response.deliver_tx.info;
+        anyhow::bail!(
+            "CreateJob deliver_tx failed: code={:?} log={} info={}",
             res.response.deliver_tx.code,
-            res.response.deliver_tx.log
+            if log.is_empty() { "<empty>" } else { log.as_str() },
+            if info.is_empty() { "<empty>" } else { info.as_str() },
         );
     }
 
     println!("Job submitted successfully");
     println!("  tx_hash: {}", res.response.hash);
+    if !all_input_refs.is_empty() {
+        println!("  inputs:");
+        for r in &all_input_refs {
+            println!("    - {}", r);
+        }
+    }
+    if !args.outputs.is_empty() {
+        println!("  outputs:");
+        for o in &args.outputs {
+            println!("    - {}", o);
+        }
+    }
     Ok(())
 }
 
@@ -211,28 +252,52 @@ async fn status_job(args: &StatusJobArgs) -> Result<()> {
     match maybe {
         Some(job) => {
             println!("Job {}", job.id);
-            println!("  status: {:?}", job.status);
-            println!("  creator: {}", job.creator);
+            println!("  status:      {:?}", job.status);
+            println!("  creator:     {}", job.creator);
             println!(
-                "  claimed_by: {}",
+                "  claimed_by:  {}",
                 job.claimed_by
                     .map(|a| a.to_string())
                     .unwrap_or_else(|| "-".to_string())
             );
-            println!("  binary_ref: {}", job.binary_ref);
-            println!("  inputs: {}", job.input_refs.len());
-            println!("  outputs: {}", job.output_refs.len());
-            if !job.output_refs.is_empty() {
-                println!("  output_refs:");
-                for output_ref in &job.output_refs {
-                    println!("    - {}", output_ref);
+            println!("  binary_ref:  {}", job.binary_ref);
+            if !job.args.is_empty() {
+                println!("  args:        {:?}", job.args);
+            }
+            if !job.env.is_empty() {
+                println!("  env:");
+                for (k, v) in &job.env {
+                    println!("    {}={}", k, v);
                 }
             }
-            if let Some(code) = job.exit_code {
-                println!("  exit_code: {}", code);
+            println!("  timeout:     {}s", job.timeout_secs);
+            println!("  created:     epoch {}", job.created_epoch);
+            if let Some(ep) = job.started_epoch {
+                println!("  started:     epoch {}", ep);
             }
-            if let Some(err) = job.error {
-                println!("  error: {}", err);
+            if let Some(ep) = job.completed_epoch {
+                println!("  completed:   epoch {}", ep);
+            }
+            if !job.input_refs.is_empty() {
+                println!("  input_refs:");
+                for r in &job.input_refs {
+                    println!("    - {}", r);
+                }
+            }
+            if !job.output_refs.is_empty() {
+                println!("  output_refs:");
+                for r in &job.output_refs {
+                    println!("    - {}", r);
+                }
+            }
+            if let Some(hash) = &job.output_commitment {
+                println!("  output_hash: 0x{}", hex::encode(hash.0));
+            }
+            if let Some(code) = job.exit_code {
+                println!("  exit_code:   {}", code);
+            }
+            if let Some(err) = &job.error {
+                println!("  error:       {}", err);
             }
         }
         None => println!("Job {} not found", args.id),

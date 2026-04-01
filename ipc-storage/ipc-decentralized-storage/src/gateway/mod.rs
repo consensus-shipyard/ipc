@@ -10,12 +10,15 @@ pub mod objects_service;
 
 use anyhow::{Context, Result};
 use bls_signatures::{aggregate, Serialize as BlsSerialize, Signature as BlsSignature};
+use bytes::Bytes;
+use ethers::abi::{encode as abi_encode, Token as AbiToken};
+use ethers::types::U256 as EthU256;
 use fendermint_actor_blobs_shared::blobs::{
-    BlobStatus, FinalizeBlobParams, GetAddedBlobsParams, SubscriptionId,
+    BlobStatus, GetAddedBlobsParams, SubscriptionId,
 };
 use fendermint_actor_blobs_shared::bytes::B256;
 use fendermint_actor_blobs_shared::method::Method::{
-    FinalizeBlob, GetActiveOperators, GetAddedBlobs, GetOperatorInfo,
+    GetActiveOperators, GetAddedBlobs, GetOperatorInfo,
 };
 use fendermint_actor_blobs_shared::operators::{
     GetActiveOperatorsReturn, GetOperatorInfoParams, OperatorInfo,
@@ -23,6 +26,7 @@ use fendermint_actor_blobs_shared::operators::{
 use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::tx::{BoundClient, TxClient, TxCommit};
+use fendermint_vm_actor_interface::eam::EthAddress as FvmEthAddress;
 use fendermint_vm_actor_interface::system;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_ipld_encoding::RawBytes;
@@ -34,6 +38,24 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
+
+/// keccak256("finalizeBlob(bytes32,address,bytes32,uint64,string,uint8,bytes,uint128)")
+const FINALIZE_BLOB_SELECTOR: [u8; 4] = [0xf6, 0x94, 0x17, 0x21];
+
+/// Convert an FVM Address to a 20-byte Ethereum address (H160) for ABI encoding.
+fn fvm_addr_to_h160(addr: &Address) -> Result<ethers::types::H160> {
+    use fvm_shared::address::Payload;
+    match addr.payload() {
+        Payload::Delegated(d) if d.namespace() == 10 && d.subaddress().len() == 20 => {
+            Ok(ethers::types::H160::from_slice(d.subaddress()))
+        }
+        Payload::ID(id) => {
+            let eth = FvmEthAddress::from_id(*id);
+            Ok(ethers::types::H160::from_slice(&eth.0))
+        }
+        _ => anyhow::bail!("cannot convert address {} to Ethereum H160", addr),
+    }
+}
 
 /// A blob item with its hash, size, and subscribers
 /// Note: We use B256 for both hash and source to match the actor's return type exactly.
@@ -151,8 +173,8 @@ fn assigned_operator_indices(
 fn default_gas_params() -> GasParams {
     GasParams {
         gas_limit: 10_000_000_000,
-        gas_fee_cap: TokenAmount::from_atto(100),
-        gas_premium: TokenAmount::from_atto(100),
+        gas_fee_cap: TokenAmount::from_atto(1_000_000),
+        gas_premium: TokenAmount::from_atto(100_000),
     }
 }
 
@@ -498,7 +520,7 @@ where
                                 info!("Blob {} finalized on-chain and removed from tracking", hash);
                             }
                             Err(e) => {
-                                warn!("Failed to finalize blob {} on-chain: {}", hash, e);
+                                warn!("Failed to finalize blob {} on-chain: {:#}", hash, e);
                                 // Keep in tracking to retry later
                             }
                         }
@@ -753,9 +775,10 @@ impl<C> BlobGateway<C>
 where
     C: fendermint_rpc::QueryClient + BoundClient + TxClient<TxCommit> + Send + Sync,
 {
-    /// Call finalize_blob on-chain with aggregated signature and bitmap
+    /// Call finalize_blob on-chain via the EVM facade (InvokeContract).
     ///
-    /// This submits a real transaction to the blockchain (not just a query).
+    /// This encodes the parameters as ABI calldata and uses `fevm_invoke` so that
+    /// the transaction works with both f1 (native) and f410 (delegated) sender addresses.
     pub async fn finalize_blob(
         &mut self,
         blob_hash: B256,
@@ -765,47 +788,66 @@ where
     ) -> Result<()> {
         info!("Finalizing blob {} on-chain", blob_hash);
 
-        // Serialize aggregated signature
         let signature_bytes = aggregated_signature.as_bytes().to_vec();
 
-        // Create finalize blob params
-        let params = FinalizeBlobParams {
-            source: metadata.source,
-            subscriber: metadata.subscriber,
-            hash: blob_hash,
-            size: metadata.size,
-            id: metadata.subscription_id.clone(),
-            status: BlobStatus::Resolved,
-            aggregated_signature: signature_bytes,
+        let subscriber_h160 = fvm_addr_to_h160(&metadata.subscriber)
+            .context("failed to convert subscriber to Ethereum address")?;
+
+        let status_u8: u8 = blob_status_to_u8(BlobStatus::Resolved);
+
+        let calldata = encode_finalize_blob_calldata(
+            &metadata.source,
+            subscriber_h160,
+            &blob_hash,
+            metadata.size,
+            &String::from(metadata.subscription_id.clone()),
+            status_u8,
+            &signature_bytes,
             signer_bitmap,
-        };
+        );
 
-        let params_bytes =
-            RawBytes::serialize(params).context("failed to serialize FinalizeBlobParams")?;
+        debug!("FinalizeBlob ABI calldata ({} bytes)", calldata.len());
 
-        // Submit actual transaction using TxClient
-        let res = TxClient::<TxCommit>::transaction(
+        let gas = default_gas_params();
+        debug!(
+            "Gas params: limit={}, fee_cap={}, premium={}",
+            gas.gas_limit, gas.gas_fee_cap, gas.gas_premium
+        );
+
+        let res = match TxClient::<TxCommit>::fevm_invoke(
             &mut self.client,
             BLOBS_ACTOR_ADDR,
-            FinalizeBlob as u64,
-            params_bytes,
+            calldata,
             TokenAmount::zero(),
-            default_gas_params(),
+            gas,
         )
         .await
-        .context("failed to send FinalizeBlob transaction")?;
+        {
+            Ok(res) => res,
+            Err(e) => {
+                error!(
+                    "FinalizeBlob fevm_invoke failed for {}: {:?}",
+                    blob_hash, e
+                );
+                return Err(e).context("failed to send FinalizeBlob transaction");
+            }
+        };
 
         if res.response.check_tx.code.is_err() {
             anyhow::bail!(
-                "FinalizeBlob check_tx failed: {}",
-                res.response.check_tx.log
+                "FinalizeBlob check_tx failed (code {:?}): log={} info={}",
+                res.response.check_tx.code,
+                res.response.check_tx.log,
+                res.response.check_tx.info,
             );
         }
 
         if res.response.deliver_tx.code.is_err() {
             anyhow::bail!(
-                "FinalizeBlob deliver_tx failed: {}",
-                res.response.deliver_tx.log
+                "FinalizeBlob deliver_tx failed (code {:?}): log={} info={}",
+                res.response.deliver_tx.code,
+                res.response.deliver_tx.log,
+                res.response.deliver_tx.info,
             );
         }
 
@@ -815,4 +857,39 @@ where
         );
         Ok(())
     }
+}
+
+fn blob_status_to_u8(status: BlobStatus) -> u8 {
+    match status {
+        BlobStatus::Added => 0,
+        BlobStatus::Pending => 1,
+        BlobStatus::Resolved => 2,
+        BlobStatus::Failed => 3,
+    }
+}
+
+fn encode_finalize_blob_calldata(
+    source: &B256,
+    subscriber: ethers::types::H160,
+    blob_hash: &B256,
+    size: u64,
+    subscription_id: &str,
+    status: u8,
+    aggregated_signature: &[u8],
+    signer_bitmap: u128,
+) -> Bytes {
+    let args = abi_encode(&[
+        AbiToken::FixedBytes(source.0.to_vec()),
+        AbiToken::Address(subscriber),
+        AbiToken::FixedBytes(blob_hash.0.to_vec()),
+        AbiToken::Uint(EthU256::from(size)),
+        AbiToken::String(subscription_id.to_string()),
+        AbiToken::Uint(EthU256::from(status)),
+        AbiToken::Bytes(aggregated_signature.to_vec()),
+        AbiToken::Uint(EthU256::from(signer_bitmap)),
+    ]);
+    let mut calldata = Vec::with_capacity(4 + args.len());
+    calldata.extend_from_slice(&FINALIZE_BLOB_SELECTOR);
+    calldata.extend_from_slice(&args);
+    Bytes::from(calldata)
 }

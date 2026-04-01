@@ -195,6 +195,11 @@ impl SignedMessageFactory {
         self.inner.address()
     }
 
+    /// Set the sequence to an arbitrary value, e.g. after resyncing from chain state.
+    pub fn set_sequence(&mut self, sequence: u64) {
+        self.inner.set_sequence(sequence);
+    }
+
     /// Transfer tokens to another account.
     pub fn transfer(
         &mut self,

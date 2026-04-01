@@ -29,7 +29,8 @@ urlencoding.workspace = true
 blake3.workspace = true
 
 # HTTP client dependencies
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "multipart"] }
+tempfile = "3.8"
 
 # CLI dependencies
 clap = { workspace = true, features = ["derive"] }

@@ -3,7 +3,7 @@
 
 use crate::finality::{ensure_sequential, ParentViewPayload};
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
-use async_stm::{abort, atomically, Stm, StmResult, TVar};
+use async_stm::{abort, Stm, StmResult, TVar};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
 use std::cmp::min;

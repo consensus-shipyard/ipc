@@ -12,19 +12,17 @@ async fn main() {
 }
 
 fn print_user_friendly_error(error: &anyhow::Error) {
-    // Extract the most meaningful error message
-    let error_msg = extract_meaningful_error(error);
+    // Print the full error chain so nothing is hidden from the user.
+    eprintln!("\n❌ Error: {:#}", error);
 
-    // Print a clean, user-friendly error message
-    eprintln!("\n❌ Error: {}", error_msg);
-
-    // Provide helpful suggestions based on the error type
-    if let Some(suggestion) = get_error_suggestion(&error_msg) {
+    // Provide helpful suggestions based on the top-level message.
+    let top = error.to_string();
+    if let Some(suggestion) = get_error_suggestion(&top) {
         eprintln!("\n💡 Suggestion: {}", suggestion);
     }
 
-    // Check if this might be a contract-related error and suggest the documentation
-    if is_contract_related_error(&error_msg) {
+    // Suggest documentation for contract-related errors.
+    if is_contract_related_error(&top) {
         eprintln!("\n📖 For detailed information about contract errors, see:");
         eprintln!(
             "   https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/contract-errors.md"
@@ -32,44 +30,7 @@ fn print_user_friendly_error(error: &anyhow::Error) {
         eprintln!("   or run: ipc-cli --help");
     }
 
-    // For debugging, show the full error chain if RUST_BACKTRACE is set
-    if std::env::var("RUST_BACKTRACE").is_ok() {
-        eprintln!("\n🔍 Full error details:");
-        eprintln!("{}", error);
-    }
-
-    eprintln!(); // Add spacing for better readability
-}
-
-fn extract_meaningful_error(error: &anyhow::Error) -> String {
-    // Get the root cause of the error chain
-    let mut root_cause = error.to_string();
-
-    // Get the first source error if available
-    if let Some(source) = error.source() {
-        root_cause = source.to_string();
-    }
-
-    // Clean up common error patterns
-    let cleaned = root_cause
-        .replace("error processing command Some(", "")
-        .replace("main process failed: ", "")
-        .trim()
-        .to_string();
-
-    // Special handling for contract revert errors
-    if cleaned.contains("Contract call reverted with data:") {
-        // Provide a generic but helpful message
-        return "Contract operation failed. The transaction was reverted by the smart contract."
-            .to_string();
-    }
-
-    // If the cleaned message is significantly shorter, use it
-    if cleaned.len() < root_cause.len() * 2 / 3 {
-        cleaned
-    } else {
-        root_cause
-    }
+    eprintln!();
 }
 
 fn is_contract_related_error(error_msg: &str) -> bool {

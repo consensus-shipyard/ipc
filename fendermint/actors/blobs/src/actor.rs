@@ -103,6 +103,12 @@ impl BlobsActor {
             Ok(InvokeContractReturn {
                 output_data: Vec::new(),
             })
+        } else if sol_blobs::is_finalize_blob_call(&input_data) {
+            let params = sol_blobs::parse_finalize_blob_input(&input_data, rt)?;
+            Self::finalize_blob(rt, params)?;
+            Ok(InvokeContractReturn {
+                output_data: Vec::new(),
+            })
         } else if sol_blobs::can_handle(&input_data) {
             let output_data = match sol_blobs::parse_input(&input_data)? {
                 sol_blobs::Calls::addBlob(call) => {
