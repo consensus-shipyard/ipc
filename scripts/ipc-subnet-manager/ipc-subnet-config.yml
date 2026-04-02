@@ -19,7 +19,7 @@ subnet:
 # ip: external IP (for SSH, RPC). internal_ip: for CometBFT/libp2p peer connections (same VPC)
 validators:
   - name: "validator-1"
-    ip: "34.16.93.183"
+    ip: "130.211.225.54"
     internal_ip: "10.128.0.2"
     ssh_user: "philip"
     ipc_user: "ipc"
