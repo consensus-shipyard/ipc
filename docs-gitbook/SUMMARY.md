@@ -3,32 +3,30 @@
 ## Overview
 
 - [Introduction](README.md)
-- [How IPC works](overview/how-it-works.md)
-- [Use cases](overview/use-cases.md)
-- [How IPC compares](overview/how-ipc-compares.md)
-- [Architecture](overview/architecture.md)
+- [How IPC Compares](overview/how-ipc-compares.md)
+- [Use Cases](overview/use-cases.md)
 
-## Quickstarts
+## Protocol
 
-- [Deploy a subnet](quickstarts/deploy-a-subnet.md)
+- [Protocol Overview](protocol/README.md)
+- [Requirements & Guarantees](protocol/requirements-and-guarantees.md)
+- [Core Mechanisms](protocol/core-mechanisms.md)
+- [Architecture](protocol/architecture.md)
+- [Workflows](protocol/workflows.md)
+- [Security & Economics](protocol/security-and-economics.md)
 
-## Concepts
+## Getting Started
 
-- [Subnets](concepts/subnets/README.md)
-  - [Parent-child interactions](concepts/subnets/parent-child-interactions.md)
-- [Circulating supply](concepts/circulating-supply.md)
+- [Deploy a Subnet](quickstarts/deploy-a-subnet.md)
 
-## User guides
+## Guides
 
-- [Performing transactions in a subnet](user-guides/performing-transactions-in-a-subnet.md)
-
-## Developer Guides
-
-- [Customizing a subnet](developer-guides/pluggable-syscall-tutorial.md)
-- [Upgrading a subnet](developer-guides/upgrades/README.md)
+- [Performing Transactions in a Subnet](user-guides/performing-transactions-in-a-subnet.md)
+- [Customizing a Subnet](developer-guides/pluggable-syscall-tutorial.md)
+- [Upgrading a Subnet](developer-guides/upgrades/README.md)
   - [Example: Patching actor state](developer-guides/upgrades/patch-state.md)
   - [Example: Upgrading Wasm actor](developer-guides/upgrades/upgrade-wasm-actor.md)
-- [Deploying an explorer](developer-guides/deploy-blockscout.md)
+- [Deploying an Explorer](developer-guides/deploy-blockscout.md)
 
 ## Specifications
 
@@ -43,5 +41,6 @@
 
 - [Networks](reference/networks.md)
 - [IPC CLI](reference/ipc-cli-usage.md)
+- [Glossary](reference/glossary.md)
 - [Troubleshooting](reference/troubleshooting.md)
 - [FAQ](reference/faq.md)
