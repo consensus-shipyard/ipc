@@ -1,33 +1,59 @@
----
-description: >-
-  IPC is a standout framework that strikes a considerable balance, to achieve
-  breakthroughs in scaling.
----
+# How IPC Compares
 
-# How IPC compares
+IPC is one approach among several for scaling and extending blockchains, each making different trade-offs between security, sovereignty, performance, and operational complexity. This page positions IPC within the broader landscape; for IPC's own capabilities in detail, see the [Protocol Overview](../protocol/README.md).
 
-## **Benefits of IPC Design**
+## Scaling Approaches
 
-The IPC framework offers several significant benefits:
+Blockchain scaling generally works by moving execution off a slow, expensive base chain. The approaches differ in where execution happens, who is trusted for correctness, and how the base chain relates to the executing chain. (For a detailed taxonomy, see Vitalik Buterin's [Different types of layer 2s](https://vitalik.eth.limo/general/2023/10/31/l2types.html).)
 
-- **Scalability**: By enabling the creation of subnets, IPC allows for on-demand horizontal scalability, effectively managing increased network load by distributing transactions across multiple chains.
-- **Flexibility**: The ability to tailor stakeholder incentives per subnet caters to diverse application needs, optimizing performance and security. However, switching consensus mechanisms may not be straightforward at the current stage.
-- **Interoperability**: Full EVM compatibility ensures that subnets can seamlessly integrate with the broader Ethereum ecosystem, leveraging existing development tools and community resources.
-- **Decentralization and Security**: The hierarchical structure of subnets supports a robust security architecture while promoting greater decentralization, as subnets can operate independently but are still connected to the main network.
+**[Rollups](https://ethereum.org/en/developers/docs/scaling/#rollups)** execute transactions off-chain and post transaction data (or compressed state differences) back to the base chain, along with a correctness guarantee: either a validity proof verified on-chain (ZK rollups) or a challenge window during which fraud can be proven (optimistic rollups). Because the base chain verifies state transition correctness, rollup security is derived from the base chain. Users can, in principle, reconstruct the rollup's state and withdraw assets from base chain data, though blob pruning ([EIP-4844](https://eips.ethereum.org/EIPS/eip-4844)) means long-term reconstruction requires archival infrastructure.
 
-## **Highly customizable without compromising security**
+**[Sidechains](https://ethereum.org/en/developers/docs/scaling/sidechains/)** are independent blockchains connected to a base chain through a bridge. They run their own consensus and manage their own state; the base chain does not verify their state transitions. Security depends on the sidechain's own validator set, and the bridge mechanism (ranging from multisig federations to light-client-based verification) determines how trust is managed for cross-chain asset transfers. The term covers a wide spectrum of designs with varying trust properties.
 
-Most L2 scaling solutions today either inherit the L1's security features but don't have their own consensus algorithms (e.g. rollups), or do the reverse (e.g. sidechains). They are also deployed in isolation and require custom bridges or protocols to transfer assets and state between L2s that share a common L1, which are vulnerable to attacks. In contrast, IPC subnets have their own consensus algorithms, inherit security features from the parent subnet and have native cross-net communication, eliminating the need for bridges.&#x20;
+**Appchain frameworks** provide infrastructure for deploying application-specific or special-purpose blockchains. They differ substantially in security model. [Cosmos](https://docs.cosmos.network/) zones are sovereign chains with independent validator sets, communicating via the [IBC protocol](https://ibcprotocol.dev/) and optionally opting into shared security from the Cosmos Hub. [Polkadot](https://wiki.polkadot.network/) parachains share security with the relay chain, which assigns validators to verify parachain state transitions, providing strong inherited security but constraining consensus sovereignty while preserving broad execution and governance autonomy. [Avalanche L1s](https://build.avax.network/) (formerly subnets) run their own validation with configurable rules and communicate via [Interchain Messaging (ICM)](https://docs.avax.network/build/cross-chain/awm/overview), built on Avalanche Warp Messaging.
 
-## **Multi-chain interoperability**&#x20;
+**State and payment channels** (e.g., [Lightning Network](https://lightning.network/)) enable off-chain interactions that settle on-chain only upon disagreement. They provide near-instant finality for the interaction patterns they support but are limited in the types of state transitions they can handle.
 
-- IPC uses [Tendermint Core](https://tendermint.com/core/) as a generic blockchain SMR system, without defaulting to the Cosmos SDK (written in Go). This allows IPC to plug in our own application logic regardless of what language it’s written in: it can be Go, Rust, Java, Haskell, Scheme, etc.
-- IPC uses the [Filecoin Virtual Machine (FVM)](https://docs.filecoin.io/smart-contracts/fundamentals/the-fvm) as its transaction execution layer. The FVM is a WASM-based polyglot execution environment for IPLD data and is designed to support smart contracts written in any programming language, compiled to WebAssembly. This enables multi-chain support and gives developers the flexibility to build with familiar tools. Today, IPC is fully compatible with Filecoin and Ethereum and can use either as a rootnet, with more multi-chain support in the roadmap.
+**[Validiums](https://ethereum.org/en/developers/docs/scaling/validium/)** use validity proofs like ZK rollups but store transaction data off-chain (e.g., with a data availability committee). The base chain verifies state transition correctness but cannot reconstruct state from on-chain data alone, trading data availability guarantees for lower cost.
 
-## **Compute-Storage Interoperability with Filecoin and more**&#x20;
+## Where IPC Sits
 
-IPC is designed to seamlessly integrate with Filecoin and EVM-compatible chains (with more to come), allowing developers to embed IPC subnets within these ecosystems. In particular, IPC unlocks new compute possibilities with the data-centric L1, [Filecoin](https://docs.filecoin.io/basics/what-is-filecoin), which is the largest decentralized storage network. IPC can leverage its storage primitives, like [IPLD](https://spec.filecoin.io/libraries/ipld/) data integration, to deliver enhanced solutions for data availability and more.
+IPC follows the **sidechain model**: subnets are autonomous blockchains with their own consensus, connected to parent chains. More broadly, IPC is an extensibility and scalability framework whose protocol can support configurations along a wider spectrum (see Design Trade-offs below). What distinguishes IPC from generic sidechains are the following design choices.
 
-## **Increased performance**
+**Checkpoint-based objectivity.** Subnets periodically commit cryptographic state commitments, [checkpoints](../protocol/core-mechanisms.md#checkpointing), to their parent chains. These serve as objective trust anchors: anyone can determine a recent valid state of the subnet (as attested by a quorum of its validators) by examining checkpoints on the parent chain, without running a subnet node or relying on social consensus. Checkpoints mitigate long-range attacks and enable trustless bootstrapping, since an attacker cannot rewrite history beyond the last committed checkpoint without compromising the parent chain, and new participants can join by verifying a recent checkpoint rather than relying on [weak subjectivity](https://ethereum.org/en/developers/docs/consensus-mechanisms/pos/weak-subjectivity/).
 
-IPC’s modular runtime enables the creation of truly flexible blockchains to increase throughput while managing gas efficiency. Developers can dynamically adjust their throughput by spawning and closing temporary subnets as needed.
+**Protocol-native [bridging](../protocol/core-mechanisms.md#bridging) secured by checkpoints.** Cross-chain communication in IPC is not an external bridge added to otherwise independent chains. Bottom-up messages (subnet to parent) are batched with checkpoints and verified against them on the parent chain. Top-down messages (parent to subnet) are delivered as the subnet tracks and verifies parent chain finality. In both directions, the lock-mint-burn-release cycle for asset transfers is enforced by on-chain logic on both sides, with per-subnet supply accounting limiting the impact of any subnet compromise to its own circulating supply.
+
+**Recursive hierarchy.** Subnets can themselves serve as parent chains for further subnets, forming a recursive tree. Transitive checkpointing into a common chain establishes eventual consistency across subnets, enabling cross-chain coordination without requiring all subnets to coordinate directly.
+
+**Minimal parent chain requirements.** IPC imposes minimal requirements on the parent chain's capabilities at the protocol level: recording arbitrary data, basic asset operations (lock/release), and governance enforcement. A general-purpose smart contract environment is not required in principle, though the standard implementation relies on EVM smart contracts on the parent chain. Anchoring into chains with limited programmability is possible but requires specialized extensions, as [demonstrated for Bitcoin](https://arxiv.org/abs/2512.23439) using SegWit/OP_RETURN encoding.
+
+## Comparison Along Key Dimensions
+
+**Security.** Rollups verify state transition correctness on the base chain; a compromised operator cannot cause acceptance of invalid state (though most deployments [haven't fully achieved this](https://l2beat.com/scaling/summary) due to upgradeable contracts, security councils, and immature proof systems). IPC verifies checkpoint authenticity (quorum signatures) but not state transition correctness; security rests on the subnet's own consensus, with damage bounded to the subnet's circulating supply. Polkadot parachains inherit relay chain security (randomly assigned validators with reshuffling and approval voting). Cosmos zones and Avalanche L1s are sovereign like IPC.
+
+**Data.** Rollups post data to the base chain, enabling independent state reconstruction at significant cost. IPC checkpoints are compact cryptographic commitments; the parent chain cannot reconstruct subnet state, but subnets avoid data posting costs and maintain data sovereignty. The protocol could be extended with data availability proofs, moving toward a validium-like model.
+
+**Ordering.** Most rollup deployments currently use centralized sequencers, with escape hatches (forced inclusion via L1) that involve significant delays. IPC subnets run their own consensus, with no architectural dependency on a centralized sequencer.
+
+**Cross-chain messaging.** IPC provides protocol-native messaging secured by checkpoints (multi-hop routing through intermediate chains is specified in the foundational design but not yet implemented). Cosmos [IBC](https://ibcprotocol.dev/) is the most mature cross-chain protocol (115+ chains, light-client-based, peer-to-peer). Polkadot's [XCM](https://wiki.polkadot.network/docs/learn-xcm) defines a message format, currently relay-routed via [HRMP](https://wiki.polkadot.network/docs/learn-hrmp). Rollups lack standardized cross-rollup messaging.
+
+**Partition tolerance.** IPC subnets continue operating with local finality when disconnected from parent chains; cross-chain operations stall but internal operations are unaffected. Rollups achieve soft finality but cannot settle without L1. Polkadot parachains depend on the relay chain. Cosmos zones are similarly partition-tolerant.
+
+**Customizability.** IPC and Cosmos offer comparable flexibility (consensus, execution, fees, governance, permissioning), enabling application-specific or special-purpose subnets tailored to particular workloads. Polkadot parachains can customize execution logic broadly but cede consensus sovereignty. Rollups are constrained by their proof system's verification capabilities.
+
+## Design Trade-offs
+
+IPC's design choices involve explicit trade-offs, discussed further in [Security & Economics](../protocol/security-and-economics.md). Some are fundamental to the sovereignty-oriented sidechain approach; others are current design boundaries that the protocol could be extended beyond.
+
+**Quorum-based trust for checkpoints.** The parent chain verifies that checkpoints are properly signed by the subnet's recognized validator set, but does not independently verify the correctness of the state transitions they commit to. A compromised subnet quorum can therefore submit false checkpoints that the parent chain would accept. This is the central security trade-off relative to rollups, which verify state transitions at the base chain level. The protocol is architecturally compatible with augmenting checkpoints with state transition proofs (validity proofs or fraud proof mechanisms), which would move the security model toward that of a validium or optimium, where the parent chain verifies state transition correctness while data remains with the subnet. Such an extension would strengthen the security guarantee at the cost of additional complexity, computational overhead, and stronger requirements on the parent chain.
+
+**Per-subnet validator sets.** Each subnet requires its own validator set and consensus mechanism. This provides sovereignty and partition tolerance but incurs bootstrapping and operational overhead compared to shared-security models. Validator sets of different subnets may overlap, and the protocol supports a range of configurations (from small federated deployments to open, collateral-based sets), but each subnet must independently assemble sufficient validation capacity.
+
+**Cross-chain latency.** Bottom-up cross-chain operations are bounded by the checkpoint period, the interval at which checkpoints are committed to the parent chain. Top-down operations are bounded by the parent chain's finality time and the subnet's monitoring cycle, which is independent of the checkpoint period. More frequent bottom-up checkpoints reduce latency but increase parent chain overhead. This periodic anchoring differs from rollups (where state updates can be reflected on the base chain with each proof or batch submission) and from IBC (where light client updates can be frequent and event-driven).
+
+**Risk scoping.** A compromised subnet can extract assets delegated to it, bounded by the subnet's circulating supply. Per-subnet supply accounting limits the blast radius, preventing a compromised subnet from affecting the parent chain or sibling subnets. This is the fundamental trade-off of any system that does not verify state transitions at the parent chain level.
+
+## Bottom Line
+
+IPC sits between fully inherited security (rollups) and fully independent chains (plain sidechains). It adds checkpoint-based objectivity, protocol-native bridging, recursive extensibility, and risk containment to the sidechain model. The central trade-off is that subnet security rests on the subnet's own consensus rather than parent chain verification, though the protocol leaves room for strengthening this through state transition proofs. Best suited for deploying application-specific or special-purpose chains that need autonomy, configurable trust, and partition tolerance, rather than maximal inherited security from a single base chain.
