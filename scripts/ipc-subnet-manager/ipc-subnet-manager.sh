@@ -48,6 +48,7 @@ Commands:
     init --resume     Continue init from where it left off (after deploy failure)
     update-config     Update existing node configs without wiping data
     update-binaries   Pull latest code, build, and install binaries on all validators
+    deploy-binaries   Copy existing binaries to validators (no build)
     check             Comprehensive health check on all nodes
     diagnose [name]   Detailed diagnostics for troubleshooting (all or one validator)
     restart           Graceful restart of all nodes
@@ -71,6 +72,7 @@ Options:
     --yes                Skip confirmation prompts
     --debug              Show verbose debug output
     --branch NAME        For bootstrap/update-binaries: git branch to pull from (default: main)
+    --compile MODE       For update-binaries: 'local' or 'remote' (default: remote)
     --duration SECONDS   For block-time: sample duration (default: 10)
     --help               Show this help message
 
@@ -93,6 +95,8 @@ Examples:
     $0 init --debug                            # Initialize with verbose debug output
     $0 check                                   # Run health checks
     $0 update-binaries --branch main           # Update binaries from main branch
+    $0 update-binaries -C local --branch main  # Build locally, deploy to validators
+    $0 deploy-binaries --path ./target/release # Copy binaries to all validators
     $0 watch-finality                          # Monitor parent finality progress
     $0 watch-blocks                            # Monitor block production
     $0 logs validator-1                        # View logs from validator-1
@@ -426,12 +430,21 @@ cmd_init() {
 # Update binaries on all validators
 cmd_update_binaries() {
     local branch="main"
+    local compile_mode="remote"
 
     # Parse options
     while [[ $# -gt 0 ]]; do
         case $1 in
             --branch)
                 branch="$2"
+                shift 2
+                ;;
+            --compile|-C)
+                compile_mode="$2"
+                if [[ "$compile_mode" != "local" && "$compile_mode" != "remote" ]]; then
+                    log_error "Invalid --compile value: $compile_mode (use 'local' or 'remote')"
+                    exit 1
+                fi
                 shift 2
                 ;;
             --help|-h)
@@ -441,25 +454,28 @@ Update IPC binaries on all validators
 Usage: $0 update-binaries [options]
 
 Options:
-    --branch NAME    Git branch to pull from (default: main)
-    --help           Show this help message
+    --branch NAME       Git branch to pull from (default: main)
+    --compile MODE      Where to build: 'local' or 'remote' (default: remote)
+    -C MODE             Short for --compile
+    --help              Show this help message
 
-This command will:
-  1. SSH to each validator (in parallel)
-  2. Pull latest changes from the specified branch
-  3. Build binaries using 'make' in the repo root
-  4. Copy ipc-cli and fendermint binaries to /usr/local/bin
+Compile modes:
+  remote  Build on each validator via SSH (current behavior). Requires pnpm,
+          Rust, Foundry on each host.
+  local   Build on this machine and SCP binaries to validators. If you're on
+          macOS and validators are Linux, cross-compiles to x86_64-unknown-linux-gnu.
+          Requires: cargo-zigbuild + zig (recommended) or cross (needs Docker).
 
 Examples:
     $0 update-binaries --branch main
-    $0 update-binaries --branch dev
-    $0 update-binaries --branch feature-xyz
+    $0 update-binaries --branch main --compile local
+    $0 update-binaries -C local --branch main
 EOF
                 exit 0
                 ;;
             *)
                 log_error "Unknown option: $1"
-                echo "Usage: $0 update-binaries --branch <branch-name>"
+                echo "Usage: $0 update-binaries [options] (use --help for details)"
                 exit 1
                 ;;
         esac
@@ -469,7 +485,82 @@ EOF
     load_config
 
     # Update binaries
-    update_all_binaries "$branch"
+    update_all_binaries "$branch" "$compile_mode"
+}
+
+# Deploy binaries to validators (copy only, no build)
+cmd_deploy_binaries() {
+    local binary_path=""
+    local target_validator=""
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --path)
+                binary_path="$2"
+                shift 2
+                ;;
+            --help|-h)
+                cat << EOF
+Copy ipc-cli and fendermint binaries to validators (no build)
+
+Usage: $0 deploy-binaries [options] [validator-name]
+
+Options:
+    --path DIR    Path to directory containing ipc-cli and fendermint
+    --help        Show this help message
+
+If --path is omitted, auto-detects from local IPC repo:
+  - target/release/ (native build)
+  - target/x86_64-unknown-linux-gnu/release/ (cross-compiled)
+
+Examples:
+    $0 deploy-binaries --path ./target/release
+    $0 deploy-binaries --path ./target/x86_64-unknown-linux-gnu/release
+    $0 deploy-binaries validator-2   # Deploy to single validator (uses auto-detect path)
+EOF
+                exit 0
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                target_validator="$1"
+                shift
+                ;;
+        esac
+    done
+
+    load_config
+
+    # Auto-detect path if not specified
+    if [ -z "$binary_path" ]; then
+        local local_repo
+        local_repo=$(get_config_value "paths.local_ipc_repo" 2>/dev/null || true)
+        if [ -z "$local_repo" ] || [ "$local_repo" = "null" ]; then
+            local_repo=$(cd "${SCRIPT_DIR}/../.." && pwd)
+        fi
+        if [ -f "$local_repo/target/release/ipc-cli" ]; then
+            binary_path="$local_repo/target/release"
+        elif [ -f "$local_repo/target/x86_64-unknown-linux-gnu/release/ipc-cli" ]; then
+            binary_path="$local_repo/target/x86_64-unknown-linux-gnu/release"
+        else
+            log_error "Binaries not found. Specify --path or run from IPC repo with built binaries."
+            log_info "Expected: target/release/ or target/x86_64-unknown-linux-gnu/release/"
+            exit 1
+        fi
+        log_info "Using binaries from: $binary_path"
+    fi
+
+    binary_path=$(cd "$binary_path" 2>/dev/null && pwd)
+    if [ -z "$binary_path" ]; then
+        log_error "Invalid path"
+        exit 1
+    fi
+
+    log_header "Deploying Binaries"
+    deploy_binaries_only "$binary_path" "$target_validator"
 }
 
 # Update existing node configs
@@ -854,7 +945,7 @@ main() {
 
     # Acquire lock for destructive operations
     case $command in
-        init|restart|update-binaries)
+        init|restart|update-binaries|deploy-binaries)
             acquire_lock
             ;;
     esac
@@ -872,6 +963,9 @@ main() {
             ;;
         update-binaries)
             cmd_update_binaries "$@"
+            ;;
+        deploy-binaries)
+            cmd_deploy_binaries "$@"
             ;;
         check)
             cmd_check "$@"

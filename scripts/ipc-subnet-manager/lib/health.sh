@@ -1788,6 +1788,9 @@ update_validator_binaries() {
     log_info "[$name] Updating binaries from branch '$branch'..."
 
     local update_cmd="cd $ipc_repo && \
+        source ~/.cargo/env 2>/dev/null; \
+        source ~/.bashrc 2>/dev/null; \
+        export PATH=\"\$HOME/.cargo/bin:\$HOME/.foundry/bin:\$HOME/.npm-global/bin:\$PATH\" && \
         git fetch origin && \
         git checkout $branch && \
         git pull origin $branch && \
@@ -1814,15 +1817,224 @@ update_validator_binaries() {
     return 0
 }
 
+# Build IPC binaries locally (with cross-compilation for macOS->Linux)
+# On success, writes binary directory path to $3 (result file). Returns 0/1.
+build_ipc_locally() {
+    local branch="${1:-main}"
+    local local_repo="$2"
+    local result_file="$3"
+
+    log_info "Building IPC locally (branch: $branch)..."
+    log_info "Repository: $local_repo"
+
+    # Git fetch and checkout
+    if ! (cd "$local_repo" && git fetch origin && git checkout "$branch" && git pull origin "$branch"); then
+        log_error "Failed to update git repository"
+        return 1
+    fi
+
+    # Contracts codegen (requires pnpm)
+    log_info "Running contracts codegen..."
+    if ! (cd "$local_repo/contracts" && make gen 2>&1); then
+        log_error "Contracts codegen failed (ensure pnpm is installed)"
+        return 1
+    fi
+
+    local target_triple=""
+    local binary_dir=""
+    local os_name
+    os_name=$(uname -s)
+
+    if [ "$os_name" = "Darwin" ]; then
+        # Cross-compile for Linux (validators are typically x86_64 Linux)
+        target_triple="x86_64-unknown-linux-gnu"
+        binary_dir="$local_repo/target/$target_triple/release"
+
+        # Prefer cargo-zigbuild (no Docker needed); fall back to cross
+        if command -v cargo-zigbuild &>/dev/null && command -v zig &>/dev/null; then
+            log_info "Cross-compiling for $target_triple using cargo-zigbuild (macOS -> Linux)..."
+            rustup target add "$target_triple" 2>/dev/null || true
+            if ! (cd "$local_repo" && cargo zigbuild --release --target "$target_triple" 2>&1); then
+                log_error "cargo-zigbuild failed"
+                return 1
+            fi
+        elif command -v cross &>/dev/null; then
+            log_info "Cross-compiling for $target_triple using cross (macOS -> Linux)..."
+            local cross_output
+            cross_output=$(cd "$local_repo" && cross build --release --target "$target_triple" 2>&1)
+            local cross_exit=$?
+            if [ $cross_exit -ne 0 ]; then
+                echo "$cross_output" | tail -20
+                log_error "Cross-compilation failed"
+                if echo "$cross_output" | grep -q "couldn't install toolchain"; then
+                    log_info "Tip: cross 0.2.5 has a bug on macOS. Try one of:"
+                    log_info "  1. cargo install cross --git https://github.com/cross-rs/cross"
+                    log_info "  2. cargo install cargo-zigbuild && brew install zig  (no Docker needed)"
+                fi
+                return 1
+            fi
+        else
+            log_error "No cross-compiler found. Install one of:"
+            log_info "  cargo-zigbuild (recommended, no Docker): cargo install cargo-zigbuild && brew install zig"
+            log_info "  cross (needs Docker): cargo install cross --git https://github.com/cross-rs/cross"
+            return 1
+        fi
+    else
+        # Native build (Linux or same-arch)
+        binary_dir="$local_repo/target/release"
+        log_info "Building natively..."
+        if ! (cd "$local_repo" && cargo build --release 2>&1); then
+            log_error "Build failed"
+            return 1
+        fi
+    fi
+
+    if [ ! -f "$binary_dir/ipc-cli" ] || [ ! -f "$binary_dir/fendermint" ]; then
+        log_error "Binaries not found in $binary_dir"
+        return 1
+    fi
+
+    echo "$binary_dir" > "$result_file"
+    return 0
+}
+
+# Deploy binaries to a single validator (used by update-binaries --compile local and deploy-binaries)
+deploy_binaries_to_validator() {
+    local validator_idx="$1"
+    local binary_dir="$2"
+
+    local name="${VALIDATORS[$validator_idx]}"
+    local ipc_repo=$(get_config_value "paths.ipc_repo")
+    local remote_release="$ipc_repo/target/release"
+
+    log_info "[$name] Deploying binaries..."
+
+    # Ensure directory exists (exec_on_host handles local/remote via is_local_mode)
+    exec_on_host "$validator_idx" "mkdir -p $remote_release" >/dev/null 2>&1 || true
+
+    if ! copy_to_host "$validator_idx" "$binary_dir/ipc-cli" "$remote_release/ipc-cli"; then
+        log_error "[$name] Failed to copy ipc-cli"
+        return 1
+    fi
+    if ! copy_to_host "$validator_idx" "$binary_dir/fendermint" "$remote_release/fendermint"; then
+        log_error "[$name] Failed to copy fendermint"
+        return 1
+    fi
+
+    log_success "[$name] Binaries deployed"
+    return 0
+}
+
+# Deploy binaries to validators (copy only, no build)
+# Usage: deploy_binaries_only <binary_dir> [validator_name]
+deploy_binaries_only() {
+    local binary_dir="$1"
+    local target_validator="${2:-}"
+
+    if [ ! -f "$binary_dir/ipc-cli" ] || [ ! -f "$binary_dir/fendermint" ]; then
+        log_error "Binaries not found in $binary_dir (need ipc-cli and fendermint)"
+        return 1
+    fi
+
+    if [ -n "$target_validator" ]; then
+        local found=false
+        for name in "${VALIDATORS[@]}"; do
+            [ "$name" = "$target_validator" ] && found=true && break
+        done
+        if [ "$found" != true ]; then
+            log_error "Unknown validator: $target_validator"
+            log_info "Valid: ${VALIDATORS[*]}"
+            return 1
+        fi
+    fi
+
+    local all_success=true
+    local deployed=0
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        if [ -n "$target_validator" ] && [ "$name" != "$target_validator" ]; then
+            continue
+        fi
+        deployed=1
+        if ! deploy_binaries_to_validator "$idx" "$binary_dir"; then
+            all_success=false
+        fi
+    done
+
+    if [ "$deployed" -eq 0 ]; then
+        log_error "No validators matched"
+        return 1
+    fi
+
+    if [ "$all_success" = true ]; then
+        log_success "✓ All binaries deployed successfully"
+        log_info "You may need to restart nodes: $0 restart"
+        return 0
+    else
+        log_error "✗ Some validators failed to receive binaries"
+        return 1
+    fi
+}
+
 # Update binaries on all validators
 update_all_binaries() {
     local branch="${1:-main}"
+    local compile_mode="${2:-remote}"
 
     log_header "Updating IPC Binaries"
     log_info "Branch: $branch"
+    log_info "Compile mode: $compile_mode"
     log_info "Validators: ${#VALIDATORS[@]}"
     echo ""
 
+    if [ "$compile_mode" = "local" ]; then
+        # Build once locally, deploy to all validators
+        local local_repo
+        local_repo=$(get_config_value "paths.local_ipc_repo" 2>/dev/null || true)
+        if [ -z "$local_repo" ] || [ "$local_repo" = "null" ]; then
+            # Default: repo root (script is in scripts/ipc-subnet-manager/)
+            local_repo=$(cd "${SCRIPT_DIR}/../.." && pwd)
+        fi
+        if [ ! -d "$local_repo/.git" ]; then
+            log_error "Not a git repository: $local_repo"
+            log_info "Set paths.local_ipc_repo in config to point to IPC repo"
+            return 1
+        fi
+
+        local result_file="/tmp/ipc-manager-build-result.$$"
+        trap "rm -f $result_file" EXIT
+        if ! build_ipc_locally "$branch" "$local_repo" "$result_file"; then
+            rm -f "$result_file"
+            return 1
+        fi
+        local binary_dir
+        binary_dir=$(cat "$result_file")
+        rm -f "$result_file"
+
+        log_success "Build complete. Deploying to validators..."
+        echo ""
+
+        local all_success=true
+        for idx in "${!VALIDATORS[@]}"; do
+            if ! deploy_binaries_to_validator "$idx" "$binary_dir"; then
+                all_success=false
+            fi
+        done
+
+        if [ "$all_success" = true ]; then
+            echo ""
+            log_success "✓ All validators updated successfully"
+            log_info "You may need to restart nodes for changes to take effect:"
+            log_info "  $0 restart"
+            return 0
+        else
+            echo ""
+            log_error "✗ Some validators failed to update"
+            return 1
+        fi
+    fi
+
+    # Remote compile (original behavior)
     local all_success=true
     local results=()
 
